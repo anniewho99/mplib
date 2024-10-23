@@ -227,7 +227,7 @@ let playerElements = {};
 let coins = {};
 let coinElements = {};
 let hasEnded = false;
-let roundTime = 10;  // 90 seconds per round
+let roundTime = 90;  // 90 seconds per round
 let breakTime = 5;   // 5-second break between rounds
 let roundInterval = null; // To store the round timer interval
 let isBreakTime = false; 
@@ -288,37 +288,31 @@ async function resetCoinsAndDoors() {
 
   // Step 1: Remove all current coins
   console.log("Removing all current coins...");
-  // let currentCoins = Object.keys(coins);
-  // currentCoins.forEach(coinKey => {
-  //     let path = `coins/${coinKey}`;
-  //     updateStateDirect(path, null);  // Remove coin from Firebase
-  // });
-
-  let coinPath = "coins";
-
-  updateStateDirect(coinPath, null);
+  let currentCoins = Object.keys(coins);
+  currentCoins.forEach(coinKey => {
+      let path = `coins/${coinKey}`;
+      updateStateDirect(path, null);  // Remove coin from Firebase
+  });
   coins = {};  // Clear local coin state
 
   // Step 2: Move all players to starting position
-  // Object.keys(players).forEach(playerId => {
-  //     let player = players[playerId];
-  //     let startX = 1;
-  //     let startY = 1;
-  //     console.log(`Moving player ${playerId} to starting position...`);
+  Object.keys(players).forEach(playerId => {
+      let player = players[playerId];
+      let startX = 1;
+      let startY = 1;
+      console.log(`Moving player ${playerId} to starting position...`);
 
-  //     // Update player's position to the starting coordinates (1,1)
-  //     let path = `players/${playerId}`;
-  //     let newState = {
-  //         ...player,
-  //         x: startX,
-  //         y: startY,
-  //         oldX: player.x,
-  //         oldY: player.y,
-  //     };
-  //     updateStateDirect(path, newState);
-  // });
-
-
+      // Update player's position to the starting coordinates (1,1)
+      let path = `players/${playerId}`;
+      let newState = {
+          ...player,
+          x: startX,
+          y: startY,
+          oldX: player.x,
+          oldY: player.y,
+      };
+      updateStateDirect(path, newState);
+  });
 
   // Step 3: Place new coins for this player
   // Object.keys(players).forEach(playerId => {
@@ -328,19 +322,12 @@ async function resetCoinsAndDoors() {
   placeTokensForPlayer(playerId);
 
     let player = players[playerId];
-    let startX = 1;
-    let startY = 1;
-    console.log(`Moving player ${playerId} to starting position...`);
     let path = `players/${playerId}`;
     let newState = {
       ...player,
-      x: startX,
-      y: startY,
-      oldX: player.x,
-      oldY: player.y,
       isTrapped: false,
     };
-    updateStateDirect(path, newState);
+    await updateStateDirect(path, newState);
 
   // Step 4: Reset doors
   console.log("Resetting doors for all subgrids...");
