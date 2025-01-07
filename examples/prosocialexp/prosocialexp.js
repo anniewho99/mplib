@@ -48,8 +48,8 @@ const studyId = 'prosocial';
 
 // Configuration setting for the session
 let sessionConfig = {
-    minPlayersNeeded: 3, // Minimum number of players needed; if set to 1, there is no waiting room (unless a countdown has been setup)
-    maxPlayersNeeded: 3, // Maximum number of players allowed in a session
+    minPlayersNeeded: 2, // Minimum number of players needed; if set to 1, there is no waiting room (unless a countdown has been setup)
+    maxPlayersNeeded: 2, // Maximum number of players allowed in a session
     maxParallelSessions: 0, // Maximum number of sessions in parallel (if zero, there are no limit)
     allowReplacements: false, // Allow replacing any players who leave an ongoing session?
     exitDelayWaitingRoom: 0, // Number of countdown seconds before leaving waiting room (if zero, player leaves waiting room immediately)
@@ -860,20 +860,22 @@ let arrivalIndex;
 
 let playerSequence = 'test';
 
+let robotHere = false;
+
 
 function getPlayerStartingPosition() {
-  const playerColor = introColor; // Get the player's color
+  //const playerColor = introColor; // Get the player's color
 
   // Define starting positions based on color
   const startingPositions = {
-    blue: { x: mapData.minX, y: mapData.minY },          // Top-left for blue
-    red: { x: mapData.maxX, y: mapData.minY },           // Top-right for red
-    yellow: { x: mapData.minX, y: mapData.maxY },        // Bottom-left for yellow
-    purple: { x: mapData.maxX, y: mapData.maxY }         // Bottom-right for purple
+    4: { x: mapData.minX, y: mapData.minY },          // Top-left for blue
+    3: { x: mapData.maxX, y: mapData.minY },           // Top-right for red
+    2: { x: mapData.minX, y: mapData.maxY },        // Bottom-left for yellow
+    1: { x: mapData.maxX, y: mapData.maxY }         // Bottom-right for purple
   };
 
   // Return the starting position based on the player's color
-  return startingPositions[playerColor] || { x: mapData.minX, y: mapData.minY }; // Default to blue if color is not recognized
+  return startingPositions[arrivalIndex] || { x: mapData.minX, y: mapData.minY }; // Default to blue if color is not recognized
 }
 
 
@@ -985,6 +987,8 @@ function endRound() {
     // Create the first part of the text
   const textBeforeAvatar = document.createElement('span');
   textBeforeAvatar.innerText = `You are ${introName} `; // Space added after the name
+
+  //textBeforeAvatar.innerText = `You are `; // Space added after the name
 
   // Create the second part of the text
   const textAfterAvatar = document.createElement('span');
@@ -1120,7 +1124,7 @@ async function initRounds() {
     // Create the first part of the text
   const textBeforeAvatar = document.createElement('span');
   textBeforeAvatar.innerText = `You are ${introName} `; // Space added after the name
-
+  //textBeforeAvatar.innerText = `You are `; 
   // Create the second part of the text
   const textAfterAvatar = document.createElement('span');
   textAfterAvatar.innerText = `, and you can only collect ${introColor} tokens and go through ${introColor} doors.`;
@@ -1890,23 +1894,6 @@ async function initGame() {
     arrivalIndex = getCurrentPlayerArrivalIndex() % 4;
     let color= 'test';
 
-    // switch (arrivalIndex) {
-    //     case 1:
-    //         color = "blue";
-    //         break;
-    //     case 2:
-    //         color = "red";
-    //         break;
-    //     case 3:
-    //         color = "yellow";
-    //         break;
-    //     case 0:
-    //         color = "purple";
-    //         break;
-    //     default:
-    //         color = "gray"; // Fallback color
-    // }
-
     if (arrivalIndex === 1) {
       // Define possible trap schedules
       const trapSchedules = [
@@ -1930,6 +1917,7 @@ async function initGame() {
       playerSequence = shuffledPlayerIDs[arrivalIndex - 1];
 
       introColor = color;
+      introName = name;
 
       const playerSequenceObject = {};
       shuffledPlayerIDs.forEach((id, index) => {
@@ -1955,6 +1943,32 @@ async function initGame() {
       updateStateDirect(path, colorSequenceObject,'storeColorSequence');
       console.log("Color sequence updated to Firebase:", colorSequenceObject);
 
+      if(robotHere){
+        const {x, y} = { x: 1, y: 1 }; 
+
+        let robotname = 'robot1';
+        let robotId  = 'robotPlayer';
+        const aiColor = availableColors.find(color => !shuffledColors.includes(color));
+        // Broadcast this new player position to the database
+        let path = `players/${robotId}`;
+        let newState = {
+              id: robotId,
+              name: robotname,
+              direction: "right",
+              color: aiColor, 
+              oldX: x,
+              oldY: y,
+              x,
+              y,
+              coins: 0,
+              isTrapped: false,
+              roundNumber: currentRound,
+              sequence: numPlayers + 1,
+            };
+        updateStateDirect(path, newState , 'initRobotPlayer');
+    
+      }
+
     }
 
  
@@ -1963,14 +1977,12 @@ async function initGame() {
     // messageGame.innerHTML = str;
     
     const {x, y} = { x: 1, y: 1 }; 
-
-    introName = name;
     
     // Broadcast this new player position to the database
     let path = `players/${playerId}`;
     let newState = {
           id: playerId,
-          name,
+          name: name,
           direction: "right",
           color: color, 
           oldX: x,
