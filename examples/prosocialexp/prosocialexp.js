@@ -1568,7 +1568,14 @@ function updatePlayerList(players, introMessage) {
 
     const avatar = document.createElement('div');
     avatar.classList.add('player-avatar', 'Character_sprite');
-    avatar.style.backgroundPositionY = getPlayerBackgroundPosition(player.color);
+    // avatar.style.backgroundPositionY = getPlayerBackgroundPosition(player.color);
+        // Check if the player is a robot
+    if (player.id === 'robotPlayer') {
+      avatar.classList.add('robot-sprite', 'display-board-robot'); // Add the robot sprite class
+      avatar.style.backgroundPositionY = getRobotBackgroundPosition(player.color);
+    } else {
+      avatar.style.backgroundPositionY = getPlayerBackgroundPosition(player.color);
+    }
     avatarContainer.appendChild(avatar);
     playerItem.appendChild(avatarContainer);
 
@@ -1610,6 +1617,16 @@ function getPlayerBackgroundPosition(color) {
     // Add more colors if needed
     default: return '0px';
   }
+}
+
+function getRobotBackgroundPosition(color) {
+  const colorMap = {
+    blue: '0px',
+    red: '-60px',
+    yellow: '-180px',
+    purple: '-300px',
+  };
+  return colorMap[color] || '0px'; // Default to blue if color is not found
 }
 
 function randomFromArray(array) {
@@ -2385,9 +2402,10 @@ function receiveStateChange(pathNow,nodeName, newState, typeChange ) {
       const addedPlayer = newState; 
       const characterElement = document.createElement("div");
       characterElement.classList.add("Character", "grid-cell");
+      const isRobot = addedPlayer.id  === "robotPlayer"; 
       characterElement.innerHTML = (`
         <div class="Character_shadow grid-cell"></div>
-        <div class="Character_sprite grid-cell"></div>
+        <div class="Character_sprite grid-cell ${isRobot ? "robot-sprite" : ""}"></div>
       `);
 
     //   <div class="Character_name-container">

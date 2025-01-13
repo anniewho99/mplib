@@ -163,6 +163,55 @@ button:active {
   background: url(./images/shadow.png) no-repeat no-repeat;
 }
 
+.Character_sprite.robot-sprite {
+  caret-color: transparent;
+  overflow: hidden;
+  background: url(./images/robot.png); /* Robot sprite sheet */
+  background-size: auto; /* Keep the original size */
+  transform: scale(0.28);
+  image-rendering: pixelated; /* Retain sharp pixel art quality */
+  width: 60px; /* Match sprite size */
+  height: 60px; /* Match sprite size */
+  transform-origin: top left;
+}
+
+.Character[data-direction="right"] .robot-sprite {
+  background-position-x: -60px; /* Adjust as needed for direction */
+}
+
+.Character[data-direction="left"] .robot-sprite {
+  background-position-x: 0; /* First sprite in the row (facing left) */
+}
+
+.Character[data-color="blue"] .robot-sprite {
+  background-position-y: 0; /* First row (blue) */
+}
+
+.Character[data-color="red"] .robot-sprite {
+  background-position-y: -60px; /* Adjust for the 'red' color */
+}
+
+.Character[data-color="orange"] .robot-sprite {
+  background-position-y: -120px;
+}
+
+.Character[data-color="yellow"] .robot-sprite {
+  background-position-y: -180px;
+}
+
+.Character[data-color="green"] .robot-sprite {
+  background-position-y: -240px;
+}
+
+.Character[data-color="purple"] .robot-sprite {
+  background-position-y: -300px;
+}
+
+.Character_sprite.robot-sprite.display-board-robot {
+  transform: scale(0.5); /* Scale up the robot sprite on the display board */
+  transform-origin: center; /* Scale from the center */
+}
+
 /* .Character_name-container {
   caret-color: transparent;
   position: absolute;
