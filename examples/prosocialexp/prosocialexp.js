@@ -695,13 +695,6 @@ let mapData = {
   blockedSpaces: {  },
 };
 
-// const trapSchedule = {
-//   1: [1],   // Player 1 trapped in round 1 and 2
-//   2: [1],
-//   3: [2],   // Player 2 trapped in round 3 and 4
-//   4: [2],
-// }
-
 let trapSchedule = {};
 
 let sequenceObject = {};
@@ -719,6 +712,279 @@ let subgridPositions = [
   { xStart: 9, xEnd: 11, yStart: 15, yEnd: 17 },
   { xStart: 15, xEnd: 17, yStart: 15, yEnd: 17 },
 ];
+
+// const initialGrid = [
+//   [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+//   [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+//   [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+//   [0, 0, 0, 1, 1, 1, 0, 0, 0, 1, 1, 1, 0, 0, 0, 1, 1, 1, 0],
+//   [0, 0, 0, 1, 1, 1, 0, 0, 0, 1, 1, 1, 0, 0, 0, 1, 1, 1, 0],
+//   [0, 0, 0, 1, 1, 1, 0, 0, 0, 1, 1, 1, 0, 0, 0, 1, 1, 1, 0],
+//   [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+//   [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+//   [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+//   [0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0],
+//   [0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0],
+//   [0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0],
+//   [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+//   [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+//   [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+//   [0, 0, 0, 1, 1, 1, 0, 0, 0, 1, 1, 1, 0, 0, 0, 1, 1, 1, 0],
+//   [0, 0, 0, 1, 1, 1, 0, 0, 0, 1, 1, 1, 0, 0, 0, 1, 1, 1, 0],
+//   [0, 0, 0, 1, 1, 1, 0, 0, 0, 1, 1, 1, 0, 0, 0, 1, 1, 1, 0],
+//   [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+// ];
+
+
+const initialGrid = [
+  [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 1, 0, 1, 0, 0, 0, 1, 0, 1, 0, 0, 0, 1, 0, 1, 0, 0],
+  [0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0],
+  [0, 0, 1, 0, 1, 0, 0, 0, 1, 0, 1, 0, 0, 0, 1, 0, 1, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0],
+  [0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0],
+  [0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 1, 0, 1, 0, 0, 0, 1, 0, 1, 0, 0, 0, 1, 0, 1, 0, 0],
+  [0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0],
+  [0, 0, 1, 0, 1, 0, 0, 0, 1, 0, 1, 0, 0, 0, 1, 0, 1, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+];
+
+let robotX = 0;
+let robotY = 0;
+
+let exitPointAdded = false;
+
+let isPathBeingFollowed = false; 
+
+const easystar = new EasyStar.js();
+
+let currentIndex = 0;
+
+function updateGridWalkability(state, subgridIndex) {
+  let walkableGrid;
+
+  if (state === "transition") {
+    // Use the initial grid for the transition state
+    walkableGrid = initialGrid;
+  } else if (state === "collection" && subgridIndex !== null) {
+    // Clone the initial grid as the base
+    walkableGrid = JSON.parse(JSON.stringify(initialGrid));
+
+    // Overlay the subGrid template on the target subgrid
+    const subGrid = [
+      [1, 1, 0, 1, 1],
+      [1, 0, 0, 0, 1],
+      [0, 0, 0, 0, 0],
+      [1, 0, 0, 0, 1],
+      [1, 1, 0, 1, 1],
+    ];
+
+    const subgrid = subgridPositions[subgridIndex];
+    const { xStart, yStart } = subgrid;
+
+    for (let x = 0; x < subGrid.length; x++) {
+      for (let y = 0; y < subGrid[x].length; y++) {
+        // Calculate corresponding position in the main grid
+        const gridX = xStart - 2 + x; // Offset by -1 for 0-based indexing
+        const gridY = yStart - 2 + y;
+
+        // Ensure within bounds of the main grid
+        if (
+          gridX >= 0 &&
+          gridX < walkableGrid[0].length &&
+          gridY >= 0 &&
+          gridY < walkableGrid.length
+        ) {
+          walkableGrid[gridY][gridX] = subGrid[y][x];
+        }
+      }
+    }
+  }
+
+  console.log(`The grid is like:`, walkableGrid);
+
+  // Update EasyStar grid
+  easystar.setGrid(walkableGrid);
+}
+
+
+function findNearestRobotDoor(subgridIndex) {
+  // Find the door for the given subgridIndex
+  const door = robotDoors.find(door => door.subgridIndex === subgridIndex);
+
+  if (!door) {
+    console.log(`No door found for subgrid ${subgridIndex}`);
+    return null;
+  }
+
+  console.log(`Door enter point:`, door);
+
+  return door;
+}
+
+
+function startRobotMovement() {
+  // Run the movement loop every 500ms
+  movementInterval = setInterval(() => {
+    if (isPathBeingFollowed && currentPath.length > 0 && currentStep < currentPath.length) {
+      // Get the next position in the path
+      const { x: nextX, y: nextY } = currentPath[currentStep] || { x: robotX, y: robotY };
+
+      // Calculate movement deltas
+      const xChange = nextX - robotX;
+      const yChange = nextY - robotY;
+
+      // Use handleArrowPress to update the robot's position
+      handleArrowPress(xChange, yChange, "robotPlayer");
+
+      // Update global robot position
+      robotX = nextX;
+      robotY = nextY;
+
+      //console.log(`Robot moved to (${robotX}, ${robotY})`);
+
+      currentStep++;
+
+      // If the path is complete
+      if (currentStep >= currentPath.length) {
+        isPathBeingFollowed = false; // Path completed
+        handleStateChange(); // Trigger the next state
+      }
+    }else if (!isPathBeingFollowed && robotX == 0 && robotY == 0) {
+      // If no path is currently being followed, trigger a state change
+      console.log("No path being followed. Triggering state change...");
+      handleStateChange();
+    }
+  }, 500); // Move every 500ms
+}
+
+
+function handleStateChange() {
+  if (isPathBeingFollowed) {
+    return; // Don't process a new state if a path is being followed
+  }
+  if (robotState === "transition") {
+    updateGridWalkability("transition", robotSubgrid - 1);
+    // Transition state: move to the nearest door of the current subgrid
+    const nearestDoor = findNearestRobotDoor(robotSubgrid - 1);
+    switch (nearestDoor.side) {
+      case "bottom":
+        nearestDoor.x -= 1;
+        nearestDoor.y = nearestDoor.y;
+        break;
+    
+      case "left":
+        nearestDoor.x -= 2;
+        nearestDoor.y -= 1;
+        break;
+    
+      case "right":
+        nearestDoor.y -= 1;
+        break;
+    
+      case "top":
+        nearestDoor.x -= 1;
+        nearestDoor.y -= 2;
+        break;
+    
+      default:
+        console.log("Unknown door side:", nearestDoor.side);
+        break;
+    }
+    moveToTarget({ x: nearestDoor.x, y: nearestDoor.y }, "collection");
+    exitPointAdded = false;
+    oldRobotCoinPositions = robotCoinPositions;
+    robotCoinPositions = [];
+    oldRobotSugrid = robotSubgrid;
+    updateGridWalkability("collection", robotSubgrid - 1);
+  } else if (robotState === "collection") {
+    // Collection state: process all tokens in the current subgrid
+    if (currentIndex < 4) {
+
+      console.log("current index is", currentIndex);
+      console.log("current target is", oldRobotCoinPositions[currentIndex].x - 1, oldRobotCoinPositions[currentIndex].y - 1);
+
+      if(currentIndex + 1 == 4){
+        robotState = "transition";
+        moveToTarget({ x: oldRobotCoinPositions[currentIndex].x, y: oldRobotCoinPositions[currentIndex].y }, "transition");
+        currentIndex = 0;
+      }else{
+        // Move to the first token in the list
+        moveToTarget({ x: oldRobotCoinPositions[currentIndex].x - 1, y: oldRobotCoinPositions[currentIndex].y - 1 }, "collection");
+        currentIndex++;
+      }
+
+
+      if(!exitPointAdded && currentIndex == 3){
+          const exitPoint = findNearestRobotDoor(oldRobotSugrid - 1);
+          switch (exitPoint.side) {
+            case "bottom":
+              exitPoint.x -= 1;
+              exitPoint.y =  exitPoint.y;
+              break;
+          
+            case "left":
+              exitPoint.x -= 2;
+              exitPoint.y -= 1;
+              break;
+          
+            case "right":
+              exitPoint.y -= 1;
+              break;
+          
+            case "top":
+              exitPoint.x -= 1;
+              exitPoint.y -= 2;
+              break;
+          
+            default:
+              console.log("Unknown door side:", exitPoint.side);
+              break;
+          }
+          oldRobotCoinPositions.push({ x: exitPoint.x, y: exitPoint.y });
+          exitPointAdded = true; 
+          console.log("Added exit point to oldRobotCoinPositions:", exitPoint);
+
+      }
+      console.log("Current oldRobotCoinPositions:", JSON.stringify(oldRobotCoinPositions));
+
+    }
+  
+    // } else {
+    //   robotState = "transition"; // Move to the next subgrid
+    //   currentIndex = 0;
+    //   updateGridWalkability(robotState, robotSubgrid - 1);
+    // }
+  }
+}
+
+function moveToTarget(target, nextState) {
+  console.log("current robot position is", robotX, robotY);
+  console.log("moving to", target.x, target.y);
+  
+  easystar.findPath(robotX, robotY, target.x, target.y, function (path) {
+    if (!path || path.length === 0) {
+      console.log("Path not found!");
+    } else {
+      console.log("Path updated:", path);
+      currentPath = path; // Update the current path
+      currentStep = 0; // Reset the step counter
+      isPathBeingFollowed = true; 
+      robotState = nextState; // Transition to the next state
+    }
+  });
+
+  easystar.calculate(); // Trigger EasyStar's pathfinding
+}
 
 let door_movements = [];
 let forbidden_moves = [];
@@ -836,7 +1102,7 @@ let playerElements = {};
 let coins = {};
 let coinElements = {};
 let hasEnded = false;
-let roundTime = 150;  // 90 seconds per round
+let roundTime = 180;  // 90 seconds per round
 let breakTime = 10;   // 5-second break between rounds
 let roundInterval = null; // To store the round timer interval
 let isBreakTime = false; 
@@ -860,8 +1126,27 @@ let arrivalIndex;
 
 let playerSequence = 'test';
 
-let robotHere = false;
+let robotHere = true;
 
+let robotId  = 'robotPlayer';
+
+let robotColor = 'test';
+
+let robotSubgrid;
+
+let oldRobotSugrid;
+
+let robotCoinPositions = []; 
+
+let oldRobotCoinPositions = [];
+
+let robotDoors = [];
+
+let movementInterval = null; // Store the interval ID
+let currentPath = []; // Store the robot's current path
+let currentStep = 0; 
+
+let robotState = "transition";
 
 function getPlayerStartingPosition() {
   //const playerColor = introColor; // Get the player's color
@@ -877,27 +1162,6 @@ function getPlayerStartingPosition() {
   // Return the starting position based on the player's color
   return startingPositions[arrivalIndex] || { x: mapData.minX, y: mapData.minY }; // Default to blue if color is not recognized
 }
-
-
-// async function fetchTrapSchedule(arrivalIndex) {
-
-//   // // Read the trap schedule from Firebase
-//   // readStateDirect(path, (trap) => {
-//   //   if (trap) {
-//   //     console.log("Trap schedule fetched from Firebase:", trapSchedule);
-//   //     trapSchedule = trap;
-//   //   }
-//   // });
-//   trapSchedule= await readState(`condition`);
-//   console.log("Trap schedule fetched from Firebase:", trapSchedule);
-
-//   let colorSequence = await readState(`colorAssignment`);
-//   introColor = colorSequence[arrivalIndex - 1];
-
-//   let playerSequences = await readState(`playerSequenceAssignment`);
-//   playerSequence = playerSequences[arrivalIndex - 1];
-
-// }
 
 // Function to start the round timer
 function startRoundTimer() {
@@ -935,6 +1199,10 @@ function startNewRound() {
 
   currentRound = currentRound + 1;
   trapFlag  = false;
+
+  if(currentRound == 1 && robotHere && arrivalIndex == 1){
+    startRobotMovement();
+  }
 
   if (currentRound <= totalRounds) {
     roundInterval = setTimeout(endRound, roundTime * 1000);  // End the round after 90 seconds
@@ -1053,6 +1321,61 @@ async function resetCoinsAndDoors() {
 
   placeTokensForPlayer(playerId);
 
+  if(arrivalIndex == 1 && currentRound < 3){
+    if(robotHere){
+      for (let coinKey in allCoins) {
+        if (allCoins[coinKey].id === robotId) {
+          let coinPath = `coins/${coinKey}`;
+          await updateStateDirect(coinPath, null, 'removeCoinForNewRound');  // Remove only coins with the matching player ID
+        }
+      }
+
+      let path = `players/${robotId}`;
+      let newState = {
+        x: 1,
+        y: 1,
+        oldX: robotX,
+        oldY: robotY,
+        coins: 0,
+        isTrapped: false,
+        roundNumber: currentRound,
+      };
+      updateStateDirect(path, newState, 'resetPlayerState');
+
+      robotX = 0;
+      robotY = 0;
+      currentStep = 0; 
+      currentPath = [];
+      currentIndex = 0;
+      oldRobotCoinPositions = [];
+      robotState = 'transition';
+      isPathBeingFollowed = false;
+      placeTokensForPlayer(robotId);
+    }
+  }
+
+  if(currentRound > 2 && robotHere){
+    robotHere = false;
+    for (let coinKey in allCoins) {
+      if (allCoins[coinKey].id === robotId) {
+        let coinPath = `coins/${coinKey}`;
+        await updateStateDirect(coinPath, null, 'removeCoinForNewRound');  // Remove only coins with the matching player ID
+      }
+    }
+    robotX = 0;
+    robotY = 0;
+    currentStep = 0; 
+    currentPath = [];
+    currentIndex = 0;
+    oldRobotCoinPositions = [];
+    robotState = 'transition';
+    isPathBeingFollowed = true;
+
+    let path = `players/${robotId}`;
+    let newState = null;
+    updateStateDirect( path, newState, 'removePlayer');
+  }
+
     // let player = players[playerId];
     let path = `players/${playerId}`;
     let newState = {
@@ -1084,19 +1407,10 @@ async function resetCoinsAndDoors() {
   document.querySelector('.player-info-panel').style.display = 'block';
   document.querySelector('.timer-container').style.display = 'block';
 
-  // if (arrivalIndex !== 1) {
-  //   fetchTrapSchedule();
-  // }
-
 }
 
 async function initRounds() {
   console.log("Initializing Rounds...");
-
-  // if (getCurrentPlayerArrivalIndex() !== 1) {
-  //   fetchTrapSchedule();
-  // }
-
 
   gameScreen.style.display = 'block';
   document.getElementById('roundTitle').innerText = "Current Round will start soon!";
@@ -1363,7 +1677,12 @@ async function placeTokensForPlayer(playerId) {
       if (transactionSuccess) {
         console.log(`Player ${playerId} successfully assigned to subgrid ${chosenSubgrid}`);
         await placeTokensInSubgrid(playerId, chosenSubgrid);
-        return; // Exit loop on success
+        if(robotHere){
+          if(playerId == 'robotPlayer'){
+            robotSubgrid = chosenSubgrid;
+          }
+        }
+        return; //  Exit loop on success
       } else {
         console.warn(`Transaction failed for player ${playerId}, retrying...`);
       }
@@ -1398,6 +1717,9 @@ async function placeTokensInSubgrid(playerId, subgridId) {
 
       await updateStateDirect(id, newState, 'placeCoin');  // Save new state in Firebase
       console.log(`Coin placed at (${x}, ${y}) for player ${playerId}`);
+      if (playerId === "robotPlayer") {
+        robotCoinPositions.push({ x, y });
+      }
 
       placedPositions.add(positionKey);  // Mark this position as used
       i++;  // Only increment after successful placement
@@ -1439,7 +1761,7 @@ async function getCoinData(key) {
 }
 
 
-async function handleArrowPress(xChange = 0, yChange = 0) {
+async function handleArrowPress(xChange = 0, yChange = 0, playerId) {
   const oldX = players[playerId].x;
   const oldY = players[playerId].y;
   const newX = oldX + xChange;
@@ -1616,13 +1938,8 @@ async function getDoorAtPosition(x, y, playerColor, playerId) {
             // If it's a main entry, shuffle the doors
             if (isMainEntry) {
 
-              //  if(trapSchedule == null){
-              //   if (arrivalIndex !== 1) {
-              //     fetchTrapSchedule();
-              //   }
-              // }
               const isPlayerTrapped = trapSchedule[currentRound]?.includes(playerSequence);
-              if(isPlayerTrapped && trapFlag === true){
+              if(isPlayerTrapped && trapFlag === true && playerId != 'robotPlayer'){
                 let player = players[playerId];
                 let path = `players/${playerId}`;
                 let newState = {
@@ -1724,6 +2041,22 @@ async function shuffleAndRedrawDoors(subgridIndex) {
 
     // Store the updated doors in Firebase
     await updateStateDirect(`doors/${subgridIndex}`, updatedDoors, 'shuffleDoor');
+    subgridIndex = Number(subgridIndex);
+
+    // robotDoors = robotDoors.filter(door => Number(door.subgridIndex) !== subgridIndex);// Remove old doors for this subgrid
+
+    // Object.values(updatedDoors).forEach(door => {
+    //   if (door.color === robotColor) {
+    //     robotDoors.push({
+    //       subgridIndex,
+    //       x: door.x,
+    //       y: door.y,
+    //       side: door.side
+    //     });
+    //   }
+    // });
+
+    // console.log(`Updated robot doors:`, robotDoors);
 
     //console.log(`Doors shuffled for subgrid ${subgridIndex}:`, updatedDoors);
 
@@ -1860,6 +2193,12 @@ async function placeDoorsForSubgrid(subgridIndex) {
    Object.keys(doorsData).forEach(side => {
      const door = doorsData[side];
      renderAndStoreDoor(door.x, door.y, door.color, side, subgridIndex, false);
+
+    //  if (door.color === robotColor) {
+    //   robotDoors.push({ subgridIndex, x: door.x, y: door.y, side: door.side });
+    //   console.log("robot doors are:");
+    //   console.log(robotDoors);
+    // }
    });
 }
 
@@ -1944,11 +2283,18 @@ async function initGame() {
       console.log("Color sequence updated to Firebase:", colorSequenceObject);
 
       if(robotHere){
+
+
+        easystar.setGrid(initialGrid);
+        
+        easystar.setAcceptableTiles([0]);
+
+
         const {x, y} = { x: 1, y: 1 }; 
 
         let robotname = 'robot1';
-        let robotId  = 'robotPlayer';
         const aiColor = availableColors.find(color => !shuffledColors.includes(color));
+        robotColor = aiColor;
         // Broadcast this new player position to the database
         let path = `players/${robotId}`;
         let newState = {
@@ -1977,6 +2323,8 @@ async function initGame() {
     // messageGame.innerHTML = str;
     
     const {x, y} = { x: 1, y: 1 }; 
+
+    introName = name;
     
     // Broadcast this new player position to the database
     let path = `players/${playerId}`;
@@ -1996,10 +2344,10 @@ async function initGame() {
         };
     updateStateDirect(path, newState , 'initPlayer');
 
-    arrowUpListener = new KeyPressListener("ArrowUp", () => handleArrowPress(0, -1));
-    arrowDownListener = new KeyPressListener("ArrowDown", () => handleArrowPress(0, 1));
-    arrowLeftListener = new KeyPressListener("ArrowLeft", () => handleArrowPress(-1, 0));
-    arrowRightListener = new KeyPressListener("ArrowRight", () => handleArrowPress(1, 0));
+    arrowUpListener = new KeyPressListener("ArrowUp", () => handleArrowPress(0, -1, playerId));
+    arrowDownListener = new KeyPressListener("ArrowDown", () => handleArrowPress(0, 1, playerId));
+    arrowLeftListener = new KeyPressListener("ArrowLeft", () => handleArrowPress(-1, 0, playerId));
+    arrowRightListener = new KeyPressListener("ArrowRight", () => handleArrowPress(1, 0 , playerId));
 
     // // Place first coin
     // placeTokensForPlayer(playerId);
@@ -2017,7 +2365,7 @@ function checkAllDataReady() {
   if (trapScheduleReady && playerColorReady && playerSequenceReady && gameStart) {
     console.log("All data received. Proceeding to initRounds...");
     gameStart = false;
-    initRounds(); // Call your initRounds function here
+    initRounds(); 
   }
 }
 
@@ -2138,7 +2486,7 @@ function receiveStateChange(pathNow,nodeName, newState, typeChange ) {
   }
 
   if (pathNow.startsWith("doors")) {
-    const subgridIndex = nodeName;  // Node name contains the subgrid index
+    const subgridIndex = Number(nodeName);  // Node name contains the subgrid index
 
     //console.log(`Updating doors for subgrid ${subgridIndex}`, newState);
 
@@ -2159,6 +2507,35 @@ function receiveStateChange(pathNow,nodeName, newState, typeChange ) {
             subgridIndex,
             false  // Don't store again during rendering
           );
+        }
+
+        if (doorData.color === robotColor && robotHere) {
+        
+          // Check if a door for this subgrid already exists in robotDoors
+          const existingDoorIndex = robotDoors.findIndex(
+            door => door.subgridIndex === subgridIndex
+          );
+
+          if (existingDoorIndex !== -1) {
+            // Replace the existing door
+            console.log(`Replacing robot door for subgrid ${subgridIndex}`);
+            robotDoors[existingDoorIndex] = {
+              subgridIndex,
+              x: doorData.x,
+              y: doorData.y,
+              side
+            };
+          } else {
+            // Add a new robot door
+            console.log(`Adding new robot door for subgrid ${subgridIndex}`);
+            robotDoors.push({
+              subgridIndex,
+              x: doorData.x,
+              y: doorData.y,
+              side
+            });
+          }
+          console.log('robot doors are:', robotDoors);
         }
       }
     }
