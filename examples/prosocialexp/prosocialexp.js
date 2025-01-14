@@ -769,6 +769,8 @@ const easystar = new EasyStar.js();
 
 let currentIndex = 0;
 
+let timeToSave = false;
+
 function updateGridWalkability(state, subgridIndex) {
   let walkableGrid;
 
@@ -817,18 +819,56 @@ function updateGridWalkability(state, subgridIndex) {
 }
 
 
-function findNearestRobotDoor(subgridIndex) {
+function getRobotDoorSide(subgridIndex) {
   // Find the door for the given subgridIndex
   const door = robotDoors.find(door => door.subgridIndex === subgridIndex);
 
   if (!door) {
-    console.log(`No door found for subgrid ${subgridIndex}`);
+    console.log(`No robot door found for subgrid ${subgridIndex}`);
     return null;
   }
 
-  console.log(`Door enter point:`, door);
+  return door.side; 
+}
 
-  return door;
+function getRobotDoorEntryPoint(subgridIndex) {
+  // Find the side of the robot door for the given subgridIndex
+  const side = getRobotDoorSide(subgridIndex);
+  if (!side) {
+    console.log(`Could not determine the side for subgrid ${subgridIndex}`);
+    return null;
+  }
+
+  // Get the subgrid boundaries
+  const subgrid = subgridPositions[subgridIndex];
+  const { xStart, yStart } = subgrid;
+
+  let entryPoint = {};
+
+  // Calculate the entry point based on the side
+  switch (side) {
+    case "top":
+      entryPoint = { x: xStart, y: yStart - 2 }; // Top entry point
+      break;
+
+    case "left":
+      entryPoint = { x: xStart - 2, y: yStart }; // Left entry point
+      break;
+
+    case "right":
+      entryPoint = { x: xStart + 2, y: yStart }; // Right entry point
+      break;
+
+    case "bottom":
+      entryPoint = { x: xStart, y: yStart + 2 }; // Bottom entry point
+      break;
+
+    default:
+      console.log("Invalid side:", side);
+      return null;
+  }
+
+  return entryPoint;
 }
 
 
@@ -857,6 +897,9 @@ function startRobotMovement() {
       // If the path is complete
       if (currentStep >= currentPath.length) {
         isPathBeingFollowed = false; // Path completed
+        if(timeToSave === true && currentIndex == 0){
+          robotState = 'savingOne';
+        }
         handleStateChange(); // Trigger the next state
       }
     }else if (!isPathBeingFollowed && robotX == 0 && robotY == 0) {
@@ -875,32 +918,9 @@ function handleStateChange() {
   if (robotState === "transition") {
     updateGridWalkability("transition", robotSubgrid - 1);
     // Transition state: move to the nearest door of the current subgrid
-    const nearestDoor = findNearestRobotDoor(robotSubgrid - 1);
-    switch (nearestDoor.side) {
-      case "bottom":
-        nearestDoor.x -= 1;
-        nearestDoor.y = nearestDoor.y;
-        break;
-    
-      case "left":
-        nearestDoor.x -= 2;
-        nearestDoor.y -= 1;
-        break;
-    
-      case "right":
-        nearestDoor.y -= 1;
-        break;
-    
-      case "top":
-        nearestDoor.x -= 1;
-        nearestDoor.y -= 2;
-        break;
-    
-      default:
-        console.log("Unknown door side:", nearestDoor.side);
-        break;
-    }
-    moveToTarget({ x: nearestDoor.x, y: nearestDoor.y }, "collection");
+    const nearestDoor = getRobotDoorEntryPoint(robotSubgrid - 1);
+
+    moveToTarget(nearestDoor, "collection");
     exitPointAdded = false;
     oldRobotCoinPositions = robotCoinPositions;
     robotCoinPositions = [];
@@ -923,33 +943,8 @@ function handleStateChange() {
         currentIndex++;
       }
 
-
       if(!exitPointAdded && currentIndex == 3){
-          const exitPoint = findNearestRobotDoor(oldRobotSugrid - 1);
-          switch (exitPoint.side) {
-            case "bottom":
-              exitPoint.x -= 1;
-              exitPoint.y =  exitPoint.y;
-              break;
-          
-            case "left":
-              exitPoint.x -= 2;
-              exitPoint.y -= 1;
-              break;
-          
-            case "right":
-              exitPoint.y -= 1;
-              break;
-          
-            case "top":
-              exitPoint.x -= 1;
-              exitPoint.y -= 2;
-              break;
-          
-            default:
-              console.log("Unknown door side:", exitPoint.side);
-              break;
-          }
+          const exitPoint = getRobotDoorEntryPoint(oldRobotSugrid - 1);
           oldRobotCoinPositions.push({ x: exitPoint.x, y: exitPoint.y });
           exitPointAdded = true; 
           console.log("Added exit point to oldRobotCoinPositions:", exitPoint);
@@ -958,12 +953,42 @@ function handleStateChange() {
       console.log("Current oldRobotCoinPositions:", JSON.stringify(oldRobotCoinPositions));
 
     }
-  
-    // } else {
-    //   robotState = "transition"; // Move to the next subgrid
-    //   currentIndex = 0;
-    //   updateGridWalkability(robotState, robotSubgrid - 1);
-    // }
+  }else if(robotState == 'savingOne'){
+    updateGridWalkability("transition", trappedIndex);
+    // Transition state: move to the nearest door of the current subgrid
+    const nearestDoor = getRobotDoorEntryPoint(trappedIndex);
+    let robotDoorSide = getRobotDoorSide(trappedIndex);
+    switch (robotDoorSide) {
+      case "bottom":
+        nearestDoor.y -= 1;
+        break;
+    
+      case "left":
+        nearestDoor.x += 1;
+        break;
+    
+      case "right":
+        nearestDoor.x -= 1;
+        break;
+    
+      case "top":
+        nearestDoor.y += 1;
+        break;
+    
+      default:
+        console.log("Unknown door side:", nearestDoor.side);
+        break;
+    }
+    moveToTarget({ x: nearestDoor.x, y: nearestDoor.y }, "savingTwo");
+    robotState = "savingTwo";
+    exitPointAdded = false;
+    timeToSave = 'blue';
+    oldRobotSugrid = robotSubgrid;
+    updateGridWalkability("collection", trappedIndex);
+  }else if(robotState == "savingTwo"){
+      const exitPoint = getRobotDoorEntryPoint(trappedIndex);
+      moveToTarget({ x: exitPoint.x, y: exitPoint.y }, "transition");
+
   }
 }
 
@@ -1102,8 +1127,8 @@ let playerElements = {};
 let coins = {};
 let coinElements = {};
 let hasEnded = false;
-let roundTime = 180;  // 90 seconds per round
-let breakTime = 10;   // 5-second break between rounds
+let roundTime = 150;  // 90 seconds per round
+let breakTime = 50;   // 5-second break between rounds
 let roundInterval = null; // To store the round timer interval
 let isBreakTime = false; 
 let timeLeft = roundTime;
@@ -1113,7 +1138,7 @@ let introColor;
 let introName;
 
 let currentRound = 0;
-let trapTime = 50; 
+let trapTime = 10; 
 let trapFlag = false;
 
 let totalRounds = 4;
@@ -1341,6 +1366,9 @@ async function resetCoinsAndDoors() {
         roundNumber: currentRound,
       };
       updateStateDirect(path, newState, 'resetPlayerState');
+      timeToSave = false; 
+      console.log("reset for new round", timeToSave);
+      updateStateDirect(`timeToSave`, timeToSave, 'reset for new round'); 
 
       robotX = 0;
       robotY = 0;
@@ -2044,38 +2072,68 @@ async function shuffleAndRedrawDoors(subgridIndex) {
 
     let doorColors = ['yellow', '#FF746C', '#00CCFF', '#9370DB'];  // Example colors
     let shuffledColors = shuffle(doorColors);  // Shuffle the colors
-
-    // Update the shuffled doors in Firebase
     const updatedDoors = {};
-    doorPositions.forEach((door, index) => {
-      updatedDoors[door.side] = {
-        x: door.x,
-        y: door.y,
-        color: getColorName(shuffledColors[index]),
-        side: door.side
-      };
-    });
 
-    // Store the updated doors in Firebase
-    await updateStateDirect(`doors/${subgridIndex}`, updatedDoors, 'shuffleDoor');
-    subgridIndex = Number(subgridIndex);
+    if(robotHere && timeToSave === "blue" && Number(subgridIndex) == trappedIndex){
+      const robotDoor = robotDoors.find(door => door.subgridIndex === Number(subgridIndex));
 
-    // robotDoors = robotDoors.filter(door => Number(door.subgridIndex) !== subgridIndex);// Remove old doors for this subgrid
+      if (!robotDoor) {
+        console.error(`No robot door found for subgrid ${subgridIndex}`);
+        return;
+      }
 
-    // Object.values(updatedDoors).forEach(door => {
-    //   if (door.color === robotColor) {
-    //     robotDoors.push({
-    //       subgridIndex,
-    //       x: door.x,
-    //       y: door.y,
-    //       side: door.side
-    //     });
-    //   }
-    // });
+      // Determine the hex code for the robotColor
+      const robotColorHex = getColorCode(robotColor);
 
-    // console.log(`Updated robot doors:`, robotDoors);
+      doorColors = doorColors.filter(color => color.toLowerCase() !== robotColorHex.toLowerCase());
 
-    //console.log(`Doors shuffled for subgrid ${subgridIndex}:`, updatedDoors);
+      // Shuffle the remaining colors
+      const shuffledColors = shuffle(doorColors);
+
+      let shuffledIndex = 0; // Use a separate index for shuffledColors
+
+      doorPositions.forEach((door) => {
+        if (door.side === robotDoor.side) {
+          // Place the robot door with the robotColor
+          updatedDoors[door.side] = {
+            x: door.x,
+            y: door.y,
+            color: robotColor, // Use robotColor directly
+            side: door.side
+          };
+        } else {
+          // Assign shuffled colors to the remaining doors
+          updatedDoors[door.side] = {
+            x: door.x,
+            y: door.y,
+            color: getColorName(shuffledColors[shuffledIndex]), // Get the next color from shuffledColors
+            side: door.side
+          };
+          shuffledIndex++; // Increment the shuffled color index
+        }
+      });
+
+      await updateStateDirect(`doors/${subgridIndex}`, updatedDoors, 'shuffleDoor');
+      subgridIndex = Number(subgridIndex);
+
+
+    }else{
+              // Update the shuffled doors in Firebase
+        doorPositions.forEach((door, index) => {
+          updatedDoors[door.side] = {
+            x: door.x,
+            y: door.y,
+            color: getColorName(shuffledColors[index]),
+            side: door.side
+          };
+        });
+
+        // Store the updated doors in Firebase
+        await updateStateDirect(`doors/${subgridIndex}`, updatedDoors, 'shuffleDoor');
+        subgridIndex = Number(subgridIndex);
+
+    }
+
 
     // Redraw the shuffled doors on the grid
     redrawDoors(subgridIndex, updatedDoors);
@@ -2527,51 +2585,53 @@ function receiveStateChange(pathNow,nodeName, newState, typeChange ) {
           );
         }
 
-        if (doorData.color === robotColor && robotHere) {
+        if (typeChange === 'onChildAdded' || typeChange === 'onChildChanged'){
+          if (doorData.color === robotColor && robotHere) {
         
-          // Check if a door for this subgrid already exists in robotDoors
-          const existingDoorIndex = robotDoors.findIndex(
-            door => door.subgridIndex === subgridIndex
-          );
-
-          if (existingDoorIndex !== -1) {
-            // Replace the existing door
-            console.log(`Replacing robot door for subgrid ${subgridIndex}`);
-            robotDoors[existingDoorIndex] = {
-              subgridIndex,
-              x: doorData.x,
-              y: doorData.y,
-              side
-            };
-          } else {
-            // Add a new robot door
-            console.log(`Adding new robot door for subgrid ${subgridIndex}`);
-            robotDoors.push({
-              subgridIndex,
-              x: doorData.x,
-              y: doorData.y,
-              side
-            });
+            // Check if a door for this subgrid already exists in robotDoors
+            const existingDoorIndex = robotDoors.findIndex(
+              door => door.subgridIndex === subgridIndex
+            );
+  
+            if (existingDoorIndex !== -1) {
+              // Replace the existing door
+              console.log(`Replacing robot door for subgrid ${subgridIndex}`);
+              robotDoors[existingDoorIndex] = {
+                subgridIndex,
+                side
+              };
+            } else {
+              // Add a new robot door
+              console.log(`Adding new robot door for subgrid ${subgridIndex}`);
+              robotDoors.push({
+                subgridIndex,
+                side
+              });
+            }
+            console.log('robot doors are:', robotDoors);
           }
-          console.log('robot doors are:', robotDoors);
+
         }
+
       }
     }
   }
 
   if (pathNow === 'subgridAssignment') {
     console.log('Updated subgrid assignments:', newState);
+    const playerId = nodeName; 
 
-    // Directly handle updates to subgridAssignment
-    for (const playerId in newState) {
-      if (newState.hasOwnProperty(playerId)) {
-        const assignedSubgrid = newState[playerId];
-        console.log(`Player ${playerId} is now assigned to subgrid ${assignedSubgrid}`);
-
-        // Insert any game logic you need here based on the new subgrid assignments
-        // For example, updating UI, moving elements, or changing game state
+    if(playerId === "trapped"){
+      trappedIndex = Number(newState) - 1; 
+      console.log('Trapped player is in subgridIndex:', trappedIndex);
+      if(arrivalIndex == 1 && timeToSave === false){
+        setTimeout(() => {
+          timeToSave = true; 
+          console.log("Time to save the trapped player", timeToSave);
+        }, 5000);
       }
     }
+
   }
 
   if (pathNow === 'condition') {
