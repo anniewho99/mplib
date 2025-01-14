@@ -1128,7 +1128,7 @@ let coins = {};
 let coinElements = {};
 let hasEnded = false;
 let roundTime = 150;  // 90 seconds per round
-let breakTime = 50;   // 5-second break between rounds
+let breakTime = 10;   // 5-second break between rounds
 let roundInterval = null; // To store the round timer interval
 let isBreakTime = false; 
 let timeLeft = roundTime;
@@ -1138,7 +1138,7 @@ let introColor;
 let introName;
 
 let currentRound = 0;
-let trapTime = 10; 
+let trapTime = 50; 
 let trapFlag = false;
 
 let totalRounds = 4;
@@ -2039,8 +2039,21 @@ async function getDoorAtPosition(x, y, playerColor, playerId) {
                   }
                   trapFlag = false;
                   }
-             
-                await shuffleAndRedrawDoors(subgridIndex);
+                  if (playerId === "robotPlayer") {
+                    // Always shuffle when the robot enters any subgrid
+                    console.log(`Robot entered subgrid ${subgridIndex}. Shuffling doors.`);
+                    await shuffleAndRedrawDoors(subgridIndex);
+                  } else {
+                    // For other players
+                    if (subgridIndex !== robotSubgrid - 1 || subgridIndex !== oldRobotSugrid - 1) {
+                      // Shuffle doors for all subgrids except the robot's subgrid
+                      console.log(`Player ${playerId} entered subgrid ${subgridIndex}. Shuffling doors.`);
+                      await shuffleAndRedrawDoors(subgridIndex);
+                    } else {
+                      // Do not shuffle doors if a player enters the robot's subgrid
+                      console.log(`Player ${playerId} entered the robot's subgrid ${subgridIndex}. No shuffling.`);
+                    }
+                  }
               }
 
             }
