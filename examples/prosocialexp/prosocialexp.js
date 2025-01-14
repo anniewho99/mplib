@@ -922,8 +922,10 @@ function handleStateChange() {
 
     moveToTarget(nearestDoor, "collection");
     exitPointAdded = false;
-    oldRobotCoinPositions = robotCoinPositions;
-    robotCoinPositions = [];
+    if(robotCoinPositions.length > 0){
+      oldRobotCoinPositions = robotCoinPositions;
+      robotCoinPositions = [];
+    }
     oldRobotSugrid = robotSubgrid;
     updateGridWalkability("collection", robotSubgrid - 1);
   } else if (robotState === "collection") {
@@ -1475,6 +1477,36 @@ async function initRounds() {
   roundMessage.appendChild(textBeforeAvatar);
   roundMessage.appendChild(avatarDiv);
   roundMessage.appendChild(textAfterAvatar);
+
+  // if (robotHere) {
+  //   const spritePositions = {
+  //     blue: '0px 0px',      // Adjust these values based on your sprite sheet
+  //     yellow: '0px -80px',  // Example position for yellow
+  //     purple: '0px -300px',     // Example position for red
+  //     red: '0px -60px'    // Example position for green
+  //   };
+  
+  //   const robotAvatarPosition = spritePositions[robotColor.toLowerCase()];
+  //   // Create the robot avatar
+  //   const robotAvatarDiv = document.createElement('div');
+  //   robotAvatarDiv.classList.add('player-avatar', 'robot-avatar'); // Use a different class for robot avatar
+  //   robotAvatarDiv.style.background = `url('./images/robot.png') no-repeat ${robotAvatarPosition}`; // Robot sprite sheet
+  //   robotAvatarDiv.style.width = '16px'; // Match size to player avatar
+  //   robotAvatarDiv.style.height = '16px';
+  //   robotAvatarDiv.style.display = 'inline-block';
+
+  //   const robotMessageBefore = document.createElement('span');
+  //   robotMessageBefore.innerText = `A robot will also join the game. It looks like this `;
+
+  //   // Create the robot message
+  //   const robotMessage = document.createElement('span');
+  //   robotMessage.innerText = ` The robot collects ${robotColor} tokens and goes through ${robotColor} doors. `;
+  
+  //   // Append the robot's avatar and message
+  //   roundMessage.appendChild(robotMessageBefore);
+  //   roundMessage.appendChild(robotAvatarDiv);
+  //   roundMessage.appendChild(robotMessage);
+  // }
 
 
   document.getElementById('breakOverlay').style.visibility = 'visible';
@@ -2045,7 +2077,7 @@ async function getDoorAtPosition(x, y, playerColor, playerId) {
                     await shuffleAndRedrawDoors(subgridIndex);
                   } else {
                     // For other players
-                    if (subgridIndex !== robotSubgrid - 1 || subgridIndex !== oldRobotSugrid - 1) {
+                    if (Number(subgridIndex) !== robotSubgrid - 1 && Number(subgridIndex) !== oldRobotSugrid - 1) {
                       // Shuffle doors for all subgrids except the robot's subgrid
                       console.log(`Player ${playerId} entered subgrid ${subgridIndex}. Shuffling doors.`);
                       await shuffleAndRedrawDoors(subgridIndex);
@@ -2470,6 +2502,11 @@ function receiveStateChange(pathNow,nodeName, newState, typeChange ) {
 
   // Adding a player
   if ((pathNow === "players") && (typeChange == 'onChildAdded') && (newState.id != null)) {
+    // if(arrivalIndex != 1){
+    //   if(addedPlayer.id  === "robotPlayer"){
+    //     robotColor = addedPlayer.color;
+    //   }
+    // }
       const addedPlayer = newState; 
       const characterElement = document.createElement("div");
       characterElement.classList.add("Character", "grid-cell");
@@ -2643,6 +2680,10 @@ function receiveStateChange(pathNow,nodeName, newState, typeChange ) {
           console.log("Time to save the trapped player", timeToSave);
         }, 5000);
       }
+    }
+
+    if(playerId === "robotPlayer" && (typeChange == 'onChildAdded' ||typeChange == 'onChildChanged')){
+      robotSubgrid = Number(newState);
     }
 
   }
