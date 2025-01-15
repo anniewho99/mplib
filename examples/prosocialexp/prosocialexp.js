@@ -90,6 +90,15 @@ if(writeToTryoutData){
   document.getElementById("joinBtn").style.display = "inline-block";
 }
 
+let roundTime = 150;  // 90 seconds per round
+let breakTime = 10;   // 5-second break between rounds
+
+const fastforward = paramsHRI.get('fastforward');
+if(fastforward){
+  breakTime = 1;
+  roundTime = 5;
+}
+
 // -------------------------------------
 //       Game Globals
 // -------------------------------------
@@ -110,6 +119,7 @@ document.getElementById("consentProceed").addEventListener("click", () => {
 
 // Instructions for each step
 let instructionStep = 0;
+let robotHere = true;
 const instructions = [
   "You’ll use the arrow keys to move your character around the grid. Let's start by placing you as the orange character on the top left corner!",
   "You are now the orange character in the top left corner of the grid, which has four rooms separated by walls and doors",
@@ -120,9 +130,25 @@ const instructions = [
   "Here, we’re demonstrating what another player might do. Keep in mind that when you start the game, you’ll be playing with real human participants. "
 ]
 
+if(robotHere){
+  instructions[6] = `
+      Here, we’re demonstrating what another player might do. Keep in mind that when you start the game, you’ll be playing with real human participants.
+      Sometimes, a robot player will join you and the robot player will be shaped like this:
+      <div class="player-avatar robot-avatar" style="
+        display: inline-block;
+        width: 20px;
+        height: 20px;
+        background: url('./images/robot.png') no-repeat center;
+        background-size: 36px 120px;
+        background-position: 0px 0px; 
+        image-rendering: pixelated;">
+      </div>
+    `;
+}
+
 document.getElementById("nextBtn").addEventListener("click", () => {
   if (instructionStep < instructions.length) {
-    document.getElementById("instructionsMessage").textContent = instructions[instructionStep];
+    document.getElementById("instructionsMessage").innerHTML = instructions[instructionStep];
     handleInstructionStep(instructionStep);
     if(instructionStep !== 2 && instructionStep !== 3){
       instructionStep++;
@@ -907,7 +933,7 @@ function startRobotMovement() {
       console.log("No path being followed. Triggering state change...");
       handleStateChange();
     }
-  }, 500); // Move every 500ms
+  }, 350); 
 }
 
 
@@ -1129,8 +1155,6 @@ let playerElements = {};
 let coins = {};
 let coinElements = {};
 let hasEnded = false;
-let roundTime = 150;  // 90 seconds per round
-let breakTime = 10;   // 5-second break between rounds
 let roundInterval = null; // To store the round timer interval
 let isBreakTime = false; 
 let timeLeft = roundTime;
@@ -1153,7 +1177,6 @@ let arrivalIndex;
 
 let playerSequence = 'test';
 
-let robotHere = true;
 
 let robotId  = 'robotPlayer';
 
@@ -3040,17 +3063,19 @@ function endSession() {
       const helpedStuckPlayer = document.querySelector('input[name="helpedStuckPlayer"]:checked')?.value;
       const reasonHelped = document.getElementById('reasonHelped').value.trim();
       const reasonNotHelped = document.getElementById('reasonNotHelped').value.trim();
-      const helpfulnessRating = document.querySelector('input[name="helpfulnessRating"]:checked')?.value;
-      const observedHelp = document.querySelector('input[name="observedHelp"]:checked')?.value;
+      const robotHelpfulnessRating = document.querySelector('input[name="robotHelpfulnessRating"]:checked')?.value;
+      const humanHelpfulnessRating = document.querySelector('input[name="humanHelpfulnessRating"]:checked')?.value;
+      const observedHumanHelp = document.querySelector('input[name="observedHumanHelp"]:checked')?.value;
+      const observedRobotHelp = document.querySelector('input[name="observedRobotHelp"]:checked')?.value;
       const selfHelpfulness = document.querySelector('input[name="selfHelpfulness"]:checked')?.value;
-      const suggestions = document.getElementById('suggestions').value.trim();
-    
+      const robotInfluence = document.getElementById('robotInfluence').value.trim();
+
     
       // Check if all required fields are filled
       if (
         !prolificID || !strategy || !gameView || !generalGameView || !noticedStuckPlayer ||
         !helpedStuckPlayer || !reasonHelped || !reasonNotHelped ||
-        !helpfulnessRating || !observedHelp || !selfHelpfulness
+        !robotHelpfulnessRating || !humanHelpfulnessRating || !observedHumanHelp  || !observedRobotHelp || !selfHelpfulness || !robotInfluence
       ) {
         alert("Please fill out all required fields before submitting the questionnaire.");
         return; // Prevent form submission
@@ -3066,10 +3091,12 @@ function endSession() {
         helpedStuckPlayer,
         reasonHelped,
         reasonNotHelped,
-        helpfulnessRating, 
-        observedHelp,
-        selfHelpfulness, 
-        suggestions
+        robotHelpfulnessRating,
+        humanHelpfulnessRating,
+        observedHumanHelp,
+        observedRobotHelp,
+        selfHelpfulness,
+        robotInfluence
       };
     
       // Path to update the player's data

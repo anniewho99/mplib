@@ -131,85 +131,101 @@
         </div>
         -->
     </div>
-    <div class="container" id="finishScreen"  style="display:none">
-        <h1>Completion</h1>  
-        <div class="containertext" id="messageFinish"></div>
+    <div class="container" id="finishScreen" style="display:none">
+      <h1>Completion</h1>  
+      <div class="containertext" id="messageFinish"></div>
+  
+      <form id="questionnaireForm" style="display:none; text-align: left;">
+          <label for="prolificID">Please enter your Prolific ID: <span style="color: red;">*</span></label>
+          <input type="text" id="prolificID" name="prolificID" required>
 
-        <form id="questionnaireForm" style="display:none; text-align: left;">
-            <label for="prolificID">Please enter your Prolific ID: <span style="color: red;">*</span></label>
-            <input type="text" id="prolificID" name="prolificID" required>
-            
-              <label for="strategy">What was your strategy in the game?<span style="color: red;">*</span></label>
-              <textarea id="strategy" name="strategy"></textarea>
-          
-              <label for="gameView">Do you see this game primarily as a:<span style="color: red;">*</span></label>
-              <div id="gameView">
-                <label><input type="radio" name="gameView" value="competitive"> Competitive</label>
-                <label><input type="radio" name="gameView" value="collaborative"> Collaborative</label>
-              </div>
-          
-              <label for="generalGameView">Generally, do you see multiplayer games primarily as:<span style="color: red;">*</span></label>
-              <div id="generalGameView">
-                <label><input type="radio" name="generalGameView" value="competitive"> Competitive</label>
-                <label><input type="radio" name="generalGameView" value="collaborative"> Collaborative</label>
-              </div>
-          
-              <label for="noticedStuckPlayer">Did you notice the other player getting stuck?<span style="color: red;">*</span></label>
-              <div id="noticedStuckPlayer">
-                <label><input type="radio" name="noticedStuckPlayer" value="yes"> Yes</label>
-                <label><input type="radio" name="noticedStuckPlayer" value="no"> No</label>
-              </div>
-    
-          
-              <label for="helpedStuckPlayer">Did you help the stuck player?<span style="color: red;">*</span></label>
-              <div id="helpedStuckPlayer">
-                <label><input type="radio" name="helpedStuckPlayer" value="yes"> Yes</label>
-                <label><input type="radio" name="helpedStuckPlayer" value="no"> No</label>
-              </div>
-    
-              <label for="reasonHelped">Whenever you helped the player who was stuck, why did you help?<span style="color: red;">*</span></label>
-              <textarea id="reasonHelped" name="reasonHelped"></textarea>
-          
-              <label for="reasonNotHelped">Whenever you didn't help the player who was stuck, why didn't you help?<span style="color: red;">*</span></label>
-              <textarea id="reasonNotHelped" name="reasonNotHelped"></textarea>
-          
-              <label for="helpfulnessRating">Rating of the perceived helpfulness of other players (1 = Not helpful at all, 7 = Very helpful):<span style="color: red;">*</span></label>
-              <div id="helpfulnessRating">
-                <label><input type="radio" name="helpfulnessRating" value="1"> 1</label>
-                <label><input type="radio" name="helpfulnessRating" value="2"> 2</label>
-                <label><input type="radio" name="helpfulnessRating" value="3"> 3</label>
-                <label><input type="radio" name="helpfulnessRating" value="4"> 4</label>
-                <label><input type="radio" name="helpfulnessRating" value="5"> 5</label>
-                <label><input type="radio" name="helpfulnessRating" value="6"> 6</label>
-                <label><input type="radio" name="helpfulnessRating" value="7"> 7</label>
-              </div>
-              <label for="observedHelp">Did you observe other players help a stuck player?<span style="color: red;">*</span></label>
-              <div id="observedHelp">
-                <label><input type="radio" name="observedHelp" value="yes"> Yes</label>
-                <label><input type="radio" name="observedHelp" value="no"> No</label>
-              </div>
-          
-              <label for="selfHelpfulness">How helpful do you think you were in the game? (1 = Not helpful at all, 7 = Very helpful):<span style="color: red;">*</span></label>
-                <div id="selfHelpfulness">
-                <label><input type="radio" name="selfHelpfulness" value="1"> 1</label>
-                <label><input type="radio" name="selfHelpfulness" value="2"> 2</label>
-                <label><input type="radio" name="selfHelpfulness" value="3"> 3</label>
-                <label><input type="radio" name="selfHelpfulness" value="4"> 4</label>
-                <label><input type="radio" name="selfHelpfulness" value="5"> 5</label>
-                <label><input type="radio" name="selfHelpfulness" value="6"> 6</label>
-                <label><input type="radio" name="selfHelpfulness" value="7"> 7</label>
-                </div>
-
-                <label for="suggestions">
-                    This is a pilot study, and your feedback is invaluable! Do you have any suggestions to enhance the experiment? We'd love to hear your insights:
-                  </label>
-                  <textarea id="suggestions" name="suggestions"></textarea>
-                <div style="margin-top: 10px;">
-                    <button type="button" id="submitQuestionnaire">Submit</button>
-                </div>
-            </form>
+          <label for="strategy">What was your strategy in the game?<span style="color: red;">*</span></label>
+          <textarea id="strategy" name="strategy" required></textarea>
+  
+          <label for="gameView">Do you see this game primarily as a:<span style="color: red;">*</span></label>
+          <div id="gameView">
+              <label><input type="radio" name="gameView" value="competitive" required> Competitive</label>
+              <label><input type="radio" name="gameView" value="collaborative"> Collaborative</label>
           </div>
-    </div>  
+  
+          <label for="generalGameView">Generally, do you see other multiplayer games primarily as:<span style="color: red;">*</span></label>
+          <div id="generalGameView">
+              <label><input type="radio" name="generalGameView" value="competitive" required> Competitive</label>
+              <label><input type="radio" name="generalGameView" value="collaborative"> Collaborative</label>
+          </div>
+  
+          <label for="noticedStuckPlayer">Did you notice another player getting stuck?<span style="color: red;">*</span></label>
+          <div id="noticedStuckPlayer">
+              <label><input type="radio" name="noticedStuckPlayer" value="yes" required> Yes</label>
+              <label><input type="radio" name="noticedStuckPlayer" value="no"> No</label>
+          </div>
+  
+          <label for="helpedStuckPlayer">Did you help the stuck player?<span style="color: red;">*</span></label>
+          <div id="helpedStuckPlayer">
+              <label><input type="radio" name="helpedStuckPlayer" value="yes" required> Yes</label>
+              <label><input type="radio" name="helpedStuckPlayer" value="no"> No</label>
+          </div>
+  
+          <label for="reasonHelped">Whenever you helped the player who was stuck, why did you help?<span style="color: red;">*</span></label>
+          <textarea id="reasonHelped" name="reasonHelped" required></textarea>
+  
+          <label for="reasonNotHelped">Whenever you didn't help the player who was stuck, why didn't you help?<span style="color: red;">*</span></label>
+          <textarea id="reasonNotHelped" name="reasonNotHelped" required></textarea>
+  
+          <label for="robotHelpfulnessRating">Rating of the perceived helpfulness of the robot player: (1 = Not helpful at all, 7 = Very helpful)<span style="color: red;">*</span></label>
+          <div id="robotHelpfulnessRating">
+              <label><input type="radio" name="robotHelpfulnessRating" value="1" required> 1</label>
+              <label><input type="radio" name="robotHelpfulnessRating" value="2"> 2</label>
+              <label><input type="radio" name="robotHelpfulnessRating" value="3"> 3</label>
+              <label><input type="radio" name="robotHelpfulnessRating" value="4"> 4</label>
+              <label><input type="radio" name="robotHelpfulnessRating" value="5"> 5</label>
+              <label><input type="radio" name="robotHelpfulnessRating" value="6"> 6</label>
+              <label><input type="radio" name="robotHelpfulnessRating" value="7"> 7</label>
+          </div>
+  
+          <label for="humanHelpfulnessRating">Rating of the perceived helpfulness of the human players: (1 = Not helpful at all, 7 = Very helpful)<span style="color: red;">*</span></label>
+          <div id="humanHelpfulnessRating">
+              <label><input type="radio" name="humanHelpfulnessRating" value="1" required> 1</label>
+              <label><input type="radio" name="humanHelpfulnessRating" value="2"> 2</label>
+              <label><input type="radio" name="humanHelpfulnessRating" value="3"> 3</label>
+              <label><input type="radio" name="humanHelpfulnessRating" value="4"> 4</label>
+              <label><input type="radio" name="humanHelpfulnessRating" value="5"> 5</label>
+              <label><input type="radio" name="humanHelpfulnessRating" value="6"> 6</label>
+              <label><input type="radio" name="humanHelpfulnessRating" value="7"> 7</label>
+          </div>
+  
+          <label for="observedHumanHelp">Did you observe another human player help a stuck player?<span style="color: red;">*</span></label>
+          <div id="observedHumanHelp">
+              <label><input type="radio" name="observedHumanHelp" value="yes" required> Yes</label>
+              <label><input type="radio" name="observedHumanHelp" value="no"> No</label>
+          </div>
+  
+          <label for="observedRobotHelp">Did you observe the robot player help a stuck player?<span style="color: red;">*</span></label>
+          <div id="observedRobotHelp">
+              <label><input type="radio" name="observedRobotHelp" value="yes" required> Yes</label>
+              <label><input type="radio" name="observedRobotHelp" value="no"> No</label>
+          </div>
+  
+          <label for="selfHelpfulness">How helpful do you think you were in the game? (1 = Not helpful at all, 7 = Very helpful)<span style="color: red;">*</span></label>
+          <div id="selfHelpfulness">
+              <label><input type="radio" name="selfHelpfulness" value="1" required> 1</label>
+              <label><input type="radio" name="selfHelpfulness" value="2"> 2</label>
+              <label><input type="radio" name="selfHelpfulness" value="3"> 3</label>
+              <label><input type="radio" name="selfHelpfulness" value="4"> 4</label>
+              <label><input type="radio" name="selfHelpfulness" value="5"> 5</label>
+              <label><input type="radio" name="selfHelpfulness" value="6"> 6</label>
+              <label><input type="radio" name="selfHelpfulness" value="7"> 7</label>
+          </div>
+  
+          <label for="robotInfluence">How did the robot influence your decision to help in the last two rounds?<span style="color: red;">*</span></label>
+          <textarea id="robotInfluence" name="robotInfluence" required></textarea>
+  
+          <div style="margin-top: 10px;">
+              <button type="button" id="submitQuestionnaire">Submit</button>
+          </div>
+      </form>
+  </div>
+  
     
     <script src="/mplib/src/mpconfig.js"></script>
     <script type="module" src="/mplib/src/mplib.js" async></script>
