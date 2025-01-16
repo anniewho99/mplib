@@ -1425,6 +1425,8 @@ async function resetCoinsAndDoors() {
     oldRobotCoinPositions = [];
     robotState = 'transition';
     isPathBeingFollowed = true;
+    oldRobotSugrid = 11;
+    robotSubgrid = 11;
 
     let path = `players/${robotId}`;
     let newState = null;
@@ -2102,13 +2104,14 @@ async function getDoorAtPosition(x, y, playerColor, playerId) {
                     await shuffleAndRedrawDoors(subgridIndex);
                   } else {
                     // For other players
-                    if (Number(subgridIndex) !== robotSubgrid - 1 && Number(subgridIndex) !== oldRobotSugrid - 1) {
-                      // Shuffle doors for all subgrids except the robot's subgrid
-                      console.log(`Player ${playerId} entered subgrid ${subgridIndex}. Shuffling doors.`);
-                      await shuffleAndRedrawDoors(subgridIndex);
-                    } else {
-                      // Do not shuffle doors if a player enters the robot's subgrid
+                    if ((Number(subgridIndex) == robotSubgrid - 1 || Number(subgridIndex) == oldRobotSugrid - 1) && currentRound < 3) {
                       console.log(`Player ${playerId} entered the robot's subgrid ${subgridIndex}. No shuffling.`);
+                      
+                      
+                    } else {
+                      await shuffleAndRedrawDoors(subgridIndex);
+                      console.log(`Player ${playerId} entered subgrid ${subgridIndex}. Shuffling doors.`);
+                      
                     }
                   }
               }
