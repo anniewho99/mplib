@@ -1016,6 +1016,8 @@ function handleStateChange() {
   }else if(robotState == "savingTwo"){
       const exitPoint = getRobotDoorEntryPoint(trappedIndex);
       moveToTarget({ x: exitPoint.x, y: exitPoint.y }, "transition");
+      updateStateDirect(`players/robotPlayer`, {
+        isTrapped: false, roundNumber: currentRound, }, 'RobotFreePlayer');
 
   }
 }
