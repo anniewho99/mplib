@@ -1186,6 +1186,10 @@ let robotSubgrid;
 
 let oldRobotSugrid;
 
+let robotSubgridForDoorSwitching;
+
+let oldRobotSugridForDoorSwitching;
+
 let robotCoinPositions = []; 
 
 let oldRobotCoinPositions = [];
@@ -2102,7 +2106,7 @@ async function getDoorAtPosition(x, y, playerColor, playerId) {
                     await shuffleAndRedrawDoors(subgridIndex);
                   } else {
                     // For other players
-                    if ((Number(subgridIndex) == robotSubgrid - 1 || Number(subgridIndex) == oldRobotSugrid - 1) && currentRound < 3) {
+                    if ((Number(subgridIndex) == robotSubgridForDoorSwitching - 1 || Number(subgridIndex) == oldRobotSugridForDoorSwitching - 1) && currentRound < 3) {
                       console.log(`Player ${playerId} entered the robot's subgrid ${subgridIndex}. No shuffling.`);
                       
                       
@@ -2709,7 +2713,13 @@ function receiveStateChange(pathNow,nodeName, newState, typeChange ) {
     }
 
     if(playerId === "robotPlayer" && (typeChange == 'onChildAdded' ||typeChange == 'onChildChanged')){
-      robotSubgrid = Number(newState);
+      const newRobotSubgrid = Number(newState);
+      if (newRobotSubgrid !== robotSubgridForDoorSwitching) {
+        oldRobotSugridForDoorSwitching = robotSubgridForDoorSwitching;
+        robotSubgridForDoorSwitching = newRobotSubgrid;
+        console.log('Robot subgrid updated to:', robotSubgridForDoorSwitching);
+      }
+      console.log('Current state for playerId:', playerId, 'State:', newState);
     }
 
   }
