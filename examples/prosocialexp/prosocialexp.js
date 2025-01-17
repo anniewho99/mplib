@@ -3108,6 +3108,8 @@ function endSession() {
         reasonNotHelped,
         robotHelpfulnessRating,
         humanHelpfulnessRating,
+        humanHelpedYou,
+        robotHelpedYou,
         observedHumanHelp,
         observedRobotHelp,
         selfHelpfulness,
