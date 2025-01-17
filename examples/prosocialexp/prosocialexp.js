@@ -122,18 +122,18 @@ let instructionStep = 0;
 let robotHere = true;
 const instructions = [
   "You’ll use the arrow keys to move your character around the grid. Let's start by placing you as the orange character on the top left corner!",
-  "You are now the orange character in the top left corner of the grid, which has four rooms separated by walls and doors",
-  "Each room has doors in different colors, and you can only pass through doors that match your color. Try passing through the orange door to enter a room! Once you enter a room, the door colors will shuffle.",
+  "You are now the orange character in the top left corner of the grid, which has four rooms separated by walls and doors.",
+  "Each room has doors in different colors, and you can only pass through doors that match your color.  You can use arrow keys to move your character. Try passing through the orange door to enter a room! Once you enter a room, the door colors will shuffle.",
   "Now, let's practice entering another room. In the lower right room, the green door has disappeared. In situations like this, if you enter the room through the door matching your color, the doors will shuffle, and the green door will reappear.",
-  "Next, let’s collect some tokens. You can only collect tokens that match your color. Ready to try collecting tokens? Go ahead and collect the three orange coins in the lower left room.",
-  "There are other players in the game, ranging from one to three additional participants. In this example, there is one other player: the green player, located in the top right corner. This player’s objective is to collect the green coins in the top right room.",
-  "Here, we’re demonstrating what another player might do. Keep in mind that when you start the game, you’ll be playing with real human participants. "
+  "Next, let’s collect some coins. You can only collect coins that match your color. Ready to try collecting coins? Go ahead and collect the three orange coins in the lower left room.",
+  "There can be other players in the game, ranging from one to three additional participants. In this example, there is one other player: the green player, located in the top right corner. This player’s objective is to collect the green coins in the top right room.",
+  "Here, we’re demonstrating what another player might do. Keep in mind that when you start the game, you’ll be playing with other human participants. "
 ]
 
 if(robotHere){
   instructions[6] = `
-      Here, we’re demonstrating what another player might do. Keep in mind that when you start the game, you’ll be playing with real human participants.
-      Sometimes, a robot player will join you and the robot player will be shaped like this:
+      Here, we’re demonstrating what another player might do. Keep in mind that when you start the game, you’ll be playing with other human participants
+      Sometimes, a robot player may join the game and the robot player will be shaped like this:
       <div class="player-avatar robot-avatar" style="
         display: inline-block;
         width: 20px;
@@ -532,9 +532,7 @@ function movePracticePlayer(event, player) {
     console.log(`Entering from door at: (${newX}, ${newY})`);
     instructionStep = 3;
     document.getElementById("nextBtn").style.visibility = "visible";
-  }
-
-  if (isEnteringFromDoor && subgridIndex === 3 && instructionStep === 3) {
+  } else if (isEnteringFromDoor && subgridIndex === 3 && instructionStep === 3) {
     console.log(`Entering from door at subgrid 3`);
     instructionStep = 4;
     document.getElementById("nextBtn").style.visibility = "visible";
@@ -1312,7 +1310,7 @@ function endRound() {
 
   // Create the second part of the text
   const textAfterAvatar = document.createElement('span');
-  textAfterAvatar.innerText = `, and you can only collect ${introColor} tokens and go through ${introColor} doors.`;
+  textAfterAvatar.innerText = `, and you can only collect ${introColor} coins and go through ${introColor} doors.`;
 
   if (currentRound >= 1) {
     const roundCompletionMessage = document.createElement('p');
@@ -1498,7 +1496,7 @@ async function initRounds() {
   //textBeforeAvatar.innerText = `You are `; 
   // Create the second part of the text
   const textAfterAvatar = document.createElement('span');
-  textAfterAvatar.innerText = `, and you can only collect ${introColor} tokens and go through ${introColor} doors.`;
+  textAfterAvatar.innerText = `, and you can only collect ${introColor} coins and go through ${introColor} doors.`;
 
   // Append the text and avatar in order
   roundMessage.appendChild(textBeforeAvatar);
@@ -1612,7 +1610,7 @@ async function fetchAndPopulatePlayerInfo() {
     const introColor = currentPlayerData.color; // Get the color for the current player
 
     // Create the intro message
-    const introMessage = `You can only collect ${introColor} tokens and go through ${introColor} doors\n        `;
+    const introMessage = `You can only collect ${introColor} coins and go through ${introColor} doors\n        `;
 
     // Update the player info panel with the message
     updatePlayerList(Object.keys(allPlayersData).map(playerId => {
@@ -3070,6 +3068,8 @@ function endSession() {
       const reasonNotHelped = document.getElementById('reasonNotHelped').value.trim();
       const robotHelpfulnessRating = document.querySelector('input[name="robotHelpfulnessRating"]:checked')?.value;
       const humanHelpfulnessRating = document.querySelector('input[name="humanHelpfulnessRating"]:checked')?.value;
+      const humanHelpedYou = document.querySelector('input[name="humanHelpedYou"]:checked')?.value;
+      const robotHelpedYou = document.querySelector('input[name="robotHelpedYou"]:checked')?.value;
       const observedHumanHelp = document.querySelector('input[name="observedHumanHelp"]:checked')?.value;
       const observedRobotHelp = document.querySelector('input[name="observedRobotHelp"]:checked')?.value;
       const selfHelpfulness = document.querySelector('input[name="selfHelpfulness"]:checked')?.value;
@@ -3080,7 +3080,7 @@ function endSession() {
       if (
         !prolificID || !strategy || !gameView || !generalGameView || !noticedStuckPlayer ||
         !helpedStuckPlayer || !reasonHelped || !reasonNotHelped ||
-        !robotHelpfulnessRating || !humanHelpfulnessRating || !observedHumanHelp  || !observedRobotHelp || !selfHelpfulness || !robotInfluence
+        !robotHelpfulnessRating || !humanHelpfulnessRating || !observedHumanHelp || !humanHelpedYou  || !robotHelpedYou || !observedRobotHelp || !selfHelpfulness || !robotInfluence
       ) {
         alert("Please fill out all required fields before submitting the questionnaire.");
         return; // Prevent form submission

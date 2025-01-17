@@ -54,7 +54,7 @@
     <div class="container" id="instructionsScreen" style="display: none;">
         <h1 id="instructionsTitle">Instructions</h1>
         <div class="containertext" id="instructionText">
-            <p id="instructionsMessage"> You are going to play a simple game with another player. The primary goal of the game is to collect coins. </p>
+            <p id="instructionsMessage"> You are going to play a simple game with other players. The primary goal of the game is to collect coins. </p>
         </div>
     
         <!-- Practice Game Container -->
@@ -142,7 +142,7 @@
           <label for="strategy">What was your strategy in the game?<span style="color: red;">*</span></label>
           <textarea id="strategy" name="strategy" required></textarea>
   
-          <label for="gameView">Do you see this game primarily as a:<span style="color: red;">*</span></label>
+          <label for="gameView">Do you see this game primarily as:<span style="color: red;">*</span></label>
           <div id="gameView">
               <label><input type="radio" name="gameView" value="competitive" required> Competitive</label>
               <label><input type="radio" name="gameView" value="collaborative"> Collaborative</label>
@@ -193,18 +193,35 @@
               <label><input type="radio" name="humanHelpfulnessRating" value="6"> 6</label>
               <label><input type="radio" name="humanHelpfulnessRating" value="7"> 7</label>
           </div>
-  
-          <label for="observedHumanHelp">Did you observe another human player help a stuck player?<span style="color: red;">*</span></label>
-          <div id="observedHumanHelp">
-              <label><input type="radio" name="observedHumanHelp" value="yes" required> Yes</label>
-              <label><input type="radio" name="observedHumanHelp" value="no"> No</label>
-          </div>
-  
-          <label for="observedRobotHelp">Did you observe the robot player help a stuck player?<span style="color: red;">*</span></label>
-          <div id="observedRobotHelp">
-              <label><input type="radio" name="observedRobotHelp" value="yes" required> Yes</label>
-              <label><input type="radio" name="observedRobotHelp" value="no"> No</label>
-          </div>
+        
+                <!-- Question 1: Did a human player help you? -->
+            <label for="humanHelpedYou">Did another human player help you when you were stuck?<span style="color: red;">*</span></label>
+            <div id="humanHelpedYou">
+                <label><input type="radio" name="humanHelpedYou" value="yes" required> Yes</label>
+                <label><input type="radio" name="humanHelpedYou" value="no"> No</label>
+            </div>
+
+            <!-- Question 2: Did the robot help you? -->
+            <label for="robotHelpedYou">Did the robot player help you when you were stuck?<span style="color: red;">*</span></label>
+            <div id="robotHelpedYou">
+                <label><input type="radio" name="robotHelpedYou" value="yes" required> Yes</label>
+                <label><input type="radio" name="robotHelpedYou" value="no"> No</label>
+            </div>
+
+            <!-- Question 3: Did you observe another human player help a stuck player? -->
+            <label for="observedHumanHelp">Did you observe another human player help a stuck player?<span style="color: red;">*</span></label>
+            <div id="observedHumanHelp">
+                <label><input type="radio" name="observedHumanHelp" value="yes" required> Yes</label>
+                <label><input type="radio" name="observedHumanHelp" value="no"> No</label>
+            </div>
+
+            <!-- Question 4: Did you observe the robot help a stuck player? -->
+            <label for="observedRobotHelp">Did you observe the robot player help a stuck player?<span style="color: red;">*</span></label>
+            <div id="observedRobotHelp">
+                <label><input type="radio" name="observedRobotHelp" value="yes" required> Yes</label>
+                <label><input type="radio" name="observedRobotHelp" value="no"> No</label>
+            </div>
+
   
           <label for="selfHelpfulness">How helpful do you think you were in the game? (1 = Not helpful at all, 7 = Very helpful)<span style="color: red;">*</span></label>
           <div id="selfHelpfulness">
