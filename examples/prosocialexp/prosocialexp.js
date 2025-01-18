@@ -2900,7 +2900,7 @@ function startWaitingTimer() {
 function endSessionDueToTimeout() {
   // Display a message or navigate to an exit screen
   //alert("The session has timed out. Please try joining again later.");
-  messageWaitingRoom.innerText = " The session has timed out. You have been disconnected from the session. We couldn't find a match for you with other participants at this time. Please close this window. You'll receive a partial compensation for your time. Thank you for your understanding.";
+  messageWaitingRoom.innerText = " The session has timed out. You have been disconnected from the session. We couldn't find a match for you with other participants at this time. Please close this window. Thank you for your understanding.";
 
   alert("The session has timed out. You have been disconnected from the session. Please close the current window. ");
   // Redirect or log the player out if necessary
