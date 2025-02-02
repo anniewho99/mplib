@@ -924,7 +924,13 @@ function startRobotMovement() {
         if(timeToSave === true && currentIndex == 0){
           robotState = 'savingOne';
         }
-        handleStateChange(); // Trigger the next state
+        if(robotState === 'transition'){
+          setTimeout(() => {
+            handleStateChange(); // Trigger the next state
+          }, 5000); 
+        }else{
+          handleStateChange(); 
+        }// Trigger the next state
       }
     }else if (!isPathBeingFollowed && robotX == 0 && robotY == 0) {
       // If no path is currently being followed, trigger a state change
@@ -1375,7 +1381,7 @@ async function resetCoinsAndDoors() {
 
   placeTokensForPlayer(playerId);
 
-  if(arrivalIndex == 1 && currentRound < 3){
+  if(arrivalIndex == 1){
     if(robotHere){
       for (let coinKey in allCoins) {
         if (allCoins[coinKey].id === robotId) {
@@ -1411,29 +1417,29 @@ async function resetCoinsAndDoors() {
     }
   }
 
-  if(currentRound > 2 && robotHere){
-    robotHere = false;
-    for (let coinKey in allCoins) {
-      if (allCoins[coinKey].id === robotId) {
-        let coinPath = `coins/${coinKey}`;
-        await updateStateDirect(coinPath, null, 'removeCoinForNewRound');  // Remove only coins with the matching player ID
-      }
-    }
-    robotX = 0;
-    robotY = 0;
-    currentStep = 0; 
-    currentPath = [];
-    currentIndex = 0;
-    oldRobotCoinPositions = [];
-    robotState = 'transition';
-    isPathBeingFollowed = true;
-    oldRobotSugrid = 11;
-    robotSubgrid = 11;
+  // if(currentRound > 2 && robotHere){
+  //   robotHere = false;
+  //   for (let coinKey in allCoins) {
+  //     if (allCoins[coinKey].id === robotId) {
+  //       let coinPath = `coins/${coinKey}`;
+  //       await updateStateDirect(coinPath, null, 'removeCoinForNewRound');  // Remove only coins with the matching player ID
+  //     }
+  //   }
+  //   robotX = 0;
+  //   robotY = 0;
+  //   currentStep = 0; 
+  //   currentPath = [];
+  //   currentIndex = 0;
+  //   oldRobotCoinPositions = [];
+  //   robotState = 'transition';
+  //   isPathBeingFollowed = true;
+  //   oldRobotSugrid = 11;
+  //   robotSubgrid = 11;
 
-    let path = `players/${robotId}`;
-    let newState = null;
-    updateStateDirect( path, newState, 'removePlayer');
-  }
+  //   let path = `players/${robotId}`;
+  //   let newState = null;
+  //   updateStateDirect( path, newState, 'removePlayer');
+  // }
 
     // let player = players[playerId];
     let path = `players/${playerId}`;
@@ -1758,6 +1764,7 @@ function isOccupied(x,y) {
 }
 
 async function placeTokensForPlayer(playerId) {
+  await new Promise(resolve => setTimeout(resolve, 5000));
   let retries = 5;
   let delay = 100; // Delay between retries in milliseconds
 
@@ -2704,7 +2711,7 @@ function receiveStateChange(pathNow,nodeName, newState, typeChange ) {
     if(playerId === "trapped"){
       trappedIndex = Number(newState) - 1; 
       console.log('Trapped player is in subgridIndex:', trappedIndex);
-      if(arrivalIndex == 1 && timeToSave === false){
+      if(arrivalIndex == 1 && timeToSave === false && currentRound < 3){
         setTimeout(() => {
           timeToSave = true; 
           console.log("Time to save the trapped player", timeToSave);
