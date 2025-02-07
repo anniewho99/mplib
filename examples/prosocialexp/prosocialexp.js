@@ -795,6 +795,11 @@ let currentIndex = 0;
 
 let timeToSave = false;
 
+// let tokenWhere;
+// let mySubgrid;
+// let otherSubgrid;
+// let placeOutside = true;
+
 function updateGridWalkability(state, subgridIndex) {
   let walkableGrid;
 
@@ -897,6 +902,9 @@ function getRobotDoorEntryPoint(subgridIndex) {
 
 
 function startRobotMovement() {
+  if (movementInterval) {
+    clearInterval(movementInterval);
+  }
   // Run the movement loop every 500ms
   movementInterval = setInterval(() => {
     if (isPathBeingFollowed && currentPath.length > 0 && currentStep < currentPath.length) {
@@ -1260,9 +1268,6 @@ function startNewRound() {
   currentRound = currentRound + 1;
   trapFlag  = false;
 
-  if(currentRound == 1 && robotHere && arrivalIndex == 1){
-    startRobotMovement();
-  }
 
   if (currentRound <= totalRounds) {
     roundInterval = setTimeout(endRound, roundTime * 1000);  // End the round after 90 seconds
@@ -1341,6 +1346,8 @@ function endRound() {
     breakTime = 10;
   }
 
+  isPathBeingFollowed = false;
+
   updateStateDirect("subgridAssignment", null, 'remove Grid for new Round');
   
   // Start a 5-second break
@@ -1375,13 +1382,21 @@ async function resetCoinsAndDoors() {
 
   let startX = x;
   let startY = y;
+  // placeOutside = true;
+  // otherSubgrid = null;
+  // mySubgrid = null;
+  // if(arrivalIndex === 2){
+  //   tokenWhere = "outside";
+  // }else if(arrivalIndex === 1){
+  //   tokenWhere = "inside";
+  // }
   console.log(`Moving player ${playerId} to starting position...`);
 
   // Update player's position to the starting coordinates (1,1)
 
   placeTokensForPlayer(playerId);
 
-  if(arrivalIndex == 1){
+  if(arrivalIndex == 1 && currentRound < 3){
     if(robotHere){
       for (let coinKey in allCoins) {
         if (allCoins[coinKey].id === robotId) {
@@ -1390,6 +1405,7 @@ async function resetCoinsAndDoors() {
         }
       }
 
+      placeTokensForPlayer(robotId);
       let path = `players/${robotId}`;
       let newState = {
         x: 1,
@@ -1405,41 +1421,46 @@ async function resetCoinsAndDoors() {
       console.log("reset for new round", timeToSave);
       updateStateDirect(`timeToSave`, timeToSave, 'reset for new round'); 
 
-      robotX = 0;
-      robotY = 0;
-      currentStep = 0; 
-      currentPath = [];
-      currentIndex = 0;
-      oldRobotCoinPositions = [];
-      robotState = 'transition';
-      isPathBeingFollowed = false;
-      placeTokensForPlayer(robotId);
+      setTimeout(() => {
+        robotX = 0;
+        robotY = 0;
+        currentStep = 0; 
+        currentPath = [];
+        currentIndex = 0;
+        oldRobotCoinPositions = [];
+        robotState = 'transition';
+        isPathBeingFollowed = false;
+
+        if (robotHere && arrivalIndex == 1 && (currentRound == 1 || currentRound == 2)) {
+          startRobotMovement();
+        }
+    }, 5000);
     }
   }
 
-  // if(currentRound > 2 && robotHere){
-  //   robotHere = false;
-  //   for (let coinKey in allCoins) {
-  //     if (allCoins[coinKey].id === robotId) {
-  //       let coinPath = `coins/${coinKey}`;
-  //       await updateStateDirect(coinPath, null, 'removeCoinForNewRound');  // Remove only coins with the matching player ID
-  //     }
-  //   }
-  //   robotX = 0;
-  //   robotY = 0;
-  //   currentStep = 0; 
-  //   currentPath = [];
-  //   currentIndex = 0;
-  //   oldRobotCoinPositions = [];
-  //   robotState = 'transition';
-  //   isPathBeingFollowed = true;
-  //   oldRobotSugrid = 11;
-  //   robotSubgrid = 11;
+  if(currentRound > 2 && robotHere){
+    robotHere = false;
+    for (let coinKey in allCoins) {
+      if (allCoins[coinKey].id === robotId) {
+        let coinPath = `coins/${coinKey}`;
+        await updateStateDirect(coinPath, null, 'removeCoinForNewRound');  // Remove only coins with the matching player ID
+      }
+    }
+    robotX = 0;
+    robotY = 0;
+    currentStep = 0; 
+    currentPath = [];
+    currentIndex = 0;
+    oldRobotCoinPositions = [];
+    robotState = 'transition';
+    isPathBeingFollowed = true;
+    oldRobotSugrid = 11;
+    robotSubgrid = 11;
 
-  //   let path = `players/${robotId}`;
-  //   let newState = null;
-  //   updateStateDirect( path, newState, 'removePlayer');
-  // }
+    let path = `players/${robotId}`;
+    let newState = null;
+    updateStateDirect( path, newState, 'removePlayer');
+  }
 
     // let player = players[playerId];
     let path = `players/${playerId}`;
@@ -1768,47 +1789,94 @@ async function placeTokensForPlayer(playerId) {
   let retries = 5;
   let delay = 100; // Delay between retries in milliseconds
 
-  while (retries > 0) {
-    try {
-      // Pre-fetch current subgrid assignments, ensure fallback to {}
-      let subgridAssignments = await readState('subgridAssignment') || {};
-      console.log('Current subgridAssignments:', subgridAssignments);
-
-      // Find the first available subgrid
-      let chosenSubgrid = getRandomAvailableSubgrid(subgridAssignments);
-      if (!chosenSubgrid) {
-        console.error("No available subgrid for assignment.");
-        return;
-      }
-
-      // Proceed with the transaction
-      const transactionSuccess = await updateStateTransaction('subgridAssignment', 'assignSubgrid', {
-        playerId: playerId,
-        subgrid: chosenSubgrid, // Pass the chosen subgrid directly
-      });
-
-      if (transactionSuccess) {
-        console.log(`Player ${playerId} successfully assigned to subgrid ${chosenSubgrid}`);
-        await placeTokensInSubgrid(playerId, chosenSubgrid);
-        if(robotHere){
-          if(playerId == 'robotPlayer'){
-            robotSubgrid = chosenSubgrid;
-          }
+  // if(playerId == 'robotPlayer'){
+    while (retries > 0) {
+      try {
+        // Pre-fetch current subgrid assignments, ensure fallback to {}
+        let subgridAssignments = await readState('subgridAssignment') || {};
+        console.log('Current subgridAssignments:', subgridAssignments);
+  
+        // Find the first available subgrid
+        let chosenSubgrid = getRandomAvailableSubgrid(subgridAssignments);
+        if (!chosenSubgrid) {
+          console.error("No available subgrid for assignment.");
+          return;
         }
-        return; //  Exit loop on success
-      } else {
-        console.warn(`Transaction failed for player ${playerId}, retrying...`);
+  
+        // Proceed with the transaction
+        const transactionSuccess = await updateStateTransaction('subgridAssignment', 'assignSubgrid', {
+          playerId: playerId,
+          subgrid: chosenSubgrid, // Pass the chosen subgrid directly
+        });
+  
+        if (transactionSuccess) {
+          console.log(`Player ${playerId} successfully assigned to subgrid ${chosenSubgrid}`);
+          await placeTokensInSubgrid(playerId, chosenSubgrid);
+          if(robotHere){
+            if(playerId == 'robotPlayer'){
+              robotSubgrid = chosenSubgrid;
+            }
+          }
+          return; //  Exit loop on success
+        } else {
+          console.warn(`Transaction failed for player ${playerId}, retrying...`);
+        }
+      } catch (error) {
+        console.error(`Error during transaction for player ${playerId}:`, error);
       }
-    } catch (error) {
-      console.error(`Error during transaction for player ${playerId}:`, error);
+  
+      retries--;
+      await new Promise((resolve) => setTimeout(resolve, delay));
+      delay *= 2; // Exponential backoff
     }
+  
+    console.error(`Failed to assign subgrid to player ${playerId} after retries.`);
 
-    retries--;
-    await new Promise((resolve) => setTimeout(resolve, delay));
-    delay *= 2; // Exponential backoff
-  }
+  // }else{
+  //   let subgridAssignments = await readState('subgridAssignment') || {};
+  //     console.log('Current subgridAssignments:', subgridAssignments);
 
-  console.error(`Failed to assign subgrid to player ${playerId} after retries.`);
+  //     let chosenSubgrid;
+  //     if (!mySubgrid && !otherSubgrid) {
+  //       // No subgrid assigned yet → Assign a new subgrid
+  //       chosenSubgrid = 4;
+  //       mySubgrid = 4;
+  //       otherSubgrid = 4;
+  //     } else if (Number(mySubgrid) == Number(otherSubgrid)) {
+  //       // Both players have the same subgrid → Time to assign a new one
+  //       chosenSubgrid = getRandomAvailableSubgrid(subgridAssignments);
+  //     }else {
+  //       chosenSubgrid = otherSubgrid;
+  //     }
+
+  //     if (!chosenSubgrid) {
+  //       console.error("No available subgrid for assignment.");
+  //       return;
+  //     }
+  //     mySubgrid = chosenSubgrid;
+
+  //       let id = `subgridAssignment/${playerId}`;
+  //       let newState = mySubgrid;
+
+  //       await updateStateDirect(id, newState, 'assignSubgrid');
+
+  //       // Determine token placement type (inside or outside)
+  //       if(tokenWhere == "inside"){
+  //         tokenWhere = "outside";
+  //       }else{
+  //         tokenWhere = "inside";
+  //       }
+  //       if(trapFlag === 'used' &&  tokenWhere == "outside" && placeOutside && Number(playerSequence) == 2){
+  //         chosenSubgrid = Number(trappedIndex) + 1;
+  //         mySubgrid = chosenSubgrid;
+  //         placeOutside = false;
+  //       }
+  //       await placeTokensInSubgrid(playerId, chosenSubgrid, tokenWhere);
+
+  //       console.log(`Player ${playerId} assigned to subgrid ${chosenSubgrid} and the tokens are placed ${tokenWhere}`);
+
+  // }
+
 }
 
 async function placeTokensInSubgrid(playerId, subgridId) {
@@ -1817,27 +1885,61 @@ async function placeTokensInSubgrid(playerId, subgridId) {
 
   console.log(`Placing tokens for player ${playerId} in subgrid ${subgridId}`);
 
-  // Place three coins within the selected subgrid
-  for (let i = 0; i < 3;) {
-    let x = Math.floor(Math.random() * (selectedSubgrid.xEnd - selectedSubgrid.xStart + 1)) + selectedSubgrid.xStart;
-    let y = Math.floor(Math.random() * (selectedSubgrid.yEnd - selectedSubgrid.yStart + 1)) + selectedSubgrid.yStart;
-    let positionKey = `${x},${y}`;
+  // if(tokenPlacement == "inside"){
+      // Place three coins within the selected subgrid
+    for (let i = 0; i < 3;) {
+      let x = Math.floor(Math.random() * (selectedSubgrid.xEnd - selectedSubgrid.xStart + 1)) + selectedSubgrid.xStart;
+      let y = Math.floor(Math.random() * (selectedSubgrid.yEnd - selectedSubgrid.yStart + 1)) + selectedSubgrid.yStart;
+      let positionKey = `${x},${y}`;
 
-    // Ensure the position is not occupied and not already used
-    if (!isOccupied(x, y) && !placedPositions.has(positionKey)) {
-      let id = `coins/${getKeyString(x, y)}`;
-      let newState = { x, y, color: players[playerId].color, id: playerId };  // Set coin color to match player
+      // Ensure the position is not occupied and not already used
+      if (!isOccupied(x, y) && !placedPositions.has(positionKey)) {
+        let id = `coins/${getKeyString(x, y)}`;
+        let newState = { x, y, color: players[playerId].color, id: playerId };  // Set coin color to match player
 
-      await updateStateDirect(id, newState, 'placeCoin');  // Save new state in Firebase
-      console.log(`Coin placed at (${x}, ${y}) for player ${playerId}`);
-      if (playerId === "robotPlayer") {
+        await updateStateDirect(id, newState, 'placeCoin');  // Save new state in Firebase
+        console.log(`Coin placed at (${x}, ${y}) for player ${playerId}`);
+        if (playerId === "robotPlayer") {
         robotCoinPositions.push({ x, y });
+        }
+        placedPositions.add(positionKey);  // Mark this position as used
+        i++;  // Only increment after successful placement
       }
-
-      placedPositions.add(positionKey);  // Mark this position as used
-      i++;  // Only increment after successful placement
     }
-  }
+
+  // }else{
+  //     // Place three coins within the selected subgrid
+  //   for (let i = 0; i < 3;) {
+
+  //     let outsideCorner = Math.random() < 0.5 ? "upper-left" : "lower-right"; // Randomly pick a corner
+  //     let x;
+  //     let y;
+
+  //     if (outsideCorner === "upper-left") {
+  //       x = Math.floor(Math.random() * 2) + (selectedSubgrid.xStart - 2); // Left of subgrid
+  //       y = Math.floor(Math.random() * 2) + (selectedSubgrid.yStart - 2); // Above subgrid
+  //     } else {
+  //       x = Math.floor(Math.random() * 2) + (selectedSubgrid.xEnd + 1); // Right of subgrid
+  //       y = Math.floor(Math.random() * 2) + (selectedSubgrid.yEnd + 1); // Below subgrid
+  //     }
+  //     //let x = Math.floor(Math.random() * (selectedSubgrid.xEnd - selectedSubgrid.xStart + 1)) + selectedSubgrid.xStart;
+  //     //let y = Math.floor(Math.random() * (selectedSubgrid.yEnd - selectedSubgrid.yStart + 1)) + selectedSubgrid.yStart;
+  //     let positionKey = `${x},${y}`;
+
+  //     // Ensure the position is not occupied and not already used
+  //     if (!isOccupied(x, y) && !placedPositions.has(positionKey)) {
+  //       let id = `coins/${getKeyString(x, y)}`;
+  //       let newState = { x, y, color: players[playerId].color, id: playerId };  // Set coin color to match player
+
+  //       await updateStateDirect(id, newState, 'placeCoin');  // Save new state in Firebase
+  //       console.log(`Coin placed at (${x}, ${y}) for player ${playerId}`);
+
+  //       placedPositions.add(positionKey);  // Mark this position as used
+  //       i++;  // Only increment after successful placement
+  //     }
+  //   }
+  // }
+
 }
 
 async function handleCoinCollection(playerId) {
@@ -2414,6 +2516,7 @@ async function initGame() {
 
       introColor = color;
       introName = name;
+      // tokenWhere = "inside";
 
       const playerSequenceObject = {};
       shuffledPlayerIDs.forEach((id, index) => {
@@ -2482,6 +2585,10 @@ async function initGame() {
     const {x, y} = { x: 1, y: 1 }; 
 
     introName = name;
+    // if(arrivalIndex === 2){
+    //   tokenWhere = "outside";
+    // }
+
     
     // Broadcast this new player position to the database
     let path = `players/${playerId}`;
@@ -2719,7 +2826,20 @@ function receiveStateChange(pathNow,nodeName, newState, typeChange ) {
       }
     }
 
-    if(playerId === "robotPlayer" && (typeChange == 'onChildAdded' ||typeChange == 'onChildChanged')){
+    // if(playerId === "robotPlayer" && (typeChange == 'onChildAdded' ||typeChange == 'onChildChanged')){
+    //   const newRobotSubgrid = Number(newState);
+    //   if (newRobotSubgrid !== robotSubgridForDoorSwitching) {
+    //     oldRobotSugridForDoorSwitching = robotSubgridForDoorSwitching;
+    //     robotSubgridForDoorSwitching = newRobotSubgrid;
+    //     console.log('Robot subgrid updated to:', robotSubgridForDoorSwitching);
+    //   }
+    //   console.log('Current state for playerId:', playerId, 'State:', newState);
+    // }
+  }
+
+  if (pathNow === 'subgridAssignment' && (typeChange == 'onChildAdded' ||typeChange == 'onChildChanged')) {
+    console.log('Updated subgrid assignments:', newState);
+    if(playerId === "robotPlayer"){
       const newRobotSubgrid = Number(newState);
       if (newRobotSubgrid !== robotSubgridForDoorSwitching) {
         oldRobotSugridForDoorSwitching = robotSubgridForDoorSwitching;
@@ -2728,6 +2848,13 @@ function receiveStateChange(pathNow,nodeName, newState, typeChange ) {
       }
       console.log('Current state for playerId:', playerId, 'State:', newState);
     }
+
+    // const id = nodeName;
+
+    // if(id != playerId && id != 'robotPlayer'){
+    //   otherSubgrid = Number(newState);
+    //   console.log('The other players subgrid is:', newState);
+    // }
 
   }
 
