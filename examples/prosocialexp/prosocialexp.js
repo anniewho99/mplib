@@ -2839,6 +2839,7 @@ function receiveStateChange(pathNow,nodeName, newState, typeChange ) {
 
   if (pathNow === 'subgridAssignment' && (typeChange == 'onChildAdded' ||typeChange == 'onChildChanged')) {
     console.log('Updated subgrid assignments:', newState);
+    const playerId = nodeName; 
     if(playerId === "robotPlayer"){
       const newRobotSubgrid = Number(newState);
       if (newRobotSubgrid !== robotSubgridForDoorSwitching) {
