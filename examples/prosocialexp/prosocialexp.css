@@ -517,6 +517,16 @@ button:active {
   caret-color: transparent;
 }
 
+.green-player {
+  width: 32px; /* Match the character size */
+  height: 32px;
+  position: absolute;
+  background: url('./images/characters_practice.png') no-repeat; /* Set to your character sprite sheet */
+  background-position: 0px -128px; /* Adjust position to show the yellow character */
+  background-size: 64px auto; /* Scale the sheet if needed; adjust to actual sprite sheet dimensions */
+  caret-color: transparent;
+}
+
 .practice-coin-yellow {
   width: 14px;
   height: 14px;
@@ -633,4 +643,32 @@ button:active {
 #questionnaireForm textarea {
   margin-top: 20px;
   display: block;
+}
+
+.subgrid-overlay {
+  position: absolute;
+  background-color: rgba(255, 255, 255, 0.5); /* Semi-transparent red */
+  pointer-events: none; /* Allow clicks to go through */
+  opacity: 0; /* Start hidden */
+  transition: opacity 0.2s ease-in-out;
+}
+.flash-visible {
+  opacity: 1;
+}
+.thank-you-message {
+  position: absolute;
+  min-width: 25px;  /* Reduce width further */
+  min-height: 10px; /* Reduce height further */
+  background: white;
+  color: black;
+  font-size: 5px;  /* Reduce font size */
+  font-weight: bold;
+  text-align: center;
+  display: flex;  /* Flexbox for centering */
+  justify-content: center;
+  align-items: center;
+  border-radius: 2px; /* Slightly smaller border radius */
+  padding: 2px; /* Reduce padding */
+  opacity: 1;
+  transition: opacity 1s ease-in-out;
 }

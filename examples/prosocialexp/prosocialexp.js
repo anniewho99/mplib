@@ -124,7 +124,7 @@ const instructions = [
   "You’ll use the arrow keys to move your character around the grid. Let's start by placing you as the orange character on the top left corner!",
   "You are now the orange character in the top left corner of the grid, which has four rooms separated by walls and doors.",
   "Each room has doors in different colors, and you can only pass through doors that match your color.  You can use arrow keys to move your character. Try passing through the orange door to enter a room! Once you enter a room, the door colors will shuffle.",
-  "Now, let's practice entering another room. In the lower right room, the green door has disappeared. In situations like this, if you enter the room through the door matching your color, the doors will shuffle, and the green door will reappear.",
+  "Now, let's practice entering another room. The green player is trapped in the lower right room since there's no green door. They can only exit if someone enters and resets the doors. Enter through the orange door to help them!",
   "Next, let’s collect some coins. You can only collect coins that match your color. Ready to try collecting coins? Go ahead and collect the three orange coins in the lower left room.",
   "There can be other players in the game, ranging from one to three additional participants. In this example, there is one other player: the green player, located in the top right corner. This player’s objective is to collect the green coins in the top right room.",
   "Here, we’re demonstrating what another player might do. Keep in mind that when you start the game, you’ll be playing with other human participants. "
@@ -176,10 +176,12 @@ function handleInstructionStep(step) {
       document.getElementById("nextBtn").style.visibility = "hidden";
       break;
     case 3:
+      placeGreenPlayer();
       setLowerRightGreenDoorGray(); 
       document.getElementById("nextBtn").style.visibility = "hidden";
       break;
     case 4:
+      removeGreenPlayer();
       placePracticeCoins();  
       document.getElementById("nextBtn").style.visibility = "hidden";
       break;
@@ -197,6 +199,27 @@ function placeYellowPlayer() {
   const yellowPlayer = { x: GRID_WIDTH - 1, y: 0, color: "#61c96f" };
   updatePlayerPosition(yellowPlayer, "yellow"); // Pass "yellow" to use the yellow sprite
   return yellowPlayer;
+}
+
+function placeGreenPlayer() {
+  const container = document.getElementById("practiceGameContainer");
+  // Remove existing green player (if any) to prevent duplicates
+  document.querySelectorAll(".green-player").forEach(el => el.remove());
+  // Create a new green player element
+  const greenPlayerElement = document.createElement("div");
+  greenPlayerElement.classList.add("green-player"); // No "practice-player" class
+  greenPlayerElement.style.position = "absolute";  // Ensure positioning
+  greenPlayerElement.style.top = `${(GRID_HEIGHT - 4) * CELL_SIZE}px`;
+  greenPlayerElement.style.left = `${(GRID_WIDTH - 4) * CELL_SIZE}px`;
+  greenPlayerElement.style.width = `${CELL_SIZE}px`;  // Adjust size
+  greenPlayerElement.style.height = `${CELL_SIZE}px`;
+  greenPlayerElement.style.zIndex = "10"; // Ensure it is visible above other elements
+  // Append directly to the container
+  container.appendChild(greenPlayerElement);
+}
+
+function removeGreenPlayer() {
+  document.querySelectorAll(".green-player").forEach(el => el.remove());
 }
 
 function updatePlayerPosition(player, color) {
@@ -2467,6 +2490,56 @@ function placeDoorsForAllSubgrids() {
   }
 }
 
+function flashTrappedSubgrid(subgridIndex) {
+  const subgrid = subgridPositions[subgridIndex]; // Get the trapped player's subgrid
+  const gameContainer = document.querySelector(".game-container");// The main grid container
+  // Create the overlay element
+  let overlay = document.createElement("div");
+  overlay.classList.add("subgrid-overlay");
+  
+  // Position overlay based on subgrid coordinates
+  overlay.style.left = `${ (subgrid.xStart - 1) * 16}px`; // Convert grid units to pixels
+  overlay.style.top = `${ (subgrid.yStart - 1) * 16}px`;
+  overlay.style.width = `${(subgrid.xEnd - subgrid.xStart + 1) * 16}px`;
+  overlay.style.height = `${(subgrid.yEnd - subgrid.yStart + 1) * 16}px`;
+  // Append the overlay to the game container
+  gameContainer.appendChild(overlay);
+  let flashCount = 0;
+  function flash() {
+    overlay.classList.toggle("flash-visible");
+    flashCount++;
+    if (flashCount < 6) { // Flash three times (show and hide)
+      setTimeout(flash, 500);
+    } else {
+      overlay.remove(); // Remove overlay after last flash
+    }
+  }
+  flash(); // Start the flashing sequence
+}
+
+function displayThankYouMessage(subgridIndex) {
+  const subgrid = subgridPositions[subgridIndex]; // Get the trapped player's subgrid
+  const gameContainer = document.querySelector(".game-container"); // The main grid container
+  // Create the thank-you message element
+  let messageDiv = document.createElement("div");
+  messageDiv.classList.add("thank-you-message");
+  messageDiv.textContent = "Thank you!";
+  // Position the message at the center of the trapped subgrid
+  messageDiv.style.left = `${(subgrid.xStart + subgrid.xEnd) / 2 * 16 - 25}px`; 
+  messageDiv.style.top = `${(subgrid.yStart + subgrid.yEnd) / 2 * 16 - 10}px`; 
+  // Append the message to the game container
+  gameContainer.appendChild(messageDiv);
+  // Remove the message after 3 seconds
+  setTimeout(() => {
+    messageDiv.style.opacity = '0';
+    setTimeout(() => {
+      messageDiv.remove();
+    }, 1000); // Wait for fade-out transition
+  }, 3000);
+}
+
+
+
 async function initGame() {
     clearTimeout(waitingTimer);
     // Get the id of this player
@@ -2811,31 +2884,31 @@ function receiveStateChange(pathNow,nodeName, newState, typeChange ) {
     }
   }
 
-  if (pathNow === 'subgridAssignment') {
-    console.log('Updated subgrid assignments:', newState);
-    const playerId = nodeName; 
+  // if (pathNow === 'subgridAssignment') {
+  //   console.log('Updated subgrid assignments:', newState);
+  //   const playerId = nodeName; 
 
-    if(playerId === "trapped"){
-      trappedIndex = Number(newState) - 1; 
-      console.log('Trapped player is in subgridIndex:', trappedIndex);
-      if(arrivalIndex == 1 && timeToSave === false && currentRound < 3){
-        setTimeout(() => {
-          timeToSave = true; 
-          console.log("Time to save the trapped player", timeToSave);
-        }, 5000);
-      }
-    }
+  //   if(playerId === "trapped"){
+  //     trappedIndex = Number(newState) - 1; 
+  //     console.log('Trapped player is in subgridIndex:', trappedIndex);
+  //     if(arrivalIndex == 1 && timeToSave === false && currentRound < 3){
+  //       setTimeout(() => {
+  //         timeToSave = true; 
+  //         console.log("Time to save the trapped player", timeToSave);
+  //       }, 5000);
+  //     }
+  //   }
 
-    // if(playerId === "robotPlayer" && (typeChange == 'onChildAdded' ||typeChange == 'onChildChanged')){
-    //   const newRobotSubgrid = Number(newState);
-    //   if (newRobotSubgrid !== robotSubgridForDoorSwitching) {
-    //     oldRobotSugridForDoorSwitching = robotSubgridForDoorSwitching;
-    //     robotSubgridForDoorSwitching = newRobotSubgrid;
-    //     console.log('Robot subgrid updated to:', robotSubgridForDoorSwitching);
-    //   }
-    //   console.log('Current state for playerId:', playerId, 'State:', newState);
-    // }
-  }
+  //   // if(playerId === "robotPlayer" && (typeChange == 'onChildAdded' ||typeChange == 'onChildChanged')){
+  //   //   const newRobotSubgrid = Number(newState);
+  //   //   if (newRobotSubgrid !== robotSubgridForDoorSwitching) {
+  //   //     oldRobotSugridForDoorSwitching = robotSubgridForDoorSwitching;
+  //   //     robotSubgridForDoorSwitching = newRobotSubgrid;
+  //   //     console.log('Robot subgrid updated to:', robotSubgridForDoorSwitching);
+  //   //   }
+  //   //   console.log('Current state for playerId:', playerId, 'State:', newState);
+  //   // }
+  // }
 
   if (pathNow === 'subgridAssignment' && (typeChange == 'onChildAdded' ||typeChange == 'onChildChanged')) {
     console.log('Updated subgrid assignments:', newState);
@@ -2850,6 +2923,20 @@ function receiveStateChange(pathNow,nodeName, newState, typeChange ) {
       console.log('Current state for playerId:', playerId, 'State:', newState);
     }
 
+    if (playerId === "trapped") {
+      trappedIndex = Number(newState) - 1;
+      console.log('Trapped player is in subgridIndex:', trappedIndex);
+      
+      // Trigger the flashing effect
+      flashTrappedSubgrid(trappedIndex);
+      if(arrivalIndex == 1 && timeToSave === false && currentRound < 3){
+        setTimeout(() => {
+          timeToSave = true; 
+          console.log("Time to save the trapped player", timeToSave);
+        }, 5000);
+      }
+    }
+
     // const id = nodeName;
 
     // if(id != playerId && id != 'robotPlayer'){
@@ -2857,6 +2944,14 @@ function receiveStateChange(pathNow,nodeName, newState, typeChange ) {
     //   console.log('The other players subgrid is:', newState);
     // }
 
+  }
+
+  if (pathNow === 'subgridAssignment' && (typeChange == 'onChildRemoved')) {
+    console.log('Updated subgrid assignments:', newState);
+    const id = nodeName;
+    if (id === "trapped") {
+      displayThankYouMessage(trappedIndex);
+    }
   }
 
   if (pathNow === 'condition') {
