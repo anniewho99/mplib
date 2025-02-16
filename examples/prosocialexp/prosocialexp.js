@@ -760,6 +760,7 @@ let subgridPositions = [
   { xStart: 15, xEnd: 17, yStart: 15, yEnd: 17 },
 ];
 
+let watchNow = false;
 // const initialGrid = [
 //   [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
 //   [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
@@ -1427,7 +1428,7 @@ async function resetCoinsAndDoors() {
           await updateStateDirect(coinPath, null, 'removeCoinForNewRound');  // Remove only coins with the matching player ID
         }
       }
-
+      watchNow = false;
       placeTokensForPlayer(robotId);
       let path = `players/${robotId}`;
       let newState = {
@@ -1808,7 +1809,13 @@ function isOccupied(x,y) {
 }
 
 async function placeTokensForPlayer(playerId) {
-  await new Promise(resolve => setTimeout(resolve, 5000));
+
+  let waitTime = 5000;
+  if(trappedPlayer!= null && currentRound < 3 && playerSequence == 2 && watchNow == false && playerId != 'robotPlayer'){
+    waitTime = 15000;
+  }
+
+  await new Promise(resolve => setTimeout(resolve, waitTime));
   let retries = 5;
   let delay = 100; // Delay between retries in milliseconds
 
@@ -2520,20 +2527,33 @@ function flashTrappedSubgrid(subgridIndex) {
 function displayThankYouMessage(subgridIndex) {
   const subgrid = subgridPositions[subgridIndex]; // Get the trapped player's subgrid
   const gameContainer = document.querySelector(".game-container"); // The main grid container
-  // Create the thank-you message element
-  let messageDiv = document.createElement("div");
-  messageDiv.classList.add("thank-you-message");
-  messageDiv.textContent = "Thank you!";
-  // Position the message at the center of the trapped subgrid
-  messageDiv.style.left = `${(subgrid.xStart + subgrid.xEnd) / 2 * 16 - 25}px`; 
-  messageDiv.style.top = `${(subgrid.yStart + subgrid.yEnd) / 2 * 16 - 10}px`; 
-  // Append the message to the game container
-  gameContainer.appendChild(messageDiv);
-  // Remove the message after 3 seconds
+
+  // Create the heart image element
+  let heartImg = document.createElement("img");
+  heartImg.classList.add("thank-you-heart");
+  heartImg.src = "./images/heart.png"; // Ensure the correct path to your heart image
+  heartImg.alt = "Thank you!";
+
+  const oldX = players[trappedPlayer].x;
+  const oldY = players[trappedPlayer].y;
+
+  // Position the heart at the center of the trapped subgrid
+  heartImg.style.position = "absolute";
+  heartImg.style.left = `${oldX * 16 - 16}px`; 
+  heartImg.style.top = `${ oldY * 16 - 26}px`; 
+  heartImg.style.width = "16px"; // Adjust size as needed
+  heartImg.style.height = "16px";
+  heartImg.style.opacity = "1";
+  heartImg.style.transition = "opacity 1s ease-in-out";
+
+  // Append the heart image to the game container
+  gameContainer.appendChild(heartImg);
+
+  // Remove the heart after 3 seconds with fade-out effect
   setTimeout(() => {
-    messageDiv.style.opacity = '0';
+    heartImg.style.opacity = '0';
     setTimeout(() => {
-      messageDiv.remove();
+      heartImg.remove();
     }, 1000); // Wait for fade-out transition
   }, 3000);
 }
@@ -2951,6 +2971,7 @@ function receiveStateChange(pathNow,nodeName, newState, typeChange ) {
     const id = nodeName;
     if (id === "trapped") {
       displayThankYouMessage(trappedIndex);
+      watchNow = true;
     }
   }
 
