@@ -1811,9 +1811,9 @@ function isOccupied(x,y) {
 async function placeTokensForPlayer(playerId) {
 
   let waitTime = 5000;
-  if(trappedPlayer!= null && currentRound < 3 && playerSequence == 2 && watchNow == false && playerId != 'robotPlayer'){
-    waitTime = 15000;
-  }
+  // if(trappedPlayer!= null && currentRound < 3 && playerSequence == 2 && watchNow == false && playerId != 'robotPlayer'){
+  //   waitTime = 15000;
+  // }
 
   await new Promise(resolve => setTimeout(resolve, waitTime));
   let retries = 5;
@@ -2497,66 +2497,112 @@ function placeDoorsForAllSubgrids() {
   }
 }
 
-function flashTrappedSubgrid(subgridIndex) {
-  const subgrid = subgridPositions[subgridIndex]; // Get the trapped player's subgrid
-  const gameContainer = document.querySelector(".game-container");// The main grid container
-  // Create the overlay element
-  let overlay = document.createElement("div");
-  overlay.classList.add("subgrid-overlay");
-  
-  // Position overlay based on subgrid coordinates
-  overlay.style.left = `${ (subgrid.xStart - 1) * 16}px`; // Convert grid units to pixels
-  overlay.style.top = `${ (subgrid.yStart - 1) * 16}px`;
-  overlay.style.width = `${(subgrid.xEnd - subgrid.xStart + 1) * 16}px`;
-  overlay.style.height = `${(subgrid.yEnd - subgrid.yStart + 1) * 16}px`;
-  // Append the overlay to the game container
-  gameContainer.appendChild(overlay);
-  let flashCount = 0;
-  function flash() {
-    overlay.classList.toggle("flash-visible");
-    flashCount++;
-    if (flashCount < 6) { // Flash three times (show and hide)
-      setTimeout(flash, 500);
-    } else {
-      overlay.remove(); // Remove overlay after last flash
-    }
+function flashTrappedMessage(playerId) {
+  const trappedPlayerData = players[playerId];
+  const gameContainer = document.querySelector(".wrapper-container"); // Main game container
+
+  // Remove existing message before adding a new one
+  let existingMessage = document.querySelector(".trapped-message");
+  if (existingMessage) {
+    existingMessage.remove();
   }
-  flash(); // Start the flashing sequence
+
+  // Create the trapped message element
+  let messageDiv = document.createElement("div");
+  messageDiv.classList.add("trapped-message");
+
+  // Create player name element
+  const playerName = document.createElement("span");
+  playerName.classList.add("player-name");
+  playerName.textContent = trappedPlayerData.name || `Player ${playerId}`;
+
+  // Create avatar
+  const avatar = document.createElement("div");
+  avatar.classList.add("player-avatar", "Character_sprite");
+  avatar.style.backgroundPositionY = getPlayerBackgroundPosition(trappedPlayerData.color);
+
+  // Create trapped text element
+  const trappedText = document.createElement("span");
+  trappedText.classList.add("trapped-text");
+  trappedText.textContent = " is trapped!";
+
+  // Append elements in the correct order: Name → Avatar → Text
+  messageDiv.appendChild(playerName);
+  messageDiv.appendChild(avatar);
+  messageDiv.appendChild(trappedText);
+
+  // Style the message
+  Object.assign(messageDiv.style, {
+    position: "absolute",
+    top: "10px", 
+    left: "50%",
+    transform: "translateX(-50%)",
+    backgroundColor: `${trappedPlayerData.color}80`, // Red semi-transparent
+    color: "white",
+    padding: "10px 20px",
+    fontSize: "20px",
+    fontWeight: "bold",
+    borderRadius: "8px",
+    zIndex: "1000",
+    transition: "opacity 0.5s ease-in-out",
+    display: "flex",
+    alignItems: "center",
+    gap: "8px"
+  });
+
+  // Append the message to the game container
+  gameContainer.appendChild(messageDiv);
+
+  function flash() {
+    if (watchNow) { 
+      messageDiv.remove(); 
+      return; // Stop further execution immediately
+    }
+  
+    messageDiv.style.opacity = messageDiv.style.opacity === "0" ? "1" : "0"; // Toggle visibility
+  
+    setTimeout(flash, 1000);
+  }  
+
+  flash(); 
 }
 
-function displayThankYouMessage(subgridIndex) {
-  const subgrid = subgridPositions[subgridIndex]; // Get the trapped player's subgrid
-  const gameContainer = document.querySelector(".game-container"); // The main grid container
 
-  // Create the heart image element
-  let heartImg = document.createElement("img");
-  heartImg.classList.add("thank-you-heart");
-  heartImg.src = "./images/heart.png"; // Ensure the correct path to your heart image
-  heartImg.alt = "Thank you!";
 
-  const oldX = players[trappedPlayer].x;
-  const oldY = players[trappedPlayer].y;
 
-  // Position the heart at the center of the trapped subgrid
-  heartImg.style.position = "absolute";
-  heartImg.style.left = `${oldX * 16 - 16}px`; 
-  heartImg.style.top = `${ oldY * 16 - 26}px`; 
-  heartImg.style.width = "16px"; // Adjust size as needed
-  heartImg.style.height = "16px";
-  heartImg.style.opacity = "1";
-  heartImg.style.transition = "opacity 1s ease-in-out";
+// function displayThankYouMessage(subgridIndex) {
+//   const subgrid = subgridPositions[subgridIndex]; // Get the trapped player's subgrid
+//   const gameContainer = document.querySelector(".game-container"); // The main grid container
 
-  // Append the heart image to the game container
-  gameContainer.appendChild(heartImg);
+//   // Create the heart image element
+//   let heartImg = document.createElement("img");
+//   heartImg.classList.add("thank-you-heart");
+//   heartImg.src = "./images/heart.png"; // Ensure the correct path to your heart image
+//   heartImg.alt = "Thank you!";
 
-  // Remove the heart after 3 seconds with fade-out effect
-  setTimeout(() => {
-    heartImg.style.opacity = '0';
-    setTimeout(() => {
-      heartImg.remove();
-    }, 1000); // Wait for fade-out transition
-  }, 3000);
-}
+//   const oldX = players[trappedPlayer].x;
+//   const oldY = players[trappedPlayer].y;
+
+//   // Position the heart at the center of the trapped subgrid
+//   heartImg.style.position = "absolute";
+//   heartImg.style.left = `${oldX * 16 - 16}px`; 
+//   heartImg.style.top = `${ oldY * 16 - 26}px`; 
+//   heartImg.style.width = "16px"; // Adjust size as needed
+//   heartImg.style.height = "16px";
+//   heartImg.style.opacity = "1";
+//   heartImg.style.transition = "opacity 1s ease-in-out";
+
+//   // Append the heart image to the game container
+//   gameContainer.appendChild(heartImg);
+
+//   // Remove the heart after 3 seconds with fade-out effect
+//   setTimeout(() => {
+//     heartImg.style.opacity = '0';
+//     setTimeout(() => {
+//       heartImg.remove();
+//     }, 1000); // Wait for fade-out transition
+//   }, 3000);
+// }
 
 
 
@@ -2932,23 +2978,30 @@ function receiveStateChange(pathNow,nodeName, newState, typeChange ) {
 
   if (pathNow === 'subgridAssignment' && (typeChange == 'onChildAdded' ||typeChange == 'onChildChanged')) {
     console.log('Updated subgrid assignments:', newState);
-    const playerId = nodeName; 
-    if(playerId === "robotPlayer"){
+    const player = nodeName; 
+    if(player === "robotPlayer"){
       const newRobotSubgrid = Number(newState);
       if (newRobotSubgrid !== robotSubgridForDoorSwitching) {
         oldRobotSugridForDoorSwitching = robotSubgridForDoorSwitching;
         robotSubgridForDoorSwitching = newRobotSubgrid;
         console.log('Robot subgrid updated to:', robotSubgridForDoorSwitching);
       }
-      console.log('Current state for playerId:', playerId, 'State:', newState);
+      console.log('Current state for playerId:', player, 'State:', newState);
     }
 
-    if (playerId === "trapped") {
+    if (player === "trapped") {
       trappedIndex = Number(newState) - 1;
       console.log('Trapped player is in subgridIndex:', trappedIndex);
       
       // Trigger the flashing effect
-      flashTrappedSubgrid(trappedIndex);
+      if(trappedPlayer == null){
+        const currentPlayerId = getCurrentPlayerId(); // Get the current player's ID
+        trappedPlayer = Object.keys(players).find(id => id !== currentPlayerId && id !== "robotPlayer");
+        flashTrappedMessage(trappedPlayer);
+
+      }else{
+        flashTrappedMessage(trappedPlayer);
+      }
       if(arrivalIndex == 1 && timeToSave === false && currentRound < 3){
         setTimeout(() => {
           timeToSave = true; 
@@ -2967,10 +3020,10 @@ function receiveStateChange(pathNow,nodeName, newState, typeChange ) {
   }
 
   if (pathNow === 'subgridAssignment' && (typeChange == 'onChildRemoved')) {
-    console.log('Updated subgrid assignments:', newState);
+    console.log('trap player is saved:', nodeName);
     const id = nodeName;
     if (id === "trapped") {
-      displayThankYouMessage(trappedIndex);
+      console.log('trap player is saved:', nodeName);
       watchNow = true;
     }
   }
@@ -3056,10 +3109,15 @@ function receiveStateChange(pathNow,nodeName, newState, typeChange ) {
     }
   }
 
-  if(pathNow === "trappedPlayer" && (typeChange == 'onChildAdded' ||typeChange == 'onChildChanged')){
-    // trappedPlayer = newState;
-    console.log('trappedPlayer is:', newState);
-  }
+  // if(pathNow === "trappedPlayer" && (typeChange == 'onChildAdded' ||typeChange == 'onChildChanged')){
+  //   // trappedPlayer = newState;
+  //   console.log('trappedPlayer is:', newState);
+  //   if(trappedPlayer == null){
+  //     trappedPlayer = nodeName;
+
+  //   }
+
+  // }
 
 }
 
