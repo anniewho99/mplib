@@ -76,7 +76,7 @@ let funList = {
 };
 
 // List the node names where we place listeners for any changes to the children of these nodes; set to '' if listening to changes for children of the root
-let listenerPaths = ['coins', 'players', 'doors', 'subgridAssignment', 'condition', 'trappedPlayer', 'colorAssignment', 'playerSequenceAssignment', 'robotPhase'];
+let listenerPaths = ['coins', 'players', 'doors', 'subgridAssignment', 'condition', 'trappedPlayer', 'colorAssignment', 'playerSequenceAssignment'];
 
 // Set the session configuration for MPLIB
 initializeMPLIB( sessionConfig , studyId , funList, listenerPaths, verbosity );
@@ -955,8 +955,8 @@ function startRobotMovement() {
         isPathBeingFollowed = false; // Path completed
         if(timeToSave === true && currentIndex == 0){
           robotState = 'savingOne';
-          let robotPhasePath = 'robotPhase';
-          updateStateDirect(robotPhasePath, 'savingOne', 'robotComingToSave');
+          // let robotPhasePath = 'robotPhase';
+          // updateStateDirect(robotPhasePath, 'savingOne', 'robotComingToSave');
         }
         if(robotState === 'transition'){
           setTimeout(() => {
