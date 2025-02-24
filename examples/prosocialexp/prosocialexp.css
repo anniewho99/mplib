@@ -672,3 +672,26 @@ button:active {
   opacity: 1;
   transition: opacity 1s ease-in-out;
 }
+
+.speech-bubble {
+  width: 65px; /* Adjust bubble size */
+  height: 30px;
+  background-size: contain;
+  background-repeat: no-repeat;
+  position: absolute;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 0px 0px 0 2px;
+}
+
+.speech-text {
+  font-size: 5px; /* Smaller text */
+  font-weight: bold;
+  color: black;
+  text-align: center;
+  line-height: 1; /* Ensures text doesn't overflow */
+  max-width: 90%; /* Prevents text from touching edges */
+  word-wrap: break-word; /* Ensures text wraps properly */
+}
+

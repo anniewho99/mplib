@@ -76,7 +76,7 @@ let funList = {
 };
 
 // List the node names where we place listeners for any changes to the children of these nodes; set to '' if listening to changes for children of the root
-let listenerPaths = ['coins', 'players', 'doors', 'subgridAssignment', 'condition', 'trappedPlayer', 'colorAssignment', 'playerSequenceAssignment'];
+let listenerPaths = ['coins', 'players', 'doors', 'subgridAssignment', 'condition', 'trappedPlayer', 'colorAssignment', 'playerSequenceAssignment', 'robotPhase'];
 
 // Set the session configuration for MPLIB
 initializeMPLIB( sessionConfig , studyId , funList, listenerPaths, verbosity );
@@ -955,6 +955,8 @@ function startRobotMovement() {
         isPathBeingFollowed = false; // Path completed
         if(timeToSave === true && currentIndex == 0){
           robotState = 'savingOne';
+          let robotPhasePath = 'robotPhase';
+          updateStateDirect(robotPhasePath, 'savingOne', 'robotComingToSave');
         }
         if(robotState === 'transition'){
           setTimeout(() => {
@@ -1428,7 +1430,7 @@ async function resetCoinsAndDoors() {
           await updateStateDirect(coinPath, null, 'removeCoinForNewRound');  // Remove only coins with the matching player ID
         }
       }
-      watchNow = false;
+      // watchNow = false;
       placeTokensForPlayer(robotId);
       let path = `players/${robotId}`;
       let newState = {
@@ -2213,14 +2215,14 @@ async function getDoorAtPosition(x, y, playerColor, playerId) {
 
               }else{
                 console.log(`Main entry detected at door (${doorX}, ${doorY}). Shuffling doors for subgrid ${subgridIndex}.`);
-                if(trappedPlayer === null && trapFlag === true){
-                  trappedIndex = await readState("subgridAssignment/trapped");
-                  trappedIndex = Number(trappedIndex) - 1;
-                  trappedPlayer = await readState('trappedPlayer');
-                  if(trappedPlayer !== null){
-                    trapFlag = 'used';
-                  }
-                }
+                // if(trappedPlayer === null && trapFlag === true){
+                //   trappedIndex = await readState("subgridAssignment/trapped");
+                //   trappedIndex = Number(trappedIndex) - 1;
+                //   trappedPlayer = await readState('trappedPlayer');
+                //   if(trappedPlayer !== null){
+                //     trapFlag = 'used';
+                //   }
+                // }
                 if (Number(subgridIndex) ===  Number(trappedIndex) && trapFlag === 'used' && trappedPlayer != null) {
 
                   let stillTrapped = await readState('trappedPlayer');
@@ -2497,75 +2499,73 @@ function placeDoorsForAllSubgrids() {
   }
 }
 
-function flashTrappedMessage(playerId) {
-  const trappedPlayerData = players[playerId];
-  const gameContainer = document.querySelector(".wrapper-container"); // Main game container
+function displaySpeechBubbleForTrappedPlayer(playerId) {
+  const trappedPlayerData = players[playerId]; // Get trapped player data
+  const gameContainer = document.querySelector(".game-container"); // Main game container
 
-  // Remove existing message before adding a new one
-  let existingMessage = document.querySelector(".trapped-message");
-  if (existingMessage) {
-    existingMessage.remove();
+  // Remove existing speech bubble if present
+  let existingBubble = document.querySelector(".speech-bubble");
+  if (existingBubble) {
+    existingBubble.remove();
   }
 
-  // Create the trapped message element
-  let messageDiv = document.createElement("div");
-  messageDiv.classList.add("trapped-message");
+  // Create speech bubble container
+  let speechBubble = document.createElement("div");
+  speechBubble.classList.add("speech-bubble");
 
-  // Create player name element
-  const playerName = document.createElement("span");
-  playerName.classList.add("player-name");
-  playerName.textContent = trappedPlayerData.name || `Player ${playerId}`;
+  // Add speech bubble image as background
+  speechBubble.style.backgroundImage = "url('./images/speechBubble.png')"; // Ensure correct path
+  speechBubble.style.backgroundSize = "contain";  // Ensures proper scaling
+  speechBubble.style.backgroundRepeat = "no-repeat";
 
-  // Create avatar
-  const avatar = document.createElement("div");
-  avatar.classList.add("player-avatar", "Character_sprite");
-  avatar.style.backgroundPositionY = getPlayerBackgroundPosition(trappedPlayerData.color);
+  // Set text inside the bubble
+  let textElement = document.createElement("span");
+  textElement.textContent = `${trappedPlayerData.name || `Player ${playerId}`} is trapped! I'm coming to save them!`;
+  textElement.classList.add("speech-text");
 
-  // Create trapped text element
-  const trappedText = document.createElement("span");
-  trappedText.classList.add("trapped-text");
-  trappedText.textContent = " is trapped!";
+  speechBubble.appendChild(textElement);
 
-  // Append elements in the correct order: Name → Avatar → Text
-  messageDiv.appendChild(playerName);
-  messageDiv.appendChild(avatar);
-  messageDiv.appendChild(trappedText);
-
-  // Style the message
-  Object.assign(messageDiv.style, {
+  // **Adjust bubble size & positioning**
+  Object.assign(speechBubble.style, {
     position: "absolute",
-    top: "10px", 
-    left: "50%",
-    transform: "translateX(-50%)",
-    backgroundColor: `${trappedPlayerData.color}80`, // Red semi-transparent
-    color: "white",
-    padding: "10px 20px",
-    fontSize: "20px",
-    fontWeight: "bold",
-    borderRadius: "8px",
-    zIndex: "1000",
-    transition: "opacity 0.5s ease-in-out",
+    width: "65px", // Smaller width
+    height: "30px", // Smaller height
     display: "flex",
+    justifyContent: "flex-start",
     alignItems: "center",
-    gap: "8px"
+    textAlign: "center",
+    padding: "0px 0px 0 2px", 
+    color: "black",
+    fontSize: "5px", // Smaller text
+    fontWeight: "bold",
+    lineHeight: "1", // Keeps text inside
+    left: "-15px", // Move more to the left
+    top: "-50px", // Move higher above the robot
   });
 
-  // Append the message to the game container
-  gameContainer.appendChild(messageDiv);
 
-  function flash() {
-    if (watchNow) { 
-      messageDiv.remove(); 
-      return; // Stop further execution immediately
-    }
-  
-    messageDiv.style.opacity = messageDiv.style.opacity === "0" ? "1" : "0"; // Toggle visibility
-  
-    setTimeout(flash, 1000);
-  }  
+  // Append to game container
+  gameContainer.appendChild(speechBubble);
 
-  flash(); 
+  updateSpeechBubblePosition();
 }
+
+
+function updateSpeechBubblePosition() {
+  let speechBubble = document.querySelector(".speech-bubble");
+
+  if (!speechBubble) {
+    return;
+  }
+  const robotData = players["robotPlayer"];
+
+  if (speechBubble && robotData) {
+    speechBubble.style.left = `${robotData.x * 16 - 20}px`; // Adjust based on grid size
+    speechBubble.style.top = `${robotData.y * 16 - 50}px`; // Slightly above robot
+  }
+}
+
+
 
 
 
@@ -2846,6 +2846,10 @@ function receiveStateChange(pathNow,nodeName, newState, typeChange ) {
       }
 
       players[ changedPlayer.id ] = changedPlayer;
+
+      if(changedPlayer.id == "robotPlayer"){
+        updateSpeechBubblePosition();
+      }
   }
 
   // Removing a player
@@ -2995,12 +2999,21 @@ function receiveStateChange(pathNow,nodeName, newState, typeChange ) {
       
       // Trigger the flashing effect
       if(trappedPlayer == null){
+        trapFlag =  'used';
         const currentPlayerId = getCurrentPlayerId(); // Get the current player's ID
         trappedPlayer = Object.keys(players).find(id => id !== currentPlayerId && id !== "robotPlayer");
-        flashTrappedMessage(trappedPlayer);
-
+        //flashTrappedMessage(trappedPlayer);
+        setTimeout(() => {
+          displaySpeechBubbleForTrappedPlayer(trappedPlayer);
+          console.log("display message for robot player");
+        }, 5000);
       }else{
-        flashTrappedMessage(trappedPlayer);
+        trapFlag = 'used';
+        //flashTrappedMessage(trappedPlayer);
+        setTimeout(() => {
+          displaySpeechBubbleForTrappedPlayer(trappedPlayer);
+          console.log("display message for robot player");
+        }, 5000);
       }
       if(arrivalIndex == 1 && timeToSave === false && currentRound < 3){
         setTimeout(() => {
@@ -3024,7 +3037,25 @@ function receiveStateChange(pathNow,nodeName, newState, typeChange ) {
     const id = nodeName;
     if (id === "trapped") {
       console.log('trap player is saved:', nodeName);
-      watchNow = true;
+      let existingBubble = document.querySelector(".speech-bubble");
+      if (existingBubble) {
+        const trappedPlayerData = players[trappedPlayer];
+        // Update text instead of removing immediately
+        let textElement = existingBubble.querySelector(".speech-text");
+        if (textElement) {
+            textElement.textContent = `I saved ${trappedPlayerData.name || `Player ${trappedPlayerId}`}!`;
+            textElement.style.textAlign = "center"; // Ensure center alignment
+            textElement.style.display = "flex";
+            textElement.style.justifyContent = "center";
+            textElement.style.alignItems = "center";
+            textElement.style.width = "100%"; 
+        }
+
+        // Remove after 5 seconds
+        setTimeout(() => {
+            existingBubble.remove();
+        }, 5000);
+    }
     }
   }
 
@@ -3108,6 +3139,14 @@ function receiveStateChange(pathNow,nodeName, newState, typeChange ) {
       checkAllDataReady(); 
     }
   }
+
+  // if(pathNow.startsWith('robot')){
+  //   console.log("robotPhase change detected:", newState); // Debugging log
+  //   console.log("typeChange:", typeChange);
+  //   if (newState == 'savingOne'){
+  //     displaySpeechBubbleForTrappedPlayer(trappedPlayer);
+  //   }
+  // }
 
   // if(pathNow === "trappedPlayer" && (typeChange == 'onChildAdded' ||typeChange == 'onChildChanged')){
   //   // trappedPlayer = newState;
@@ -3440,7 +3479,7 @@ function endSession() {
       document.getElementById('questionnaireForm').style.display = 'none';
 
       setTimeout(() => {
-        window.location.href = "https://app.prolific.com/submissions/complete?cc=CWOC0BSM";
+        window.location.href = "https://app.prolific.com/submissions/complete?cc=C34A8MLS";
       }, 3000); // 3-second delay before redirecting
     });
     
