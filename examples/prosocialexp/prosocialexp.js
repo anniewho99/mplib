@@ -124,7 +124,7 @@ const instructions = [
   "You’ll use the arrow keys to move your character around the grid. Let's start by placing you as the orange character on the top left corner!",
   "You are now the orange character in the top left corner of the grid, which has four rooms separated by walls and doors.",
   "Each room has doors in different colors, and you can only pass through doors that match your color.  You can use arrow keys to move your character. Try passing through the orange door to enter a room! Once you enter a room, the door colors will shuffle.",
-  "Now, let's practice entering another room. The green player is trapped in the lower right room since there's no green door. They can only exit if someone enters and resets the doors. Enter through the orange door to help them!",
+  "Now, let's practice entering another room. In the lower right room, the green door has disappeared. In situations like this, if you enter the room through the door matching your color, the doors will shuffle, and the green door will reappear.",
   "Next, let’s collect some coins. You can only collect coins that match your color. Ready to try collecting coins? Go ahead and collect the three orange coins in the lower left room.",
   "There can be other players in the game, ranging from one to three additional participants. In this example, there is one other player: the green player, located in the top right corner. This player’s objective is to collect the green coins in the top right room.",
   "Here, we’re demonstrating what another player might do. Keep in mind that when you start the game, you’ll be playing with other human participants. "
@@ -176,12 +176,12 @@ function handleInstructionStep(step) {
       document.getElementById("nextBtn").style.visibility = "hidden";
       break;
     case 3:
-      placeGreenPlayer();
+      // placeGreenPlayer();
       setLowerRightGreenDoorGray(); 
       document.getElementById("nextBtn").style.visibility = "hidden";
       break;
     case 4:
-      removeGreenPlayer();
+      // removeGreenPlayer();
       placePracticeCoins();  
       document.getElementById("nextBtn").style.visibility = "hidden";
       break;
@@ -201,26 +201,26 @@ function placeYellowPlayer() {
   return yellowPlayer;
 }
 
-function placeGreenPlayer() {
-  const container = document.getElementById("practiceGameContainer");
-  // Remove existing green player (if any) to prevent duplicates
-  document.querySelectorAll(".green-player").forEach(el => el.remove());
-  // Create a new green player element
-  const greenPlayerElement = document.createElement("div");
-  greenPlayerElement.classList.add("green-player"); // No "practice-player" class
-  greenPlayerElement.style.position = "absolute";  // Ensure positioning
-  greenPlayerElement.style.top = `${(GRID_HEIGHT - 4) * CELL_SIZE}px`;
-  greenPlayerElement.style.left = `${(GRID_WIDTH - 4) * CELL_SIZE}px`;
-  greenPlayerElement.style.width = `${CELL_SIZE}px`;  // Adjust size
-  greenPlayerElement.style.height = `${CELL_SIZE}px`;
-  greenPlayerElement.style.zIndex = "10"; // Ensure it is visible above other elements
-  // Append directly to the container
-  container.appendChild(greenPlayerElement);
-}
+// function placeGreenPlayer() {
+//   const container = document.getElementById("practiceGameContainer");
+//   // Remove existing green player (if any) to prevent duplicates
+//   document.querySelectorAll(".green-player").forEach(el => el.remove());
+//   // Create a new green player element
+//   const greenPlayerElement = document.createElement("div");
+//   greenPlayerElement.classList.add("green-player"); // No "practice-player" class
+//   greenPlayerElement.style.position = "absolute";  // Ensure positioning
+//   greenPlayerElement.style.top = `${(GRID_HEIGHT - 4) * CELL_SIZE}px`;
+//   greenPlayerElement.style.left = `${(GRID_WIDTH - 4) * CELL_SIZE}px`;
+//   greenPlayerElement.style.width = `${CELL_SIZE}px`;  // Adjust size
+//   greenPlayerElement.style.height = `${CELL_SIZE}px`;
+//   greenPlayerElement.style.zIndex = "10"; // Ensure it is visible above other elements
+//   // Append directly to the container
+//   container.appendChild(greenPlayerElement);
+// }
 
-function removeGreenPlayer() {
-  document.querySelectorAll(".green-player").forEach(el => el.remove());
-}
+// function removeGreenPlayer() {
+//   document.querySelectorAll(".green-player").forEach(el => el.remove());
+// }
 
 function updatePlayerPosition(player, color) {
   const container = document.getElementById("practiceGameContainer");
@@ -959,9 +959,7 @@ function startRobotMovement() {
           // updateStateDirect(robotPhasePath, 'savingOne', 'robotComingToSave');
         }
         if(robotState === 'transition'){
-          setTimeout(() => {
-            handleStateChange(); // Trigger the next state
-          }, 5000); 
+          handleStateChange(); // Trigger the next state
         }else{
           handleStateChange(); 
         }// Trigger the next state
@@ -1812,12 +1810,12 @@ function isOccupied(x,y) {
 
 async function placeTokensForPlayer(playerId) {
 
-  let waitTime = 5000;
-  // if(trappedPlayer!= null && currentRound < 3 && playerSequence == 2 && watchNow == false && playerId != 'robotPlayer'){
-  //   waitTime = 15000;
-  // }
+  // let waitTime = 5000;
+  // // if(trappedPlayer!= null && currentRound < 3 && playerSequence == 2 && watchNow == false && playerId != 'robotPlayer'){
+  // //   waitTime = 15000;
+  // // }
 
-  await new Promise(resolve => setTimeout(resolve, waitTime));
+  // await new Promise(resolve => setTimeout(resolve, waitTime));
   let retries = 5;
   let delay = 100; // Delay between retries in milliseconds
 
