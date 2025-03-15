@@ -2497,71 +2497,71 @@ function placeDoorsForAllSubgrids() {
   }
 }
 
-function displaySpeechBubbleForTrappedPlayer(playerId) {
-  const trappedPlayerData = players[playerId]; // Get trapped player data
-  const gameContainer = document.querySelector(".game-container"); // Main game container
+// function displaySpeechBubbleForTrappedPlayer(playerId) {
+//   const trappedPlayerData = players[playerId]; // Get trapped player data
+//   const gameContainer = document.querySelector(".game-container"); // Main game container
 
-  // Remove existing speech bubble if present
-  let existingBubble = document.querySelector(".speech-bubble");
-  if (existingBubble) {
-    existingBubble.remove();
-  }
+//   // Remove existing speech bubble if present
+//   let existingBubble = document.querySelector(".speech-bubble");
+//   if (existingBubble) {
+//     existingBubble.remove();
+//   }
 
-  // Create speech bubble container
-  let speechBubble = document.createElement("div");
-  speechBubble.classList.add("speech-bubble");
+//   // Create speech bubble container
+//   let speechBubble = document.createElement("div");
+//   speechBubble.classList.add("speech-bubble");
 
-  // Add speech bubble image as background
-  speechBubble.style.backgroundImage = "url('./images/speechBubble.png')"; // Ensure correct path
-  speechBubble.style.backgroundSize = "contain";  // Ensures proper scaling
-  speechBubble.style.backgroundRepeat = "no-repeat";
+//   // Add speech bubble image as background
+//   speechBubble.style.backgroundImage = "url('./images/speechBubble.png')"; // Ensure correct path
+//   speechBubble.style.backgroundSize = "contain";  // Ensures proper scaling
+//   speechBubble.style.backgroundRepeat = "no-repeat";
 
-  // Set text inside the bubble
-  let textElement = document.createElement("span");
-  textElement.textContent = `${trappedPlayerData.name || `Player ${playerId}`} is trapped! I'm coming to save them!`;
-  textElement.classList.add("speech-text");
+//   // Set text inside the bubble
+//   let textElement = document.createElement("span");
+//   textElement.textContent = `${trappedPlayerData.name || `Player ${playerId}`} is trapped! I'm coming to save them!`;
+//   textElement.classList.add("speech-text");
 
-  speechBubble.appendChild(textElement);
+//   speechBubble.appendChild(textElement);
 
-  // **Adjust bubble size & positioning**
-  Object.assign(speechBubble.style, {
-    position: "absolute",
-    width: "65px", // Smaller width
-    height: "30px", // Smaller height
-    display: "flex",
-    justifyContent: "flex-start",
-    alignItems: "center",
-    textAlign: "center",
-    padding: "0px 0px 0 2px", 
-    color: "black",
-    fontSize: "5px", // Smaller text
-    fontWeight: "bold",
-    lineHeight: "1", // Keeps text inside
-    left: "-15px", // Move more to the left
-    top: "-50px", // Move higher above the robot
-  });
-
-
-  // Append to game container
-  gameContainer.appendChild(speechBubble);
-
-  updateSpeechBubblePosition();
-}
+//   // **Adjust bubble size & positioning**
+//   Object.assign(speechBubble.style, {
+//     position: "absolute",
+//     width: "65px", // Smaller width
+//     height: "30px", // Smaller height
+//     display: "flex",
+//     justifyContent: "flex-start",
+//     alignItems: "center",
+//     textAlign: "center",
+//     padding: "0px 0px 0 2px", 
+//     color: "black",
+//     fontSize: "5px", // Smaller text
+//     fontWeight: "bold",
+//     lineHeight: "1", // Keeps text inside
+//     left: "-15px", // Move more to the left
+//     top: "-50px", // Move higher above the robot
+//   });
 
 
-function updateSpeechBubblePosition() {
-  let speechBubble = document.querySelector(".speech-bubble");
+//   // Append to game container
+//   gameContainer.appendChild(speechBubble);
 
-  if (!speechBubble) {
-    return;
-  }
-  const robotData = players["robotPlayer"];
+//   updateSpeechBubblePosition();
+// }
 
-  if (speechBubble && robotData) {
-    speechBubble.style.left = `${robotData.x * 16 - 20}px`; // Adjust based on grid size
-    speechBubble.style.top = `${robotData.y * 16 - 50}px`; // Slightly above robot
-  }
-}
+
+// function updateSpeechBubblePosition() {
+//   let speechBubble = document.querySelector(".speech-bubble");
+
+//   if (!speechBubble) {
+//     return;
+//   }
+//   const robotData = players["robotPlayer"];
+
+//   if (speechBubble && robotData) {
+//     speechBubble.style.left = `${robotData.x * 16 - 20}px`; // Adjust based on grid size
+//     speechBubble.style.top = `${robotData.y * 16 - 50}px`; // Slightly above robot
+//   }
+// }
 
 
 
@@ -2845,9 +2845,9 @@ function receiveStateChange(pathNow,nodeName, newState, typeChange ) {
 
       players[ changedPlayer.id ] = changedPlayer;
 
-      if(changedPlayer.id == "robotPlayer"){
-        updateSpeechBubblePosition();
-      }
+      // if(changedPlayer.id == "robotPlayer"){
+      //   updateSpeechBubblePosition();
+      // }
   }
 
   // Removing a player
@@ -3001,17 +3001,17 @@ function receiveStateChange(pathNow,nodeName, newState, typeChange ) {
         const currentPlayerId = getCurrentPlayerId(); // Get the current player's ID
         trappedPlayer = Object.keys(players).find(id => id !== currentPlayerId && id !== "robotPlayer");
         //flashTrappedMessage(trappedPlayer);
-        setTimeout(() => {
-          displaySpeechBubbleForTrappedPlayer(trappedPlayer);
-          console.log("display message for robot player");
-        }, 5000);
+        // setTimeout(() => {
+        //   displaySpeechBubbleForTrappedPlayer(trappedPlayer);
+        //   console.log("display message for robot player");
+        // }, 5000);
       }else{
         trapFlag = 'used';
         //flashTrappedMessage(trappedPlayer);
-        setTimeout(() => {
-          displaySpeechBubbleForTrappedPlayer(trappedPlayer);
-          console.log("display message for robot player");
-        }, 5000);
+        // setTimeout(() => {
+        //   displaySpeechBubbleForTrappedPlayer(trappedPlayer);
+        //   console.log("display message for robot player");
+        // }, 5000);
       }
       if(arrivalIndex == 1 && timeToSave === false && currentRound < 3){
         setTimeout(() => {
