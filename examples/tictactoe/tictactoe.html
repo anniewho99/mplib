@@ -1,97 +1,118 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Two player Tic-Tac-Toe</title>
-    <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@400;600&display=swap" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/mplib/examples/general.css">
-    <style>
-        /* Game-specific styles */
-        #board {
-            display: grid;
-            grid-template-columns: repeat(3, 100px);
-            grid-gap: 0px;
-            justify-content: center;
-            margin-top: 50px;
-        }
-
-        .cell {
-            width: 100px;
-            height: 100px;
-            border: 2px solid #000;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-family: Arial, sans-serif;
-            font-size: 60px;
-            cursor: pointer;
-            color: black;
-        }
-
-        @keyframes pulsate {
-            0% {
-                filter: brightness(1);
-                color: #000;
-            }
-            50% {
-                filter: brightness(2);
-                color: rgb(65, 65, 65);
-            }
-            100% {
-                filter: brightness(1);
-                color: #000;
-            }
-        }
-
-        .textturn {
-            font-size: 1.5em;
-            animation: pulsate 1.5s infinite;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tangram Game</title>
+  <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@400;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/mplib/examples/general.css">
+  <link rel="stylesheet" href="/mplib/examples/tictactoe/tangram.css" type="text/css">
+  <style>
+    /* Tangram board styles */
+    #board {
+      display: grid;
+      grid-template-columns: repeat(4, 100px);
+      grid-template-rows: repeat(3, 100px);
+      gap: 10px;
+      justify-content: center;
+      margin-top: 40px;
+    }
+    .tangram {
+      width: 100px;
+      height: 100px;
+      border: 2px solid #000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: Arial, sans-serif;
+      font-size: 24px;
+      cursor: pointer;
+      background-color: white;
+    }
+    .tangram.highlight {
+      background-color: gold;
+    }
+    /* Chat box styles */
+    .chat-container {
+      margin-top: 20px;
+      width: 60%;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    .chat-messages {
+      border: 1px solid #ccc;
+      height: 120px;
+      overflow-y: auto;
+      padding: 5px;
+      background-color: #f9f9f9;
+      font-family: monospace;
+    }
+    #chatInput {
+      width: 75%;
+      padding: 5px;
+    }
+    #sendChatBtn {
+      padding: 6px 12px;
+    }
+    /* Additional styles */
+    .textturn {
+      font-size: 1.5em;
+      animation: pulsate 1.5s infinite;
+    }
+    @keyframes pulsate {
+      0% { filter: brightness(1); color: #000; }
+      50% { filter: brightness(2); color: rgb(65, 65, 65); }
+      100% { filter: brightness(1); color: #000; }
+    }
+  </style>
 </head>
-
 <body>
-    <div class="container" id="instructionsScreen">
-        <h1>Instructions</h1>
-        <div class="containertext" id="instructionText">
-        
-        </div>
-        <a href="#" class="button" id="joinBtn">Proceed</a> 
+  <div class="container" id="instructionsScreen">
+    <h1>Instructions</h1>
+    <div class="containertext" id="instructionText">
+      <p>Welcome to the Tangram Game! In each round, one player is the describer who sees a highlighted tangram shape. The two listeners will see all 12 tangram shapes and must pick the one the describer is referring to. Use the chat box to communicate.</p>
     </div>
-    <div class="container" id="waitingRoomScreen" style="display:none">
-        <h1>Waiting Room</h1>  
-        <div class="containertext" id="messageWaitingRoom"></div>
+    <a href="#" class="button" id="joinBtn">Proceed</a>
+  </div>
+  <div class="container" id="waitingRoomScreen" style="display:none">
+    <h1>Waiting Room</h1>
+    <div class="containertext" id="messageWaitingRoom"></div>
+  </div>
+  <div class="container" id="gameScreen" style="display:none; caret-color: transparent;">
+    <h1>Tangram Game</h1>
+    <div class="textturn" id="turnMessage">Waiting for round to start...</div>
+    <div id="game">
+        <div id="board">
+            <div class="tangram" data-id="Tangram_A"><img src="Tangram_A.png" alt="Tangram A"></div>
+            <div class="tangram" data-id="Tangram_B"><img src="Tangram_B.png" alt="Tangram B"></div>
+            <div class="tangram" data-id="Tangram_C"><img src="Tangram_C.png" alt="Tangram C"></div>
+            <div class="tangram" data-id="Tangram_D"><img src="Tangram_D.png" alt="Tangram D"></div>
+            <div class="tangram" data-id="Tangram_E"><img src="Tangram_E.png" alt="Tangram E"></div>
+            <div class="tangram" data-id="Tangram_F"><img src="Tangram_F.png" alt="Tangram F"></div>
+            <div class="tangram" data-id="Tangram_G"><img src="Tangram_G.png" alt="Tangram G"></div>
+            <div class="tangram" data-id="Tangram_H"><img src="Tangram_H.png" alt="Tangram H"></div>
+            <div class="tangram" data-id="Tangram_I"><img src="Tangram_I.png" alt="Tangram I"></div>
+            <div class="tangram" data-id="Tangram_J"><img src="Tangram_J.png" alt="Tangram J"></div>
+            <div class="tangram" data-id="Tangram_K"><img src="Tangram_K.png" alt="Tangram K"></div>
+            <div class="tangram" data-id="Tangram_L"><img src="Tangram_L.png" alt="Tangram L"></div>
+        </div>      
+      <div id="chatBox" class="chat-container">
+        <div id="chatMessages" class="chat-messages"></div>
+        <input type="text" id="chatInput" placeholder="Type your message...">
+        <button id="sendChatBtn">Send</button>
+      </div>
     </div>
-    <div class="container" id="gameScreen" style="display:none; caret-color: transparent;">
-        <h1>Two Player Tic-Tac-Toe</h1>
-        <div class="textturn" id="turnMessage">You are player X: it is your turn</div>
-        <div id="game">
-            <div id="board">
-                <div class="cell" data-index="0"></div>
-                <div class="cell" data-index="1"></div>
-                <div class="cell" data-index="2"></div>
-                <div class="cell" data-index="3"></div>
-                <div class="cell" data-index="4"></div>
-                <div class="cell" data-index="5"></div>
-                <div class="cell" data-index="6"></div>
-                <div class="cell" data-index="7"></div>
-                <div class="cell" data-index="8"></div>
-            </div>
-        </div>
-        <div class="containertext" id="messageGame"></div>
-        <a href="#" class="button" id="leaveBtn">End Session</a> 
-    </div>
-    <div class="container" id="finishScreen" style="display:none">
-        <h1>Completion</h1>  
-        <div class="containertext" id="messageFinish"></div>
-    </div>
-    
-    
-    <script src="/mplib/src/mpconfig.js"></script>
-    <script type="module" src="/mplib/src/mplib.js" async></script>
-    <script type="module" src="/mplib/examples/tictactoe/tictactoe.js"></script>
+    <div class="containertext" id="messageGame"></div>
+    <a href="#" class="button" id="leaveBtn">End Session</a>
+  </div>
+  <div class="container" id="finishScreen" style="display:none">
+    <h1>Completion</h1>
+    <div class="containertext" id="messageFinish"></div>
+  </div>
+  
+  <script src="/mplib/src/mpconfig.js"></script>
+  <script type="module" src="/mplib/src/mplib.js" async></script>
+  <script type="module" src="/mplib/examples/tictactoe/tictactoe.js"></script>
 </body>
-
 </html>

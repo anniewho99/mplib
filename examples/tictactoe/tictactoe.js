@@ -15,7 +15,7 @@ import {
     updateStateTransaction, 
     hasControl,
     getCurrentPlayerId, getCurrentPlayerIds, getAllPlayerIds, getPlayerInfo,getNumberCurrentPlayers,getNumberAllPlayers,
-    getCurrentPlayerArrivalIndex,getSessionId,anyPlayerTerminatedAbnormally,getSessionError,getWaitRoomInfo
+    getCurrentPlayerArrivalIndex,getSessionId,getSessionError,getWaitRoomInfo
 } from "/mplib/src/mplib.js";
 
 // -------------------------------------
@@ -24,18 +24,26 @@ import {
 let instructionsScreen = document.getElementById('instructionsScreen');
 let waitingRoomScreen = document.getElementById('waitingRoomScreen');
 let gameScreen = document.getElementById('gameScreen');
+let finishScreen = document.getElementById('finishScreen');
+
+let instructionText = document.getElementById('instructionText');
+let turnText = document.getElementById('turnMessage');
 let messageWaitingRoom = document.getElementById('messageWaitingRoom');
 let messageGame = document.getElementById('messageGame');
 let messageFinish = document.getElementById('messageFinish');
-const cells = document.querySelectorAll('.cell');
-let instructionsText = document.getElementById('instructionText');
-let turnText = document.getElementById('turnMessage');
 
+let board = document.getElementById('board');
+let tangramElements = document.querySelectorAll('.tangram');
+
+// Chat UI Elements
+let chatMessages = document.getElementById('chatMessages');
+let chatInput = document.getElementById('chatInput');
+let sendChatBtn = document.getElementById('sendChatBtn');
 // -------------------------------------
 //       Game configuration
 // -------------------------------------
 // studyId is the name of the root node we create in the database
-const studyId = 'tictactoe'; 
+const studyId = 'tangram'; 
 // Configuration setting for the session
 let sessionConfig = {
     minPlayersNeeded: 2, // Minimum number of players needed; if set to 1, there is no waiting room (unless a countdown has been setup)
@@ -75,9 +83,11 @@ initializeMPLIB( sessionConfig , studyId , funList, listenerPaths, verbosity );
 //       Globals
 // -------------------------------------
 let gameState;
-let emptyPlace = ' '; // this character represents the absence of a token and a lack of a winner (it is tempting to use "null" for this state, but firebase does not store any null variables and this can complicate the coding)
-let delayStartNewGame = 3000;
-
+const tangrams = [
+  "Tangram_A", "Tangram_B", "Tangram_C", "Tangram_D", "Tangram_E",
+  "Tangram_F", "Tangram_G", "Tangram_H", "Tangram_I", "Tangram_J",
+  "Tangram_K", "Tangram_L"
+];
 // -------------------------------------
 //       Event Listeners
 // -------------------------------------
@@ -94,18 +104,30 @@ leaveButton.addEventListener('click', function () {
     leaveSession(); // call the library function to leave a session. This then triggers the local function endSession
 });
 
-// Set up listeners for mouse clicks
-cells.forEach(cell => {
-    cell.addEventListener('click', () => {   
-        const placeIndex = cell.getAttribute('data-index');      
-        updateStateTransaction('state', 'placeToken', placeIndex ).then(success => {  
-            if (!success) {
-                console.log( 'You cannot make this move');
-            }
-        });
-    });
-});
+sendChatBtn.addEventListener('click', function () {
+    let message = chatInput.value.trim();
+    if (message !== "") {
+      sendChatMessage(message);
+      chatInput.value = "";
+    }
+  });
 
+tangramElements.forEach(elem => {
+    elem.addEventListener('click', () => {
+      let selectedTangram = elem.getAttribute('data-id');
+      // Only listeners can submit a guess
+      if (gameState && gameState.roles && gameState.roles[getCurrentPlayerId()] === "listener") {
+        updateStateTransaction("state", "submitGuess", { player: getCurrentPlayerId(), guess: selectedTangram })
+          .then(success => {
+            if (success) {
+              console.log("Guess submitted: " + selectedTangram);
+            } else {
+              console.log("Guess submission failed.");
+            }
+          });
+      }
+    });
+  });
 // -------------------------------------
 //      Game logic and UI
 // -------------------------------------
@@ -364,7 +386,7 @@ function updateOngoingSession() {
 
 function endSession() {
     /*
-        Functionality to invoke when ending a session.
+        Function invoked by MPLIB when ending a session. Do *not* call this function yourself (use leaveSession for this purpose)
 
         This function does the following:
             - Displays the finish screen (hides all other divs)
@@ -380,10 +402,9 @@ function endSession() {
 
     let err = getSessionError();
 
-    if ( anyPlayerTerminatedAbnormally()) {
+    if (err.errorCode == 4) {
         // Another player closed their window or were disconnected prematurely
         messageFinish.innerHTML = `<p>Session ended abnormally because the other player closed their window or was disconnected</p>`;
-        
     } else if (err.errorCode == 1) {
         // No sessions available
         messageFinish.innerHTML = `<p>Session ended abnormally because there are no available sessions to join</p>`;
