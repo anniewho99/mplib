@@ -214,7 +214,7 @@ Game logic and functionality. All functions for gameplay. This includes:
 
 let roundTimer;
 
-let votingDuration = 2; 
+let votingDuration = 5; 
 let breakDuration = 2; 
 
 let countdownInterval;
