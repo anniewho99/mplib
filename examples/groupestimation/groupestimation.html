@@ -196,6 +196,82 @@
             position: relative;
         }
 
+        .triangle {
+            width: 0;
+            height: 0;
+            position: absolute;
+            cursor: pointer;
+            border-style: solid;
+            transition: transform 0.1s, background-color 0.2s, box-shadow 0.2s;
+        }
+
+        /* UP */
+        .triangle.up:hover {
+            border-color: transparent transparent #B39DDB transparent;
+        }
+        .triangle.up:active {
+            border-color: transparent transparent #5E35B1 transparent;
+        }
+
+        /* DOWN */
+        .triangle.down:hover {
+            border-color: #B39DDB transparent transparent transparent;
+        }
+        .triangle.down:active {
+            border-color: #5E35B1 transparent transparent transparent;
+        }
+
+        /* LEFT */
+        .triangle.left:hover {
+            border-color: transparent #B39DDB transparent transparent;
+        }
+        .triangle.left:active {
+            border-color: transparent #5E35B1 transparent transparent;
+        }
+
+        /* RIGHT */
+        .triangle.right:hover {
+            border-color: transparent transparent transparent #B39DDB;
+        }
+        .triangle.right:active {
+            border-color: transparent transparent transparent #5E35B1;
+        }
+
+
+        .triangle.up {
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            border-width: 1px 6px 9px 6px;
+            border-color: transparent transparent white transparent;
+        }
+
+        .triangle.down {
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            border-width: 9px 6px 1px 6px;
+            border-color: white transparent transparent transparent;
+        }
+
+        .triangle.left {
+            top: 50%;
+            left: 0;
+            transform: translateY(-50%);
+            border-width: 6px 9px 6px 1px;
+            border-color: transparent white transparent transparent;
+        }
+
+        .triangle.right {
+            top: 50%;
+            right: 0;
+            transform: translateY(-50%);
+            border-width: 6px 1px 6px 9px;
+            border-color: transparent transparent transparent white;
+        }
+
+
+
     </style>
 </head>
 

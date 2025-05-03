@@ -61,7 +61,7 @@ Configure all of the game settings. This includes:
 
 //  Conatant Game Variables
 let GameName = "groupestimation";
-let NumPlayers = 5;
+let NumPlayers = 2;
 let MinPlayers = NumPlayers;
 let MaxPlayers = NumPlayers;
 let MaxSessions = 0;
@@ -214,22 +214,76 @@ Game logic and functionality. All functions for gameplay. This includes:
 
 let roundTimer;
 
-let votingDuration = 15; 
-let breakDuration = 5; 
+let votingDuration = 2; 
+let breakDuration = 2; 
 
 let countdownInterval;
 
-function disableSubmitButton() {
-    if (submitSelection) {
-        submitSelection.disabled = true;
+let playerColorMap = {}; 
+
+
+function assignAvatarColors() {
+    const PLAYER_COLORS = [
+        '#E69F00', // Orange
+        '#009E73', // Green
+        '#F0E442', // Yellow
+        '#CC79A7', // Pink/Magenta
+        '#0072B2'  // Blue
+    ];
+
+    const arrivalIndex = getCurrentPlayerArrivalIndex(); // 1-based
+    const numPlayers = getNumberCurrentPlayers();
+
+    const root = document.documentElement;
+
+    // 1. Set color for local player (#player1)
+    const myColor = PLAYER_COLORS[arrivalIndex - 1];
+    root.style.setProperty('--player1avatar-backgroundcolor', myColor);
+
+    updateStateDirect(`players/${getCurrentPlayerId()}`, {
+        color: myColor
+    });
+
+    playerColorMap[getCurrentPlayerId()] = myColor;
+
+    // 2. Assign the remaining N-1 colors to player2–playerN
+    let colorIndex = 0;
+    for (let i = 2; i <= numPlayers; i++) {
+        if (colorIndex === arrivalIndex - 1) colorIndex++; // Skip local player's color
+        root.style.setProperty(`--player${i}avatar-backgroundcolor`, PLAYER_COLORS[colorIndex]);
+        colorIndex++;
     }
 }
 
-function enableSubmitButton() {
-    if (submitSelection) {
-        submitSelection.disabled = false;
-    }
+// function disableSubmitButton() {
+//     if (submitSelection) {
+//         submitSelection.disabled = true;
+//     }
+// }
+
+// function enableSubmitButton() {
+//     if (submitSelection) {
+//         submitSelection.disabled = false;
+//     }
+// }
+
+function showDirectionButtons() {
+    const buttons = document.querySelectorAll('.direction-button');
+    buttons.forEach(btn => {
+        btn.style.display = 'block';
+        btn.style.pointerEvents = 'auto';
+        btn.style.opacity = '1';
+    });
 }
+
+function hideDirectionButtons() {
+    const buttons = document.querySelectorAll('.direction-button');
+    buttons.forEach(btn => {
+        btn.style.pointerEvents = 'none';
+        btn.style.opacity = '0.4';
+    });
+}
+
 
 function startVotingPhase() {
     clearTimeout(roundTimer);
@@ -252,7 +306,7 @@ function startVotingPhase() {
     roundTimer = setTimeout(() => {
         clearInterval(countdownInterval);
         finalizeVotes();
-    }, 15000);
+    }, countdown * 1000);
 }
 
 function finalizeVotes() {
@@ -260,7 +314,7 @@ function finalizeVotes() {
         updateStateDirect(`players/${pid}`, { block: null, direction: null });
       });
     
-    disableSubmitButton();
+    hideDirectionButtons();
     const turnMessage = document.getElementById('turnMessage');
     turnMessage.innerText = `Moving the blocks now...`;
     // For each block:
@@ -294,9 +348,9 @@ function finalizeVotes() {
     });
 
     setTimeout(() => {
-        enableSubmitButton();
+        showDirectionButtons();
         startVotingPhase();
-    }, 5000);
+    }, breakDuration * 1000);
 }
 
 function getMajorityDirection(votes) {
@@ -314,16 +368,14 @@ function getMajorityDirection(votes) {
         }
     }
 
-    if (countOfMax > 1) {
-        // Tie detected: don't move
-        console.log("tie");
+    // Require at least 2 votes and no tie
+    if (maxCount < 2 || countOfMax > 1) {
+        console.log("No valid majority (either tie or fewer than 2 votes)");
         return null;
-    } else {
-        // Clear majority: move
-        console.log("directoin");
-        console.log(majority);
-        return majority;
     }
+
+    console.log("direction", majority);
+    return majority;
 }
 
 
@@ -331,130 +383,210 @@ function moveBlock(block, direction) {
     const color = block.dataset.color;
     if (lockedBlocks[color]) {
         console.log(`Block ${color} is locked and cannot move.`);
-        return; // Don't move locked blocks
+        return;
     }
 
-    console.log(`Moving block ${block.dataset.color} ${direction}`);
-    
+
     let x = parseInt(block.dataset.x);
     let y = parseInt(block.dataset.y);
-    console.log(`Old position: (${x}, ${y})`);
+
+    console.log(`moving Block ${color} to ${x}, ${y}.`);
 
     if (direction === 'up') y -= 1;
     if (direction === 'down') y += 1;
     if (direction === 'left') x -= 1;
     if (direction === 'right') x += 1;
 
-    // Enforce boundaries (clamp between 0 and 17)
+    // Clamp within grid bounds
     x = Math.max(0, Math.min(17, x));
     y = Math.max(0, Math.min(17, y));
 
-    console.log(`New position: (${x}, ${y})`);
-
-    // Update the block dataset
+    // Update dataset
     block.dataset.x = x;
     block.dataset.y = y;
 
-    // Move the block visually
-    block.style.left = (x * CELL_WIDTH + CELL_WIDTH / 2) + 'px';
-    block.style.top = (y * CELL_HEIGHT + CELL_HEIGHT / 2) + 'px';
+    // Move the block with matching logic
+    const width = CELL_WIDTH * 2;
+    const height = CELL_HEIGHT * 2;
 
+    block.style.left = (x * CELL_WIDTH + CELL_WIDTH - width / 2) + 'px';
+    block.style.top = (y * CELL_HEIGHT + CELL_HEIGHT - height / 2) + 'px';
+
+    // Check if reached its slot
     const slot = GameState.slots[color];
+    console.log(`Block ${color} final destination is ${slot.x}, ${slot.y}.`);
     if (slot && slot.x === x && slot.y === y) {
-        console.log(`Block ${color} has reached its slot! Locking.`);
+        console.log(`Block ${color} reached its slot. Locking.`);
         lockedBlocks[color] = true;
-
         block.style.border = '4px solid gold';
-        block.style.backgroundColor = 'lightgray'; 
+        block.style.backgroundColor = 'lightgray';
     }
 }
 
-
-
+function getBlockLabel(color) {
+    const labelMap = {
+        'blue': 'A',
+        'red': 'B',
+        'yellow': 'C'
+    };
+    return labelMap[color] || '?';
+}
 function drawSlot(slot) {
     const container = document.getElementById('image-container');
     const div = document.createElement('div');
     div.classList.add('slot');
-    div.style.left = (slot.x * CELL_WIDTH + CELL_WIDTH/2 - 30) + 'px'; // Center slot
-    div.style.top = (slot.y * CELL_HEIGHT + CELL_HEIGHT/2) + 'px';
-    div.style.borderColor = slot.color;
+
+    const width = CELL_WIDTH * 2;
+    const height = CELL_HEIGHT * 2;
+
+    // Position and style
+    div.style.position = 'absolute';
+    div.style.left = (slot.x * CELL_WIDTH + CELL_WIDTH - width / 2) + 'px';
+    div.style.top = (slot.y * CELL_HEIGHT + CELL_HEIGHT - height / 2) + 'px';
+    div.style.width = `${width}px`;
+    div.style.height = `${height}px`;
+    div.style.border = '3px dashed black';
+    div.style.borderRadius = '10px';
+    div.style.display = 'flex';
+    div.style.alignItems = 'center';
+    div.style.justifyContent = 'center';
+    div.style.fontWeight = 'bold';
+    div.style.color = 'black';
+    div.style.backgroundColor = 'transparent';
+
+    // Label (based on color key)
+    div.innerText = getBlockLabel(slot.color);
+
     container.appendChild(div);
 }
+
 
 function drawBlock(block) {
     const container = document.getElementById('image-container');
     const div = document.createElement('div');
     div.classList.add('block');
+
+    const width = CELL_WIDTH * 2;
+    const height = CELL_HEIGHT * 2;
+
     div.setAttribute('data-color', block.color);
     div.dataset.color = block.color;
     div.dataset.x = block.x; 
     div.dataset.y = block.y;
 
-    // Set block size
-    div.style.width = '100px';
-    div.style.height = '100px';
-
-    // Position the block
+    // Style and position
     div.style.position = 'absolute';
-    div.style.left = (block.x * CELL_WIDTH + CELL_WIDTH/2) + 'px'; // 50px/2 = 25px
-    div.style.top = (block.y * CELL_HEIGHT + CELL_HEIGHT/2) + 'px';
+    div.style.left = (block.x * CELL_WIDTH + CELL_WIDTH - width / 2) + 'px';
+    div.style.top = (block.y * CELL_HEIGHT + CELL_HEIGHT - height / 2) + 'px';
+    div.style.width = `${width}px`;
+    div.style.height = `${height}px`;
+    div.style.backgroundColor = '#444'; // dark gray
+    div.style.borderRadius = '10px';
+    //div.style.border = '2px solid black';
+    div.style.display = 'flex';
+    div.style.alignItems = 'center';
+    div.style.justifyContent = 'center';
+    div.style.position = 'absolute';
+    div.style.zIndex = '5';
+    div.style.flexDirection = 'column';
 
-    // Set appearance
-    div.style.backgroundColor = block.color;
-    div.style.borderRadius = '10px'; // a little rounded
-    div.style.border = '2px solid black';
+    // Label
+    const label = document.createElement('div');
+    label.innerText = getBlockLabel(block.color);
+    label.style.color = 'white';
+    label.style.fontWeight = 'bold';
+    label.style.fontSize = '18px';
+
+    const minText = document.createElement('div');
+    minText.innerText = 'min: 2';
+    minText.style.fontSize = '14px';
+    minText.style.color = 'white';
+
+    div.appendChild(label);
+    div.appendChild(minText);
+
+    // Directional buttons container
+    const directions = ['up', 'right', 'down', 'left'];
+    directions.forEach(dir => {
+        const arrow = document.createElement('div');
+        arrow.classList.add('triangle', dir, 'direction-button');
+        arrow.dataset.direction = dir;
+        arrow.dataset.blockColor = block.color;
+
+        // Event listener
+        arrow.addEventListener('click', () => {
+            let playerId = getCurrentPlayerId();
+            updateStateDirect(`players/${playerId}`, {
+                block: block.color,
+                direction: dir
+            });
+        });
+
+        div.appendChild(arrow);
+    });
 
     container.appendChild(div);
 }
+
 
 function addArrowToBlock(color, direction, playerId) {
     const container = document.getElementById('image-container');
     const block = container.querySelector(`.block[data-color="${color}"]`);
     if (!block) return;
 
-    // FIRST: Check if this player ALREADY has an arrow on THIS block
-    let existingArrow = block.querySelector(`.arrow[data-player-id="${playerId}"]`);
-
-    if (existingArrow) {
-        // If already exists, just update the direction (no need to reposition)
-        existingArrow.innerText = directionToArrowSymbol(direction);
-        existingArrow.dataset.direction = direction;
-        return;
-    }
-
-    // If no existing arrow on this block, REMOVE the arrow from other blocks
+    // Remove this player's previous arrow from any block
     removeArrowFromPlayer(playerId);
 
-    // Count how many arrows are already on this block (AFTER removal from elsewhere)
-    const existingArrows = block.querySelectorAll('.arrow').length;
-
-    // Create a new arrow
+    // Add the arrow to the block
     const arrow = document.createElement('div');
     arrow.classList.add('arrow');
     arrow.innerText = directionToArrowSymbol(direction);
     arrow.style.position = 'absolute';
-
-    // Layout: 3 columns × 2 rows
-    const col = existingArrows % 3;
-    const row = Math.floor(existingArrows / 3);
-
-    const cellWidth = 100 / 3; // about 33%
-    const cellHeight = 100 / 2; // 50%
-
-    arrow.style.left = `${col * cellWidth + cellWidth / 2}%`;
-    arrow.style.top = `${row * cellHeight + cellHeight / 2}%`;
-    arrow.style.transform = 'translate(-50%, -50%)';
-    arrow.style.fontSize = '25px';
+    arrow.style.fontSize = '20px';
     arrow.style.fontWeight = 'bold';
-    arrow.style.color = 'black';
     arrow.style.pointerEvents = 'none';
-    arrow.style.zIndex = '10';
+    arrow.style.zIndex = '20';
+    arrow.style.color = playerColorMap[playerId] || 'black';
 
-    // Save player ID
     arrow.dataset.playerId = playerId;
     arrow.dataset.direction = direction;
 
     block.appendChild(arrow);
+
+    // Re-layout all arrows of this direction in the block
+    layoutDirectionalArrows(block, direction);
+}
+
+
+
+function layoutDirectionalArrows(block, direction) {
+    const arrows = Array.from(block.querySelectorAll(`.arrow[data-direction="${direction}"]`));
+    const OFFSET_STEP = 12;
+
+    arrows.forEach((arrow, i) => {
+        switch (direction) {
+            case 'up':
+                arrow.style.top = '-2px';
+                arrow.style.left = `${20 + i * OFFSET_STEP}px`;
+                arrow.style.transform = 'translate(-50%, -80%)';
+                break;
+            case 'down':
+                arrow.style.bottom = '-2px';
+                arrow.style.left = `${20 + i * OFFSET_STEP}px`;
+                arrow.style.transform = 'translate(-50%, 80%)';
+                break;
+            case 'left':
+                arrow.style.left = '-2px';
+                arrow.style.top = `${10 + i * OFFSET_STEP}px`;
+                arrow.style.transform = 'translate(-100%, -50%)';
+                break;
+            case 'right':
+                arrow.style.right = '-2px';
+                arrow.style.top = `${10 + i * OFFSET_STEP}px`;
+                arrow.style.transform = 'translate(100%, -50%)';
+                break;
+        }
+    });
 }
 
 
@@ -575,64 +707,65 @@ function _createThisPlayerAvatar() {
                 <div class="person" id="player1"></div>
             </div>
         </div>
-        <div class="row" id="${thisPlayerID}-selection-container">
-            <div class="col-12" id="${thisPlayerID}-selection-content">
-                <select class="form-select" id="${thisPlayerID}-block-select" required>
-                    <option value="" disabled selected>Select Block</option>
-                    <option value="blue">Blue</option>
-                    <option value="red">Red</option>
-                    <option value="yellow">Yellow</option>
-                </select>
-                <br>
-                <select class="form-select" id="${thisPlayerID}-direction-select" required>
-                    <option value="" disabled selected>Select Direction</option>
-                    <option value="up">Up</option>
-                    <option value="down">Down</option>
-                    <option value="left">Left</option>
-                    <option value="right">Right</option>
-                </select>
-            </div>
-        </div>
-        <div class="row" id="player1-submit-container">
-            <div class="col-12" id="player1-submit-content">
-                <button type="button" class="btn btn-dark" id="submit-selection-button">
-                    Submit
-                </button>
-            </div>
-        </div>
     `;
 
-    // Setup the submit button event listener
-    submitSelection = document.getElementById('submit-selection-button');
-    submitSelection.addEventListener('click', function () {
-        // Get selected block and direction
-        let selectedBlock = document.getElementById(`${thisPlayerID}-block-select`).value;
-        let selectedDirection = document.getElementById(`${thisPlayerID}-direction-select`).value;
+//     <div class="row" id="${thisPlayerID}-selection-container">
+//     <div class="col-12" id="${thisPlayerID}-selection-content">
+//         <select class="form-select" id="${thisPlayerID}-block-select" required>
+//             <option value="" disabled selected>Select Block</option>
+//             <option value="blue">Blue</option>
+//             <option value="red">Red</option>
+//             <option value="yellow">Yellow</option>
+//         </select>
+//         <br>
+//         <select class="form-select" id="${thisPlayerID}-direction-select" required>
+//             <option value="" disabled selected>Select Direction</option>
+//             <option value="up">Up</option>
+//             <option value="down">Down</option>
+//             <option value="left">Left</option>
+//             <option value="right">Right</option>
+//         </select>
+//     </div>
+// </div>
+// <div class="row" id="player1-submit-container">
+//     <div class="col-12" id="player1-submit-content">
+//         <button type="button" class="btn btn-dark" id="submit-selection-button">
+//             Submit
+//         </button>
+//     </div>
+// </div>
 
-        // Check if both are selected
-        if (selectedBlock && selectedDirection) {
-            console.log("Selected Block:", selectedBlock);
-            console.log("Selected Direction:", selectedDirection);
+    // // Setup the submit button event listener
+    // submitSelection = document.getElementById('submit-selection-button');
+    // submitSelection.addEventListener('click', function () {
+    //     // Get selected block and direction
+    //     let selectedBlock = document.getElementById(`${thisPlayerID}-block-select`).value;
+    //     let selectedDirection = document.getElementById(`${thisPlayerID}-direction-select`).value;
 
-            // Update the database with selected block and direction
-            updateStateDirect(
-                `players/${thisPlayerID}`,
-                {
-                    block: selectedBlock,
-                    direction: selectedDirection
-                }
-            );
+    //     // Check if both are selected
+    //     if (selectedBlock && selectedDirection) {
+    //         console.log("Selected Block:", selectedBlock);
+    //         console.log("Selected Direction:", selectedDirection);
 
-            addArrowToBlock(selectedBlock, selectedDirection, thisPlayerID);
+    //         // Update the database with selected block and direction
+    //         updateStateDirect(
+    //             `players/${thisPlayerID}`,
+    //             {
+    //                 block: selectedBlock,
+    //                 direction: selectedDirection
+    //             }
+    //         );
 
-            // Update visual feedback (avatar turns green)
-            _updatePlayerAvatar(1, 'green');
-            //messageToPlayer.innerText = 'Selection received... waiting for others.';
-        } else {
-            console.log("Both selections are required!");
-            alert('Please select both a block and a direction.');
-        }
-    });
+    //         addArrowToBlock(selectedBlock, selectedDirection, thisPlayerID);
+
+    //         // Update visual feedback (avatar turns green)
+    //         _updatePlayerAvatar(1, 'green');
+    //         //messageToPlayer.innerText = 'Selection received... waiting for others.';
+    //     } else {
+    //         console.log("Both selections are required!");
+    //         alert('Please select both a block and a direction.');
+    //     }
+    // });
 }
 
 
@@ -664,19 +797,7 @@ function _createOtherPlayerAvatar() {
                     </div>
                     <div class="row" id="${player}-avatar-container">
                         <div class="col-12" id="${player}-avatar-content">
-                            <div class="person" id="player2">
-
-                            </div>
-                        </div>
-                    </div>
-                    <div class="row" id="${player}-guess-container">
-                        <div class="col-12" id="${player}-nudge-content">
-                            <button type="button" class="btn btn-danger" id="${player}-nudge-button" disabled hidden>
-                                Nudge
-                            </button>
-                        </div>
-                        <div class="col-12" id="${player}-guess-content-text">
-                            <h4 id="${player}-guess-text">----</h4>
+                            <div class="person" id="player${otherPlayerCountID}"></div>
                         </div>
                     </div>
                 </div>
@@ -724,6 +845,8 @@ function newGame() {
     _createThisPlayerAvatar();
     _createOtherPlayerAvatar();
 
+    assignAvatarColors();
+
     GameState = _randomizeGamePlacement();
 
     let arrivalIndex = getCurrentPlayerArrivalIndex();
@@ -766,6 +889,12 @@ function receiveStateChange(pathNow, nodeName, newState, typeChange ) {
     if (pathNow == "players" && (typeChange == 'onChildAdded' ||typeChange == 'onChildChanged')) {
         const playerId = nodeName; // nodeName is the player ID
         const playerData = newState; // newState contains { selectedBlock, selectedDirection }
+
+        if (playerData.color) {
+            playerColorMap[playerId] = playerData.color;
+            console.log("color received");
+            console.log(playerColorMap);
+        }
     
         // 2. Draw the new arrow if both block and direction are selected
         if (playerData.block && playerData.direction) {
