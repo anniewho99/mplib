@@ -61,7 +61,7 @@ Configure all of the game settings. This includes:
 
 //  Conatant Game Variables
 let GameName = "groupestimation";
-let NumPlayers = 2;
+let NumPlayers = 5;
 let MinPlayers = NumPlayers;
 let MaxPlayers = NumPlayers;
 let MaxSessions = 0;
