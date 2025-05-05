@@ -64,7 +64,7 @@ Configure all of the game settings. This includes:
 function getNumPlayersFromURL() {
     const params = new URLSearchParams(window.location.search);
     const num = parseInt(params.get("numPlayers"));
-    return num; 
+    return isNaN(num) ? 2 : Math.max(2, Math.min(num, 5)); // default to 5, clamp between 2–5
 }
 
 let GameName = "groupestimation";
