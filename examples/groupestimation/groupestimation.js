@@ -60,8 +60,15 @@ Configure all of the game settings. This includes:
 */
 
 //  Conatant Game Variables
+
+function getNumPlayersFromURL() {
+    const params = new URLSearchParams(window.location.search);
+    const num = parseInt(params.get("numPlayers"));
+    return num; 
+}
+
 let GameName = "groupestimation";
-let NumPlayers = 5;
+let NumPlayers = getNumPlayersFromURL();
 let MinPlayers = NumPlayers;
 let MaxPlayers = NumPlayers;
 let MaxSessions = 0;
@@ -406,8 +413,8 @@ function moveBlock(block, direction) {
     block.dataset.y = y;
 
     // Move the block with matching logic
-    const width = CELL_WIDTH * 2;
-    const height = CELL_HEIGHT * 2;
+    const width = CELL_WIDTH * 3;
+    const height = CELL_HEIGHT * 3;
 
     block.style.left = (x * CELL_WIDTH + CELL_WIDTH - width / 2) + 'px';
     block.style.top = (y * CELL_HEIGHT + CELL_HEIGHT - height / 2) + 'px';
@@ -436,8 +443,8 @@ function drawSlot(slot) {
     const div = document.createElement('div');
     div.classList.add('slot');
 
-    const width = CELL_WIDTH * 2;
-    const height = CELL_HEIGHT * 2;
+    const width = CELL_WIDTH * 3;
+    const height = CELL_HEIGHT * 3;
 
     // Position and style
     div.style.position = 'absolute';
@@ -466,8 +473,8 @@ function drawBlock(block) {
     const div = document.createElement('div');
     div.classList.add('block');
 
-    const width = CELL_WIDTH * 2;
-    const height = CELL_HEIGHT * 2;
+    const width = CELL_WIDTH * 3;
+    const height = CELL_HEIGHT * 3;
 
     div.setAttribute('data-color', block.color);
     div.dataset.color = block.color;
@@ -542,7 +549,7 @@ function addArrowToBlock(color, direction, playerId) {
     arrow.classList.add('arrow');
     arrow.innerText = directionToArrowSymbol(direction);
     arrow.style.position = 'absolute';
-    arrow.style.fontSize = '20px';
+    arrow.style.fontSize = '40px';
     arrow.style.fontWeight = 'bold';
     arrow.style.pointerEvents = 'none';
     arrow.style.zIndex = '20';
@@ -561,7 +568,7 @@ function addArrowToBlock(color, direction, playerId) {
 
 function layoutDirectionalArrows(block, direction) {
     const arrows = Array.from(block.querySelectorAll(`.arrow[data-direction="${direction}"]`));
-    const OFFSET_STEP = 12;
+    const OFFSET_STEP = 20;
 
     arrows.forEach((arrow, i) => {
         switch (direction) {
@@ -623,10 +630,10 @@ function _randomizeGamePlacement() {
     // Random starting positions for blocks
     let blockColors = ['blue', 'red', 'yellow'];
     let possibleStartPositions = [
-        {x: 1, y: 1},
-        {x: 2, y: 9},
-        {x: 1, y: 14}
-    ];
+        { x: 1, y: 2 },   // Top-left
+        { x: 2, y: 8 },   // Middle-left
+        { x: 1, y: 14 }   // Bottom-left
+      ];
     // Shuffle the start positions
     possibleStartPositions = shuffleArray(possibleStartPositions);
 
@@ -638,12 +645,11 @@ function _randomizeGamePlacement() {
         };
     });
 
-    // Random ending positions for slots
     let possibleEndPositions = [
-        {x: 16, y: 2},
-        {x: 16, y: 8},
-        {x: 16, y: 14}
-    ];
+        { x: 16, y: 3 },  // Top-right
+        { x: 15, y: 9 },  // Middle-right
+        { x: 16, y: 15 }  // Bottom-right
+      ];;
     // Shuffle the slot positions
     possibleEndPositions = shuffleArray(possibleEndPositions);
 
