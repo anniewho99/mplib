@@ -61,8 +61,14 @@ Configure all of the game settings. This includes:
 
 //  Conatant Game Variables
 
+function getNumPlayersFromURL() {
+    const params = new URLSearchParams(window.location.search);
+    const num = parseInt(params.get("numPlayers"));
+    return isNaN(num) ? 5 : Math.max(2, Math.min(num, 5)); // default to 5, clamp between 2–5
+}
+
 let GameName = "groupestimation";
-let NumPlayers = 2;
+let NumPlayers = getNumPlayersFromURL();
 let MinPlayers = NumPlayers;
 let MaxPlayers = NumPlayers;
 let MaxSessions = 0;
