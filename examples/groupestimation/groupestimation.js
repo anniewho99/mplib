@@ -231,37 +231,53 @@ let playerColorMap = {};
 
 
 function assignAvatarColors() {
-    const PLAYER_COLORS = [
-        '#E69F00', // Orange
-        '#009E73', // Green
-        '#F0E442', // Yellow
-        '#CC79A7', // Pink/Magenta
-        '#0072B2'  // Blue
-    ];
 
     const arrivalIndex = getCurrentPlayerArrivalIndex(); // 1-based
-    const numPlayers = getNumberCurrentPlayers();
 
-    const root = document.documentElement;
-
-    // 1. Set color for local player (#player1)
-    const myColor = PLAYER_COLORS[arrivalIndex - 1];
-    root.style.setProperty('--player1avatar-backgroundcolor', myColor);
 
     updateStateDirect(`players/${getCurrentPlayerId()}`, {
-        color: myColor
+        color: arrivalIndex 
     });
 
-    playerColorMap[getCurrentPlayerId()] = myColor;
+    playerColorMap[getCurrentPlayerId()] = arrivalIndex;
 
-    // 2. Assign the remaining N-1 colors to player2–playerN
-    let colorIndex = 0;
-    for (let i = 2; i <= numPlayers; i++) {
-        if (colorIndex === arrivalIndex - 1) colorIndex++; // Skip local player's color
-        root.style.setProperty(`--player${i}avatar-backgroundcolor`, PLAYER_COLORS[colorIndex]);
-        colorIndex++;
-    }
 }
+
+// let playerColorMap = {}; 
+
+
+// function assignAvatarColors() {
+//     const PLAYER_COLORS = [
+//         '#E69F00', // Orange
+//         '#009E73', // Green
+//         '#F0E442', // Yellow
+//         '#CC79A7', // Pink/Magenta
+//         '#0072B2'  // Blue
+//     ];
+
+//     const arrivalIndex = getCurrentPlayerArrivalIndex(); // 1-based
+//     const numPlayers = getNumberCurrentPlayers();
+
+//     const root = document.documentElement;
+
+//     // 1. Set color for local player (#player1)
+//     const myColor = PLAYER_COLORS[arrivalIndex - 1];
+//     root.style.setProperty('--player1avatar-backgroundcolor', myColor);
+
+//     updateStateDirect(`players/${getCurrentPlayerId()}`, {
+//         color: myColor
+//     });
+
+//     playerColorMap[getCurrentPlayerId()] = myColor;
+
+//     // 2. Assign the remaining N-1 colors to player2–playerN
+//     let colorIndex = 0;
+//     for (let i = 2; i <= numPlayers; i++) {
+//         if (colorIndex === arrivalIndex - 1) colorIndex++; // Skip local player's color
+//         root.style.setProperty(`--player${i}avatar-backgroundcolor`, PLAYER_COLORS[colorIndex]);
+//         colorIndex++;
+//     }
+// }
 
 // function disableSubmitButton() {
 //     if (submitSelection) {
@@ -822,79 +838,43 @@ function _setPlayerAvatarCSS() {
 
 };
 
+// function _createThisPlayerAvatar() {
+//     let thisPlayerContainer = document.getElementById('player1-container');
+//     thisPlayerContainer.innerHTML = `
+//         <div class="row" id="${thisPlayerID}-container">
+//             <div class="col-12" id="${thisPlayerID}-content">
+//                 <h3 id="${thisPlayerID}-name">You</h3>
+//             </div>
+//         </div>
+//         <div class="row" id="${thisPlayerID}-avatar-container">
+//             <div class="col-12" id="${thisPlayerID}-avatar-content">
+//                 <div class="person" id="player1"></div>
+//             </div>
+//         </div>
+//     `;
+
+// }
+
 function _createThisPlayerAvatar() {
-    let thisPlayerContainer = document.getElementById('player1-container');
-    thisPlayerContainer.innerHTML = `
-        <div class="row" id="${thisPlayerID}-container">
-            <div class="col-12" id="${thisPlayerID}-content">
-                <h3 id="${thisPlayerID}-name">You</h3>
+    const container = document.getElementById('player1-container');
+    const playerId = getCurrentPlayerId();
+    const index = playerColorMap[playerId]; 
+    const imgSrc = `./images/player${index}.png`;
+
+    container.innerHTML = `
+        <div class="row" id="${playerId}-container">
+            <div class="col-12" id="${playerId}-content">
+                <h3 id="${playerId}-name">You</h3>
             </div>
         </div>
-        <div class="row" id="${thisPlayerID}-avatar-container">
-            <div class="col-12" id="${thisPlayerID}-avatar-content">
-                <div class="person" id="player1"></div>
+        <div class="row" id="${playerId}-avatar-container">
+            <div class="col-12" id="${playerId}-avatar-content">
+                <img src="${imgSrc}" class="player-avatar" />
             </div>
         </div>
     `;
-
-//     <div class="row" id="${thisPlayerID}-selection-container">
-//     <div class="col-12" id="${thisPlayerID}-selection-content">
-//         <select class="form-select" id="${thisPlayerID}-block-select" required>
-//             <option value="" disabled selected>Select Block</option>
-//             <option value="blue">Blue</option>
-//             <option value="red">Red</option>
-//             <option value="yellow">Yellow</option>
-//         </select>
-//         <br>
-//         <select class="form-select" id="${thisPlayerID}-direction-select" required>
-//             <option value="" disabled selected>Select Direction</option>
-//             <option value="up">Up</option>
-//             <option value="down">Down</option>
-//             <option value="left">Left</option>
-//             <option value="right">Right</option>
-//         </select>
-//     </div>
-// </div>
-// <div class="row" id="player1-submit-container">
-//     <div class="col-12" id="player1-submit-content">
-//         <button type="button" class="btn btn-dark" id="submit-selection-button">
-//             Submit
-//         </button>
-//     </div>
-// </div>
-
-    // // Setup the submit button event listener
-    // submitSelection = document.getElementById('submit-selection-button');
-    // submitSelection.addEventListener('click', function () {
-    //     // Get selected block and direction
-    //     let selectedBlock = document.getElementById(`${thisPlayerID}-block-select`).value;
-    //     let selectedDirection = document.getElementById(`${thisPlayerID}-direction-select`).value;
-
-    //     // Check if both are selected
-    //     if (selectedBlock && selectedDirection) {
-    //         console.log("Selected Block:", selectedBlock);
-    //         console.log("Selected Direction:", selectedDirection);
-
-    //         // Update the database with selected block and direction
-    //         updateStateDirect(
-    //             `players/${thisPlayerID}`,
-    //             {
-    //                 block: selectedBlock,
-    //                 direction: selectedDirection
-    //             }
-    //         );
-
-    //         addArrowToBlock(selectedBlock, selectedDirection, thisPlayerID);
-
-    //         // Update visual feedback (avatar turns green)
-    //         _updatePlayerAvatar(1, 'green');
-    //         //messageToPlayer.innerText = 'Selection received... waiting for others.';
-    //     } else {
-    //         console.log("Both selections are required!");
-    //         alert('Please select both a block and a direction.');
-    //     }
-    // });
 }
+
 
 
 function _createOtherPlayerAvatar() {
