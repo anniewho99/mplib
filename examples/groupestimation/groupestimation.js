@@ -68,7 +68,7 @@ function getNumPlayersFromURL() {
 }
 
 let GameName = "groupestimation";
-let NumPlayers = 1;
+let NumPlayers = getNumPlayersFromURL();
 let MinPlayers = NumPlayers;
 let MaxPlayers = NumPlayers;
 let MaxSessions = 0;
@@ -79,6 +79,8 @@ let MaxSessionTime = 0;
 let SaveData = true;
 
 let playerId;
+
+let arrivalIndex;
 
 const CELL_WIDTH = 30;
 const CELL_HEIGHT = 30;
@@ -222,8 +224,8 @@ Game logic and functionality. All functions for gameplay. This includes:
 
 let roundTimer;
 
-let votingDuration = 2; 
-let breakDuration = 1; 
+let votingDuration = 5; 
+let breakDuration = 2; 
 
 let countdownInterval;
 
@@ -232,7 +234,7 @@ let playerColorMap = {};
 
 function assignAvatarColors() {
 
-    const arrivalIndex = getCurrentPlayerArrivalIndex(); // 1-based
+    arrivalIndex = getCurrentPlayerArrivalIndex(); // 1-based
 
 
     updateStateDirect(`players/${getCurrentPlayerId()}`, {
@@ -477,8 +479,8 @@ function moveBlock(block, direction) {
     if (direction === 'left') x -= 1;
     if (direction === 'right') x += 1;
 
-    x = Math.max(0, Math.min(17, x));
-    y = Math.max(0, Math.min(26, y));
+    x = Math.max(0, Math.min(26, x));
+    y = Math.max(0, Math.min(17, y));
 
     block.dataset.x = x;
     block.dataset.y = y;
@@ -673,16 +675,29 @@ function addArrowToBlock(color, direction, playerId) {
     // Remove this player's previous arrow from any block
     removeArrowFromPlayer(playerId);
 
-    // Add the arrow to the block
-    const arrow = document.createElement('div');
+    // Get the arrival index to determine the correct image
+    const arrivalIndex = playerColorMap[playerId]; // assumes 1-based index
+    const imgSrc = `./images/player${arrivalIndex}_arrow.png`;
+
+    // Create image-based arrow
+    const arrow = document.createElement('img');
     arrow.classList.add('arrow');
-    arrow.innerText = directionToArrowSymbol(direction);
+    arrow.src = imgSrc;
     arrow.style.position = 'absolute';
-    arrow.style.fontSize = '40px';
-    arrow.style.fontWeight = 'bold';
+    arrow.style.width = '28px';
+    arrow.style.height = '28px';
     arrow.style.pointerEvents = 'none';
     arrow.style.zIndex = '20';
-    arrow.style.color = playerColorMap[playerId] || 'black';
+    arrow.style.transformOrigin = 'center center';
+
+    // Rotate based on direction
+    const rotationMap = {
+        up: 'rotate(0deg)',
+        right: 'rotate(90deg)',
+        down: 'rotate(180deg)',
+        left: 'rotate(270deg)'
+    };
+    arrow.style.transform = rotationMap[direction] || 'rotate(0deg)';
 
     arrow.dataset.playerId = playerId;
     arrow.dataset.direction = direction;
@@ -696,29 +711,43 @@ function addArrowToBlock(color, direction, playerId) {
 
 function layoutDirectionalArrows(block, direction) {
     const arrows = Array.from(block.querySelectorAll(`.arrow[data-direction="${direction}"]`));
-    const OFFSET_STEP = 20;
+    const OFFSET_STEP = 24;
 
     arrows.forEach((arrow, i) => {
+        // Only rotation string from previous transform
+        const rotation = arrow.style.transform.match(/rotate\([^)]*\)/)?.[0] || '';
+
         switch (direction) {
             case 'up':
-                arrow.style.top = '-2px';
+                arrow.style.top = '-5px';
                 arrow.style.left = `${20 + i * OFFSET_STEP}px`;
-                arrow.style.transform = 'translate(-50%, -80%)';
+                arrow.style.right = '';
+                arrow.style.bottom = '';
+                arrow.style.transform = `${rotation} translate(-50%, -100%)`;
                 break;
+
             case 'down':
-                arrow.style.bottom = '-2px';
-                arrow.style.left = `${20 + i * OFFSET_STEP}px`;
-                arrow.style.transform = 'translate(-50%, 80%)';
+                arrow.style.top = '100%';
+                arrow.style.left = `${i * OFFSET_STEP}px`;
+                arrow.style.right = '';
+                arrow.style.bottom = '';
+                arrow.style.transform = `${rotation} translate(-50%, 0%)`;
                 break;
+
             case 'left':
-                arrow.style.left = '-2px';
-                arrow.style.top = `${10 + i * OFFSET_STEP}px`;
-                arrow.style.transform = 'translate(-100%, -50%)';
+                arrow.style.top = `${-20 + i * OFFSET_STEP}px`;
+                arrow.style.left = '-15px';
+                arrow.style.right = '';
+                arrow.style.bottom = '';
+                arrow.style.transform = `${rotation} translate(-100%, -50%)`;
                 break;
+
             case 'right':
-                arrow.style.right = '-2px';
-                arrow.style.top = `${10 + i * OFFSET_STEP}px`;
-                arrow.style.transform = 'translate(100%, -50%)';
+                arrow.style.top = `${5 + i * OFFSET_STEP}px`;
+                arrow.style.left = 'calc(100% - 10px)';
+                arrow.style.right = '';
+                arrow.style.bottom = '';
+                arrow.style.transform = `${rotation} translate(0%, -50%)`;
                 break;
         }
     });
@@ -857,14 +886,13 @@ function _setPlayerAvatarCSS() {
 
 function _createThisPlayerAvatar() {
     const container = document.getElementById('player1-container');
-    const playerId = getCurrentPlayerId();
-    const index = playerColorMap[playerId]; 
-    const imgSrc = `./images/player${index}.png`;
+    arrivalIndex = getCurrentPlayerArrivalIndex();
+    const imgSrc = `./images/player${arrivalIndex}.png`;
 
     container.innerHTML = `
         <div class="row" id="${playerId}-container">
             <div class="col-12" id="${playerId}-content">
-                <h3 id="${playerId}-name">You</h3>
+                <h3 id="${playerId}-name" style="font-size: 16px;">You</h3>
             </div>
         </div>
         <div class="row" id="${playerId}-avatar-container">
@@ -878,44 +906,48 @@ function _createThisPlayerAvatar() {
 
 
 function _createOtherPlayerAvatar() {
-    
     let otherPlayerContainer = document.getElementById('other-player-content');
 
-    let thisPlayerID = getCurrentPlayerId();
-    let allPlayerIDs = getCurrentPlayerIds();
-    let otherPlayerCountID = 2;
-    allPlayerIDs.forEach((player) => {
-        if (player == thisPlayerID){} else {
-            let columnSize;
-            if (allPlayerIDs.length == 5){
-                columnSize = 3;
-            } else if (allPlayerIDs.length == 4) {
-                columnSize = 4;
-            } else if (allPlayerIDs.length == 3) {
-                columnSize = 6;
-            } else {
-                columnSize = 12;
-            };
+    const thisPlayerID = getCurrentPlayerId();
+    const allPlayerIDs = getCurrentPlayerIds();
+
+    // Create a list of indices 1–5, remove this player's index
+    let avatarIndices = [1, 2, 3, 4, 5].filter(i => i !== arrivalIndex);
+
+    let avatarAssignIndex = 0;
+    let visualPlayerNumber = 2;
+
+    allPlayerIDs.forEach((playerId) => {
+        if (playerId !== thisPlayerID) {
+            const columnSize = {
+                5: 3,
+                4: 4,
+                3: 6
+            }[allPlayerIDs.length] || 12;
+
+            const avatarIndex = avatarIndices[avatarAssignIndex];
+            const avatarSrc = `./images/player${avatarIndex}.png`;
+
             otherPlayerContainer.innerHTML += `
-                <div class="col-${columnSize}" id="${player}-container">
-                    <div class="row" id="${player}-name-container">
-                        <div class="col-12" id="${player}-name-content">
-                            <h3 id="${player}-name">Player ${otherPlayerCountID}</h3>
+                <div class="col-${columnSize}" id="${playerId}-container">
+                    <div class="row" id="${playerId}-name-container">
+                        <div class="col-12" id="${playerId}-name-content">
+                            <h3 id="${playerId}-name" style="font-size: 16px;">Player ${visualPlayerNumber}</h3>
                         </div>
                     </div>
-                    <div class="row" id="${player}-avatar-container">
-                        <div class="col-12" id="${player}-avatar-content">
-                            <div class="person" id="player${otherPlayerCountID}"></div>
+                    <div class="row" id="${playerId}-avatar-container">
+                        <div class="col-12" id="${playerId}-avatar-content">
+                            <img src="${avatarSrc}" class="player-avatar" id="player${visualPlayerNumber}">
                         </div>
                     </div>
                 </div>
             `;
-            otherPlayerCountID++;
+            avatarAssignIndex++;
+            visualPlayerNumber++;
         }
     });
-    
+}
 
-};
 
 function _updatePlayerAvatar(n, color) {
     /*
@@ -949,11 +981,11 @@ function _updatePlayerAvatarV2(player) {
 function newGame() {
     // Initialize a game
     //let whoStarts;
+    assignAvatarColors();
     _setPlayerAvatarCSS();
     _createThisPlayerAvatar();
     _createOtherPlayerAvatar();
 
-    assignAvatarColors();
 
     GameState = _randomizeGamePlacement();
 
