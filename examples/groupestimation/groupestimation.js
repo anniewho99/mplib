@@ -68,7 +68,7 @@ function getNumPlayersFromURL() {
 }
 
 let GameName = "groupestimation";
-let NumPlayers = getNumPlayersFromURL();
+let NumPlayers = 1;
 let MinPlayers = NumPlayers;
 let MaxPlayers = NumPlayers;
 let MaxSessions = 0;
@@ -80,7 +80,7 @@ let SaveData = true;
 
 let playerId;
 
-const CELL_WIDTH = 45;
+const CELL_WIDTH = 30;
 const CELL_HEIGHT = 30;
 
 //  Configuration Settings for the Session
@@ -116,7 +116,7 @@ let funList = {
 };
 
 // List the node names where we place listeners for any changes to the children of these nodes; set to '' if listening to changes for children of the root
-let listenerPaths = [ 'players', 'blocks', 'slots' ];
+let listenerPaths = [ 'players', 'blocks', 'slots', 'obs' ];
 
 //  Initialize the Game Session with all Configs
 initializeMPLIB( sessionConfig , studyId , funList, listenerPaths, verbosity );
@@ -145,7 +145,8 @@ console.log("Game Starting...", thisPlayerID);
 let GameState = {
     blocks: {},
     slots: {},
-    players: {}
+    players: {},
+    obstacles: {}
 };
 
 let lockedBlocks = {};
@@ -221,8 +222,8 @@ Game logic and functionality. All functions for gameplay. This includes:
 
 let roundTimer;
 
-let votingDuration = 5; 
-let breakDuration = 2; 
+let votingDuration = 2; 
+let breakDuration = 1; 
 
 let countdownInterval;
 
@@ -318,24 +319,19 @@ function startVotingPhase() {
 
 function finalizeVotes() {
     getCurrentPlayerIds().forEach(pid => {
-        updateStateDirect(`players/${pid}`, { block: null, direction: null });
-      });
-    
+        updateStateDirect(`players/${pid}`, { block: null, direction: null, obstacle: null });
+    });
+
     hideDirectionButtons();
     const turnMessage = document.getElementById('turnMessage');
     turnMessage.innerText = `Moving the blocks now...`;
-    // For each block:
+
     const container = document.getElementById('image-container');
     const blocks = container.querySelectorAll('.block');
+    const futurePlans = [];
 
     blocks.forEach(block => {
-        let voteCounts = {
-            'up': 0,
-            'down': 0,
-            'left': 0,
-            'right': 0
-        };
-
+        const voteCounts = { up: 0, down: 0, left: 0, right: 0 };
         const arrows = block.querySelectorAll('.arrow');
 
         arrows.forEach(arrow => {
@@ -343,15 +339,56 @@ function finalizeVotes() {
             voteCounts[direction]++;
         });
 
-        // Find majority direction
-        let majorityDirection = getMajorityDirection(voteCounts);
-        
-        if (majorityDirection) {
-            moveBlock(block, majorityDirection);
-        }
+        const id = block.dataset.color;
+        const minRequired = getMinRequiredVotes(id);
+        const majorityDirection = getMajorityDirection(voteCounts, minRequired);
 
-        // Remove all arrows after move
+        let x = parseInt(block.dataset.x);
+        let y = parseInt(block.dataset.y);
+
+        let targetX = x;
+        let targetY = y;
+
+        if (majorityDirection === 'up') targetY -= 1;
+        if (majorityDirection === 'down') targetY += 1;
+        if (majorityDirection === 'left') targetX -= 1;
+        if (majorityDirection === 'right') targetX += 1;
+
+        const size = block.dataset.obstacle === 'true' ? 2 : 3;
+
+        futurePlans.push({
+            id,
+            block,
+            direction: majorityDirection,
+            willMove: !!majorityDirection,
+            size,
+            futureCoords: getOccupiedCells(targetX, targetY, size)
+        });
+
         arrows.forEach(arrow => arrow.remove());
+    });
+
+    for (let i = 0; i < futurePlans.length; i++) {
+        for (let j = i + 1; j < futurePlans.length; j++) {
+            const a = futurePlans[i];
+            const b = futurePlans[j];
+    
+            const overlap = a.futureCoords.some(posA =>
+                b.futureCoords.some(posB => posA.x === posB.x && posA.y === posB.y)
+            );
+    
+            if (overlap) {
+                console.warn(`Conflict between ${a.id} and ${b.id}`);
+                a.willMove = false;
+                b.willMove = false;
+            }
+        }
+    }
+    
+    futurePlans.forEach(plan => {
+        if (plan.willMove) {
+            moveBlock(plan.block, plan.direction);
+        }
     });
 
     setTimeout(() => {
@@ -360,7 +397,19 @@ function finalizeVotes() {
     }, breakDuration * 1000);
 }
 
-function getMajorityDirection(votes) {
+
+function getOccupiedCells(startX, startY, size) {
+    const cells = [];
+    for (let dx = 0; dx < size; dx++) {
+        for (let dy = 0; dy < size; dy++) {
+            cells.push({ x: startX + dx, y: startY + dy });
+        }
+    }
+    return cells;
+}
+
+
+function getMajorityDirection(votes, minRequired) {
     let maxCount = 0;
     let majority = null;
     let countOfMax = 0;
@@ -375,60 +424,76 @@ function getMajorityDirection(votes) {
         }
     }
 
-    // Require at least 2 votes and no tie
-    if (maxCount < 2 || countOfMax > 1) {
-        console.log("No valid majority (either tie or fewer than 2 votes)");
+    // Check tie or below min
+    if (maxCount < minRequired || countOfMax > 1) {
+        console.log(`No move: needs at least ${minRequired} votes.`);
         return null;
     }
 
-    console.log("direction", majority);
+    console.log("Moving in direction:", majority);
     return majority;
+}
+
+function getMinRequiredVotes(color) {
+    const minVotesMap = {
+        blue: 3,
+        red: 2,
+        yellow: 1,
+    };
+    return minVotesMap[color] || 1; // default to 1 if undefined
 }
 
 
 function moveBlock(block, direction) {
     const color = block.dataset.color;
-    if (lockedBlocks[color]) {
-        console.log(`Block ${color} is locked and cannot move.`);
-        return;
-    }
 
+    // Skip slot locking logic if it's an obstacle
+    const isObstacle = block.dataset.obstacle === "true";
+
+    // Don't move if already locked (only applies to non-obstacles)
+    if (!isObstacle && lockedBlocks[color]) return;
 
     let x = parseInt(block.dataset.x);
     let y = parseInt(block.dataset.y);
-
-    console.log(`moving Block ${color} to ${x}, ${y}.`);
 
     if (direction === 'up') y -= 1;
     if (direction === 'down') y += 1;
     if (direction === 'left') x -= 1;
     if (direction === 'right') x += 1;
 
-    // Clamp within grid bounds
     x = Math.max(0, Math.min(17, x));
-    y = Math.max(0, Math.min(17, y));
+    y = Math.max(0, Math.min(26, y));
 
-    // Update dataset
     block.dataset.x = x;
     block.dataset.y = y;
 
-    // Move the block with matching logic
-    const width = CELL_WIDTH * 3;
-    const height = CELL_HEIGHT * 3;
+    block.style.left = (x * CELL_WIDTH) + 'px';
+    block.style.top = (y * CELL_HEIGHT) + 'px';
 
-    block.style.left = (x * CELL_WIDTH + CELL_WIDTH - width / 2) + 'px';
-    block.style.top = (y * CELL_HEIGHT + CELL_HEIGHT - height / 2) + 'px';
+    // Only check slot match if it's not an obstacle
+    if (!isObstacle) {
+        for (let slotColor in GameState.slots) {
+            const slot = GameState.slots[slotColor];
+            if (slot && slot.x === x && slot.y === y) {
+                console.log(`Block ${color} reached slot at (${x}, ${y}). Locking.`);
 
-    // Check if reached its slot
-    const slot = GameState.slots[color];
-    console.log(`Block ${color} final destination is ${slot.x}, ${slot.y}.`);
-    if (slot && slot.x === x && slot.y === y) {
-        console.log(`Block ${color} reached its slot. Locking.`);
-        lockedBlocks[color] = true;
-        block.style.border = '4px solid gold';
-        block.style.backgroundColor = 'lightgray';
+                lockedBlocks[color] = true;
+
+                // Visually indicate it's locked
+                block.style.border = '4px solid gold';
+                block.style.backgroundColor = 'lightgray';
+
+                const arrows = block.querySelectorAll('.direction-button');
+                arrows.forEach(btn => btn.remove());
+
+                delete GameState.slots[slotColor];
+                break;
+            }
+        }
     }
 }
+
+
 
 function getBlockLabel(color) {
     const labelMap = {
@@ -448,11 +513,11 @@ function drawSlot(slot) {
 
     // Position and style
     div.style.position = 'absolute';
-    div.style.left = (slot.x * CELL_WIDTH + CELL_WIDTH - width / 2) + 'px';
-    div.style.top = (slot.y * CELL_HEIGHT + CELL_HEIGHT - height / 2) + 'px';
+    div.style.left = (slot.x * CELL_WIDTH) + 'px';
+    div.style.top = (slot.y * CELL_HEIGHT) + 'px';
     div.style.width = `${width}px`;
     div.style.height = `${height}px`;
-    div.style.border = '3px dashed black';
+    div.style.border = '3px dashed #4a90a4';
     div.style.borderRadius = '10px';
     div.style.display = 'flex';
     div.style.alignItems = 'center';
@@ -461,72 +526,120 @@ function drawSlot(slot) {
     div.style.color = 'black';
     div.style.backgroundColor = 'transparent';
 
-    // Label (based on color key)
-    div.innerText = getBlockLabel(slot.color);
+    // // Label (based on color key)
+    // div.innerText = getBlockLabel(slot.color);
 
     container.appendChild(div);
 }
 
-
-function drawBlock(block) {
+function drawBlock(block, isObstacle) {
     const container = document.getElementById('image-container');
     const div = document.createElement('div');
     div.classList.add('block');
+    let width;
+    let height;
+    if(isObstacle){
+        width = CELL_WIDTH * 2;
+        height = CELL_HEIGHT * 2;
+    }else{
+        width = CELL_WIDTH * 3;
+        height = CELL_HEIGHT * 3;
+    }
 
-    const width = CELL_WIDTH * 3;
-    const height = CELL_HEIGHT * 3;
+    const id = isObstacle ? block.id : block.color;
 
-    div.setAttribute('data-color', block.color);
-    div.dataset.color = block.color;
+    div.setAttribute('data-color', id);
+    if(!isObstacle){
+        div.dataset.color = block.color;
+    }
     div.dataset.x = block.x; 
     div.dataset.y = block.y;
+    div.dataset.obstacle = isObstacle;
 
-    // Style and position
+    // Align with top-left grid cell
     div.style.position = 'absolute';
-    div.style.left = (block.x * CELL_WIDTH + CELL_WIDTH - width / 2) + 'px';
-    div.style.top = (block.y * CELL_HEIGHT + CELL_HEIGHT - height / 2) + 'px';
+    div.style.left = (block.x * CELL_WIDTH) + 'px';
+    div.style.top = (block.y * CELL_HEIGHT) + 'px';
     div.style.width = `${width}px`;
     div.style.height = `${height}px`;
-    div.style.backgroundColor = '#444'; // dark gray
-    div.style.borderRadius = '10px';
-    //div.style.border = '2px solid black';
+
+    // div.style.backgroundColor = '#8ab6d6'; 
+    // div.style.borderRadius = '10px';
     div.style.display = 'flex';
     div.style.alignItems = 'center';
     div.style.justifyContent = 'center';
-    div.style.position = 'absolute';
-    div.style.zIndex = '5';
     div.style.flexDirection = 'column';
+    div.style.zIndex = '5';
 
-    // Label
-    const label = document.createElement('div');
-    label.innerText = getBlockLabel(block.color);
-    label.style.color = 'white';
-    label.style.fontWeight = 'bold';
-    label.style.fontSize = '18px';
+    if(isObstacle == false){
+        div.style.backgroundColor = '#8ab6d6'; 
+        div.style.borderRadius = '10px';
+        const minPlayersMap = {
+            blue: 3,
+            red: 2,
+            yellow: 1
+        };
+        const minRequired = minPlayersMap[block.color] || 1;
+    
+        const minText = document.createElement('div');
+        minText.innerText = `min: ${minRequired}`;
+        minText.style.fontSize = '14px';
+        minText.style.color = 'white';
+        minText.style.marginBottom = '4px';
+    
+        div.appendChild(minText);
 
-    const minText = document.createElement('div');
-    minText.innerText = 'min: 2';
-    minText.style.fontSize = '14px';
-    minText.style.color = 'white';
+    }else{
+        div.style.backgroundColor = '#555'; // dark gray
+        div.style.borderRadius = '50%';
+        const minText = document.createElement('div');
+        minText.innerText = `min: 1`;
+        minText.style.fontSize = '12px';
+        minText.style.color = 'white';
+        minText.style.marginBottom = '2px';
+        div.appendChild(minText);
 
-    div.appendChild(label);
-    div.appendChild(minText);
+    }
 
-    // Directional buttons container
+
     const directions = ['up', 'right', 'down', 'left'];
     directions.forEach(dir => {
         const arrow = document.createElement('div');
         arrow.classList.add('triangle', dir, 'direction-button');
         arrow.dataset.direction = dir;
-        arrow.dataset.blockColor = block.color;
+        arrow.dataset.targetId = id;
+        arrow.dataset.isObstacle = isObstacle;
+        if (isObstacle) {
+            switch (dir) {
+                case 'up':
+                    arrow.style.borderWidth = '1px 7px 11px 7px';
+                    break;
+                case 'down':
+                    arrow.style.borderWidth = '11px 7px 1px 7px';
+                    break;
+                case 'left':
+                    arrow.style.borderWidth = '7px 11px 7px 1px';
+                    break;
+                case 'right':
+                    arrow.style.borderWidth = '7px 1px 7px 11px';
+                    break;
+            }
+        }
+        
 
-        // Event listener
         arrow.addEventListener('click', () => {
-            let playerId = getCurrentPlayerId();
-            updateStateDirect(`players/${playerId}`, {
-                block: block.color,
-                direction: dir
-            });
+            const playerId = getCurrentPlayerId();
+            if (isObstacle) {
+                updateStateDirect(`players/${playerId}`, {
+                    obstacle: id,
+                    direction: dir
+                });
+            } else {
+                updateStateDirect(`players/${playerId}`, {
+                    block: id,
+                    direction: dir
+                });
+            }
         });
 
         div.appendChild(arrow);
@@ -563,7 +676,6 @@ function addArrowToBlock(color, direction, playerId) {
     // Re-layout all arrows of this direction in the block
     layoutDirectionalArrows(block, direction);
 }
-
 
 
 function layoutDirectionalArrows(block, direction) {
@@ -624,42 +736,52 @@ function _randomizeGamePlacement() {
     let newGameState = {
         blocks: {},
         slots: {},
-        players: {}
+        players: {},
+        obstacles: {}
     };
 
-    // Random starting positions for blocks
-    let blockColors = ['blue', 'red', 'yellow'];
-    let possibleStartPositions = [
-        { x: 1, y: 2 },   // Top-left
-        { x: 2, y: 8 },   // Middle-left
-        { x: 1, y: 14 }   // Bottom-left
-      ];
-    // Shuffle the start positions
-    possibleStartPositions = shuffleArray(possibleStartPositions);
+    // Block setup — all in the middle
+    const blockSettings = [
+        { color: 'blue', minVotes: 3 },
+        { color: 'red', minVotes: 2 },
+        { color: 'yellow', minVotes: 1 }
+    ];
 
-    blockColors.forEach((color, index) => {
-        newGameState.blocks[color] = {
-            x: possibleStartPositions[index].x,
-            y: possibleStartPositions[index].y,
-            color: color
+    const possibleStartY = [2, 8, 15];
+    shuffleArray(possibleStartY);
+
+    blockSettings.forEach((block, index) => {
+        newGameState.blocks[block.color] = {
+            x: 13, // middle of the board
+            y: possibleStartY[index],
+            color: block.color,
+            minVotes: block.minVotes
         };
     });
 
-    let possibleEndPositions = [
-        { x: 16, y: 3 },  // Top-right
-        { x: 15, y: 9 },  // Middle-right
-        { x: 16, y: 15 }  // Bottom-right
-      ];;
-    // Shuffle the slot positions
-    possibleEndPositions = shuffleArray(possibleEndPositions);
+    // Slots on both sides (3 left + 3 right)
+    const possibleSlotPositions = [
+        { x: 2, y: 3 },
+        { x: 2, y: 14 },
+        { x: 24, y: 9 },
+        { x: 23, y: 14 }
+    ];
+    shuffleArray(possibleSlotPositions);
 
-    blockColors.forEach((color, index) => {
-        newGameState.slots[color] = {
-            x: possibleEndPositions[index].x,
-            y: possibleEndPositions[index].y,
-            color: color
+    // Use all 6 slots
+    for (let i = 0; i < 4; i++) {
+        newGameState.slots[`slot${i}`] = {
+            x: possibleSlotPositions[i].x,
+            y: possibleSlotPositions[i].y
         };
-    });
+    }
+
+    newGameState.obstacles = {
+        obs1: { x: 8, y: 6, id: 'obs1'},
+        obs2: { x: 10, y: 15, id: 'obs2' },
+        obs3: { x: 19, y: 6, id: 'obs3' },
+        obs4: { x: 18, y: 15, id: 'obs4'}
+    };
 
     // Initialize player choices
     let allPlayerIDs = getCurrentPlayerIds();
@@ -859,14 +981,19 @@ function newGame() {
 
     if (arrivalIndex == 1){
         updateStateDirect('blocks', GameState.blocks, 'initalizeBlock');
-        updateStateDirect('slots', GameState.slots, 'initalizeBlock');
+        updateStateDirect('slots', GameState.slots, 'initalizeSlots');
+        updateStateDirect('obs', GameState.obstacles, 'initalizeObstacle');
 
         Object.values(GameState.slots).forEach(slot => {
             drawSlot(slot);
         });
         
         Object.values(GameState.blocks).forEach(block => {
-            drawBlock(block);
+            drawBlock(block, false);
+        });
+
+        Object.values(GameState.obstacles).forEach(obstacles => {
+            drawBlock(obstacles, true);
         });
         
     }
@@ -906,13 +1033,17 @@ function receiveStateChange(pathNow, nodeName, newState, typeChange ) {
         if (playerData.block && playerData.direction) {
             console.log(`player ${playerId} decided to move ${playerData.block} to ${playerData.direction} .`);
             addArrowToBlock(playerData.block, playerData.direction, playerId);
+        }else if (playerData.block && playerData.direction) {
+            addArrowToBlock(playerData.block, playerData.direction, playerId);
+        } else if (playerData.obstacle && playerData.direction) {
+            addArrowToBlock(playerData.obstacle, playerData.direction, playerId);
         }
 
     } else if(pathNow == "blocks" && (typeChange == 'onChildAdded' ||typeChange == 'onChildChanged')){
         let arrivalIndex = getCurrentPlayerArrivalIndex();
         if(arrivalIndex != 1){
             GameState.blocks[nodeName] = newState;  // update your local GameState
-            drawBlock(newState)
+            drawBlock(newState, false)
         }
 
     }else if(pathNow == "slots" && (typeChange == 'onChildAdded' ||typeChange == 'onChildChanged')){
@@ -920,6 +1051,13 @@ function receiveStateChange(pathNow, nodeName, newState, typeChange ) {
         if(arrivalIndex != 1){
             GameState.slots[nodeName] = newState; // update your local GameState
             drawSlot(newState);
+        }
+    }else if(pathNow == "obs" && (typeChange == 'onChildAdded' ||typeChange == 'onChildChanged')){
+        console.log("received obstacle update");
+        let arrivalIndex = getCurrentPlayerArrivalIndex();
+        if(arrivalIndex != 1){
+            GameState.obstacles[newState.id] = newState; 
+            drawBlock(newState, true);
         }
     }
 
