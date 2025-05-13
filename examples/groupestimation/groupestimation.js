@@ -684,8 +684,8 @@ function addArrowToBlock(color, direction, playerId) {
     arrow.classList.add('arrow');
     arrow.src = imgSrc;
     arrow.style.position = 'absolute';
-    arrow.style.width = '28px';
-    arrow.style.height = '28px';
+    arrow.style.width = '37px';
+    arrow.style.height = '37px';
     arrow.style.pointerEvents = 'none';
     arrow.style.zIndex = '20';
     arrow.style.transformOrigin = 'center center';
@@ -897,7 +897,7 @@ function _createThisPlayerAvatar() {
         </div>
         <div class="row" id="${playerId}-avatar-container">
             <div class="col-12" id="${playerId}-avatar-content">
-                <img src="${imgSrc}" class="player-avatar" />
+                <img src="${imgSrc}" class="player-avatar" style="width: 50px; height: 50px;"/>
             </div>
         </div>
     `;
@@ -937,7 +937,7 @@ function _createOtherPlayerAvatar() {
                     </div>
                     <div class="row" id="${playerId}-avatar-container">
                         <div class="col-12" id="${playerId}-avatar-content">
-                            <img src="${avatarSrc}" class="player-avatar" id="player${visualPlayerNumber}">
+                            <img src="${avatarSrc}" class="player-avatar" id="player${visualPlayerNumber}" style="width: 50px; height: 50px;">
                         </div>
                     </div>
                 </div>
