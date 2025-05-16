@@ -68,7 +68,7 @@ function getNumPlayersFromURL() {
 }
 
 let GameName = "groupestimation";
-let NumPlayers = getNumPlayersFromURL();
+let NumPlayers = 1;
 let MinPlayers = NumPlayers;
 let MaxPlayers = NumPlayers;
 let MaxSessions = 0;
@@ -82,8 +82,8 @@ let playerId;
 
 let arrivalIndex;
 
-const CELL_WIDTH = 30;
-const CELL_HEIGHT = 30;
+const CELL_WIDTH = 40;
+const CELL_HEIGHT = 40;
 
 //  Configuration Settings for the Session
 const studyId = GameName; 
@@ -432,6 +432,7 @@ function getMajorityDirection(votes, minRequired) {
     let majority = null;
     let countOfMax = 0;
 
+    // Step 1: Find direction with most votes
     for (let direction in votes) {
         if (votes[direction] > maxCount) {
             maxCount = votes[direction];
@@ -442,15 +443,32 @@ function getMajorityDirection(votes, minRequired) {
         }
     }
 
-    // Check tie or below min
-    if (maxCount < minRequired || countOfMax > 1) {
-        console.log(`No move: needs at least ${minRequired} votes.`);
+    // Step 2: Handle ties
+    if (countOfMax > 1) {
+        console.log("No move: tie between directions.");
         return null;
     }
 
-    console.log("Moving in direction:", majority);
+    // Step 3: Adjust maxCount by subtracting competing votes
+    let competingVotes = 0;
+    for (let direction in votes) {
+        if (direction !== majority) {
+            competingVotes += votes[direction];
+        }
+    }
+
+    const adjustedVoteCount = maxCount - competingVotes;
+
+    // Step 4: Final threshold check
+    if (adjustedVoteCount < minRequired) {
+        console.log(`No move: adjusted vote count (${adjustedVoteCount}) below minimum required (${minRequired}).`);
+        return null;
+    }
+
+    console.log(`Moving in direction: ${majority} (raw: ${maxCount}, adjusted: ${adjustedVoteCount})`);
     return majority;
 }
+
 
 function getMinRequiredVotes(color) {
     const minVotesMap = {
@@ -479,14 +497,21 @@ function moveBlock(block, direction) {
     if (direction === 'left') x -= 1;
     if (direction === 'right') x += 1;
 
-    x = Math.max(0, Math.min(26, x));
-    y = Math.max(0, Math.min(17, y));
+    x = Math.max(0, Math.min(19, x));
+    y = Math.max(0, Math.min(12, y));
 
     block.dataset.x = x;
     block.dataset.y = y;
 
     block.style.left = (x * CELL_WIDTH) + 'px';
     block.style.top = (y * CELL_HEIGHT) + 'px';
+
+    block.style.transition = 'top 0.2s ease, left 0.2s ease, transform 0.2s';
+    block.style.transform = 'scale(1.1)';
+    setTimeout(() => {
+        block.style.transform = 'scale(1)';
+    }, 200);
+
 
     // Only check slot match if it's not an obstacle
     if (!isObstacle) {
@@ -503,8 +528,14 @@ function moveBlock(block, direction) {
 
                 const arrows = block.querySelectorAll('.direction-button');
                 arrows.forEach(btn => btn.remove());
+                block.style.transition = 'opacity 1s';
+                block.style.opacity = '0';
 
-                delete GameState.slots[slotColor];
+                setTimeout(() => {
+                    block.remove(); // Remove from DOM
+                    delete GameState.blocks[color]; // Remove from state
+                }, 2000);
+                // delete GameState.slots[slotColor];
                 break;
             }
         }
@@ -630,16 +661,16 @@ function drawBlock(block, isObstacle) {
         if (isObstacle) {
             switch (dir) {
                 case 'up':
-                    arrow.style.borderWidth = '1px 7px 11px 7px';
+                    arrow.style.borderWidth = '1px 15px 20px 15px';
                     break;
                 case 'down':
-                    arrow.style.borderWidth = '11px 7px 1px 7px';
+                    arrow.style.borderWidth = '20px 15px 1px 15px';
                     break;
                 case 'left':
-                    arrow.style.borderWidth = '7px 11px 7px 1px';
+                    arrow.style.borderWidth = '15px 20px 15px 1px';
                     break;
                 case 'right':
-                    arrow.style.borderWidth = '7px 1px 7px 11px';
+                    arrow.style.borderWidth = '15px 1px 15px 20px';
                     break;
             }
         }
@@ -684,8 +715,8 @@ function addArrowToBlock(color, direction, playerId) {
     arrow.classList.add('arrow');
     arrow.src = imgSrc;
     arrow.style.position = 'absolute';
-    arrow.style.width = '37px';
-    arrow.style.height = '37px';
+    arrow.style.width = '45px';
+    arrow.style.height = '45px';
     arrow.style.pointerEvents = 'none';
     arrow.style.zIndex = '20';
     arrow.style.transformOrigin = 'center center';
@@ -711,7 +742,7 @@ function addArrowToBlock(color, direction, playerId) {
 
 function layoutDirectionalArrows(block, direction) {
     const arrows = Array.from(block.querySelectorAll(`.arrow[data-direction="${direction}"]`));
-    const OFFSET_STEP = 24;
+    const OFFSET_STEP = 20;
 
     arrows.forEach((arrow, i) => {
         // Only rotation string from previous transform
@@ -792,12 +823,12 @@ function _randomizeGamePlacement() {
         { color: 'yellow', minVotes: 1 }
     ];
 
-    const possibleStartY = [2, 8, 15];
+    const possibleStartY = [1, 7, 11];
     shuffleArray(possibleStartY);
 
     blockSettings.forEach((block, index) => {
         newGameState.blocks[block.color] = {
-            x: 13, // middle of the board
+            x: 10, // middle of the board
             y: possibleStartY[index],
             color: block.color,
             minVotes: block.minVotes
@@ -807,9 +838,9 @@ function _randomizeGamePlacement() {
     // Slots on both sides (3 left + 3 right)
     const possibleSlotPositions = [
         { x: 2, y: 3 },
-        { x: 2, y: 14 },
-        { x: 24, y: 9 },
-        { x: 23, y: 14 }
+        { x: 2, y: 10 },
+        { x: 17, y: 7 },
+        { x: 18, y: 10 }
     ];
     shuffleArray(possibleSlotPositions);
 
@@ -822,10 +853,10 @@ function _randomizeGamePlacement() {
     }
 
     newGameState.obstacles = {
-        obs1: { x: 8, y: 6, id: 'obs1'},
-        obs2: { x: 10, y: 15, id: 'obs2' },
-        obs3: { x: 19, y: 6, id: 'obs3' },
-        obs4: { x: 18, y: 15, id: 'obs4'}
+        obs1: { x: 3, y: 6, id: 'obs1'},
+        obs2: { x: 6, y: 6, id: 'obs2' },
+        obs3: { x: 17, y: 5, id: 'obs3' },
+        obs4: { x: 15, y: 10, id: 'obs4'}
     };
 
     // Initialize player choices
