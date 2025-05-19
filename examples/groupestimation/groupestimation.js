@@ -68,7 +68,7 @@ function getNumPlayersFromURL() {
 }
 
 let GameName = "groupestimation";
-let NumPlayers = 1;
+let NumPlayers = getNumPlayersFromURL();
 let MinPlayers = NumPlayers;
 let MaxPlayers = NumPlayers;
 let MaxSessions = 0;
@@ -522,13 +522,19 @@ function moveBlock(block, direction) {
 
                 lockedBlocks[color] = true;
 
-                // Visually indicate it's locked
-                block.style.border = '4px solid gold';
-                block.style.backgroundColor = 'lightgray';
+                // // Visually indicate it's locked
+                // block.style.border = '4px solid gold';
+                // block.style.backgroundColor = 'lightgray';
 
                 const arrows = block.querySelectorAll('.direction-button');
                 arrows.forEach(btn => btn.remove());
-                block.style.transition = 'opacity 1s';
+
+                block.style.backgroundImage = "url('./images/slot.png')"; // or a tinted version
+                block.style.backgroundSize = 'cover';
+                block.style.boxShadow = '0 0 6px gold';
+                block.style.border = '2px solid gold';
+
+                block.style.transition = 'opacity 2s';
                 block.style.opacity = '0';
 
                 setTimeout(() => {
@@ -566,14 +572,20 @@ function drawSlot(slot) {
     div.style.top = (slot.y * CELL_HEIGHT) + 'px';
     div.style.width = `${width}px`;
     div.style.height = `${height}px`;
-    div.style.border = '3px dashed #4a90a4';
-    div.style.borderRadius = '10px';
+
+    // ⚡ Bold glowing pixel-style border
+    div.style.border = '4px dashed #3090c7'; // bright cyan
+    div.style.borderRadius = '0px'; // sharp pixel corners
+    div.style.backgroundColor = 'rgba(0, 255, 255, 0.05)';
+    div.style.boxShadow = '0 0 6px rgba(0, 255, 255, 0.7), inset 0 0 6px rgba(0, 255, 255, 0.3)';
+    div.style.imageRendering = 'pixelated';
+
     div.style.display = 'flex';
     div.style.alignItems = 'center';
     div.style.justifyContent = 'center';
-    div.style.fontWeight = 'bold';
     div.style.color = 'black';
-    div.style.backgroundColor = 'transparent';
+
+    div.style.backgroundColor = 'rgba(0, 0, 0, 0.1)';
 
     // // Label (based on color key)
     // div.innerText = getBlockLabel(slot.color);
@@ -588,8 +600,8 @@ function drawBlock(block, isObstacle) {
     let width;
     let height;
     if(isObstacle){
-        width = CELL_WIDTH * 2;
-        height = CELL_HEIGHT * 2;
+        width = CELL_WIDTH * 2.3;
+        height = CELL_HEIGHT * 2.3;
     }else{
         width = CELL_WIDTH * 3;
         height = CELL_HEIGHT * 3;
@@ -612,17 +624,23 @@ function drawBlock(block, isObstacle) {
     div.style.width = `${width}px`;
     div.style.height = `${height}px`;
 
-    // div.style.backgroundColor = '#8ab6d6'; 
-    // div.style.borderRadius = '10px';
     div.style.display = 'flex';
     div.style.alignItems = 'center';
     div.style.justifyContent = 'center';
     div.style.flexDirection = 'column';
     div.style.zIndex = '1';
+    div.style.backgroundRepeat = 'no-repeat';
+    div.style.backgroundSize = 'cover';
+    div.style.imageRendering = 'pixelated';
+
+    div.style.backgroundImage = isObstacle
+    ? "url('./images/obstacle.png')"
+    : "url('./images/block.png')";
+
 
     if(isObstacle == false){
-        div.style.backgroundColor = '#8ab6d6'; 
-        div.style.borderRadius = '10px';
+        // div.style.backgroundColor = '#8ab6d6'; 
+        // div.style.borderRadius = '10px';
         const minPlayersMap = {
             blue: 3,
             red: 2,
@@ -633,19 +651,29 @@ function drawBlock(block, isObstacle) {
         const minText = document.createElement('div');
         minText.innerText = `min: ${minRequired}`;
         minText.style.fontSize = '14px';
+        minText.style.fontWeight = 'bold';
         minText.style.color = 'white';
         minText.style.marginBottom = '4px';
+        minText.style.textShadow = '1px 1px 0 #000';
+        minText.style.padding = '2px 6px';
+        minText.style.borderRadius = '3px';
+        minText.style.imageRendering = 'pixelated';
+        minText.style.fontFamily = 'monospace'; 
     
         div.appendChild(minText);
 
     }else{
-        div.style.backgroundColor = '#555'; // dark gray
-        div.style.borderRadius = '50%';
+        // div.style.backgroundColor = '#555'; // dark gray
+        // div.style.borderRadius = '50%';
         const minText = document.createElement('div');
         minText.innerText = `min: 1`;
-        minText.style.fontSize = '12px';
+        minText.style.fontSize = '11.5px';
+        minText.style.fontWeight = 'bold';
+        minText.style.textShadow = '1px 1px 0 #000';
         minText.style.color = 'white';
         minText.style.marginBottom = '2px';
+        minText.style.imageRendering = 'pixelated';
+        minText.style.fontFamily = 'monospace'; 
         div.appendChild(minText);
 
     }
@@ -661,16 +689,16 @@ function drawBlock(block, isObstacle) {
         if (isObstacle) {
             switch (dir) {
                 case 'up':
-                    arrow.style.borderWidth = '1px 15px 20px 15px';
+                    arrow.style.borderWidth = '12px 15px 20px 15px';
                     break;
                 case 'down':
-                    arrow.style.borderWidth = '20px 15px 1px 15px';
+                    arrow.style.borderWidth = '20px 15px 12px 15px';
                     break;
                 case 'left':
-                    arrow.style.borderWidth = '15px 20px 15px 1px';
+                    arrow.style.borderWidth = '15px 17px 15px 12px';
                     break;
                 case 'right':
-                    arrow.style.borderWidth = '15px 1px 15px 20px';
+                    arrow.style.borderWidth = '15px 12px 15px 17px';
                     break;
             }
         }
@@ -717,7 +745,7 @@ function addArrowToBlock(color, direction, playerId) {
     arrow.style.height = '50px';
     arrow.style.position = 'absolute';
     arrow.style.pointerEvents = 'none';
-    arrow.style.zIndex = '20';
+    arrow.style.zIndex = '10000';
     arrow.style.transformOrigin = 'center center';
     arrow.style.backgroundImage = `url(${imgSrc}) `;
     arrow.style.backgroundRepeat = 'no-repeat';
@@ -847,7 +875,7 @@ function _randomizeGamePlacement() {
 
     blockSettings.forEach((block, index) => {
         newGameState.blocks[block.color] = {
-            x: 9, // middle of the board
+            x: 8, // middle of the board
             y: possibleStartY[index],
             color: block.color,
             minVotes: block.minVotes
@@ -858,7 +886,7 @@ function _randomizeGamePlacement() {
     const possibleSlotPositions = [
         { x: 0, y: 3 },
         { x: 0, y: 9 },
-        { x: 12, y: 6 },
+        { x: 14, y: 2 },
         { x: 15, y: 9 }
     ];
     shuffleArray(possibleSlotPositions);
@@ -872,9 +900,9 @@ function _randomizeGamePlacement() {
     }
 
     newGameState.obstacles = {
-        obs1: { x: 3, y: 6, id: 'obs1'},
-        obs2: { x: 6, y: 6, id: 'obs2' },
-        obs3: { x: 12, y: 5, id: 'obs3' },
+        obs1: { x: 2, y: 6, id: 'obs1'},
+        obs2: { x: 5, y: 6, id: 'obs2' },
+        obs3: { x: 12, y: 1, id: 'obs3' },
         obs4: { x: 13, y: 9, id: 'obs4'}
     };
 
