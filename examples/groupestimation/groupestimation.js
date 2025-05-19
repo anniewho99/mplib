@@ -82,8 +82,8 @@ let playerId;
 
 let arrivalIndex;
 
-const CELL_WIDTH = 40;
-const CELL_HEIGHT = 40;
+const CELL_WIDTH = 45;
+const CELL_HEIGHT = 45;
 
 //  Configuration Settings for the Session
 const studyId = GameName; 
@@ -497,8 +497,8 @@ function moveBlock(block, direction) {
     if (direction === 'left') x -= 1;
     if (direction === 'right') x += 1;
 
-    x = Math.max(0, Math.min(19, x));
-    y = Math.max(0, Math.min(12, y));
+    x = Math.max(0, Math.min(17, x));
+    y = Math.max(0, Math.min(11, y));
 
     block.dataset.x = x;
     block.dataset.y = y;
@@ -618,7 +618,7 @@ function drawBlock(block, isObstacle) {
     div.style.alignItems = 'center';
     div.style.justifyContent = 'center';
     div.style.flexDirection = 'column';
-    div.style.zIndex = '5';
+    div.style.zIndex = '1';
 
     if(isObstacle == false){
         div.style.backgroundColor = '#8ab6d6'; 
@@ -710,28 +710,33 @@ function addArrowToBlock(color, direction, playerId) {
     const arrivalIndex = playerColorMap[playerId]; // assumes 1-based index
     const imgSrc = `./images/player${arrivalIndex}_arrow.png`;
 
-    // Create image-based arrow
-    const arrow = document.createElement('img');
+
+    const arrow = document.createElement('div');
     arrow.classList.add('arrow');
-    arrow.src = imgSrc;
+    arrow.style.width = '50px';
+    arrow.style.height = '50px';
     arrow.style.position = 'absolute';
-    arrow.style.width = '45px';
-    arrow.style.height = '45px';
     arrow.style.pointerEvents = 'none';
     arrow.style.zIndex = '20';
     arrow.style.transformOrigin = 'center center';
+    arrow.style.backgroundImage = `url(${imgSrc}) `;
+    arrow.style.backgroundRepeat = 'no-repeat';
+    arrow.style.backgroundSize = `${6 * 50}px 50px`; // assumes 32 frames of 45px
+    arrow.style.imageRendering = 'pixelated';
+
 
     // Rotate based on direction
     const rotationMap = {
-        up: 'rotate(0deg)',
-        right: 'rotate(90deg)',
-        down: 'rotate(180deg)',
-        left: 'rotate(270deg)'
+        up: 'rotate(90deg)',
+        right: 'rotate(180deg)',
+        down: 'rotate(270deg)',
+        left: 'rotate(0deg)'
     };
-    arrow.style.transform = rotationMap[direction] || 'rotate(0deg)';
+    arrow.dataset.rotation = rotationMap[direction] || 'rotate(0deg)';
 
     arrow.dataset.playerId = playerId;
     arrow.dataset.direction = direction;
+    animateSpriteOnce(arrow, 6, 50, 50, 6);
 
     block.appendChild(arrow);
 
@@ -742,46 +747,60 @@ function addArrowToBlock(color, direction, playerId) {
 
 function layoutDirectionalArrows(block, direction) {
     const arrows = Array.from(block.querySelectorAll(`.arrow[data-direction="${direction}"]`));
-    const OFFSET_STEP = 20;
+    const OFFSET_STEP = 30;
 
     arrows.forEach((arrow, i) => {
         // Only rotation string from previous transform
-        const rotation = arrow.style.transform.match(/rotate\([^)]*\)/)?.[0] || '';
+        const rotation = arrow.dataset.rotation || 'rotate(0deg)';
 
         switch (direction) {
             case 'up':
-                arrow.style.top = '-5px';
-                arrow.style.left = `${20 + i * OFFSET_STEP}px`;
-                arrow.style.right = '';
-                arrow.style.bottom = '';
-                arrow.style.transform = `${rotation} translate(-50%, -100%)`;
-                break;
-
-            case 'down':
-                arrow.style.top = '100%';
+                arrow.style.top = '0'; // anchor to top of block
                 arrow.style.left = `${i * OFFSET_STEP}px`;
                 arrow.style.right = '';
                 arrow.style.bottom = '';
-                arrow.style.transform = `${rotation} translate(-50%, 0%)`;
+                arrow.style.transform = `${rotation} translate(-90%, -10%)`; 
+                break;
+
+            case 'down':
+                arrow.style.top = '100%'; // anchor to bottom of block
+                arrow.style.left = `${i * OFFSET_STEP}px`;
+                arrow.style.right = '';
+                arrow.style.bottom = '';
+                arrow.style.transform = `${rotation} translate(5%, -10%)`; // match up styling
                 break;
 
             case 'left':
-                arrow.style.top = `${-20 + i * OFFSET_STEP}px`;
-                arrow.style.left = '-15px';
+                arrow.style.top = `${15 + i * OFFSET_STEP}px`;
+                arrow.style.left = '5px';
                 arrow.style.right = '';
                 arrow.style.bottom = '';
                 arrow.style.transform = `${rotation} translate(-100%, -50%)`;
                 break;
 
             case 'right':
-                arrow.style.top = `${5 + i * OFFSET_STEP}px`;
+                arrow.style.top = `${i * OFFSET_STEP}px`;
                 arrow.style.left = 'calc(100% - 10px)';
                 arrow.style.right = '';
                 arrow.style.bottom = '';
-                arrow.style.transform = `${rotation} translate(0%, -50%)`;
+                arrow.style.transform = `${rotation} translate(-5%, -10%)`;
                 break;
         }
     });
+}
+
+function animateSpriteOnce(arrowDiv, frameCount = 6, frameWidth = 45, frameHeight = 45, fps = 6) {
+    let currentFrame = frameCount - 1; // Start from the rightmost frame
+
+    const interval = setInterval(() => {
+        const xOffset = -currentFrame * frameWidth;
+        arrowDiv.style.backgroundPosition = `${xOffset}px 0px`;
+        currentFrame--;
+
+        if (currentFrame < 0) {
+            clearInterval(interval); // Stop after reaching the first frame
+        }
+    }, 1000 / fps);
 }
 
 
@@ -823,12 +842,12 @@ function _randomizeGamePlacement() {
         { color: 'yellow', minVotes: 1 }
     ];
 
-    const possibleStartY = [1, 7, 11];
+    const possibleStartY = [1, 5, 9];
     shuffleArray(possibleStartY);
 
     blockSettings.forEach((block, index) => {
         newGameState.blocks[block.color] = {
-            x: 10, // middle of the board
+            x: 9, // middle of the board
             y: possibleStartY[index],
             color: block.color,
             minVotes: block.minVotes
@@ -837,10 +856,10 @@ function _randomizeGamePlacement() {
 
     // Slots on both sides (3 left + 3 right)
     const possibleSlotPositions = [
-        { x: 2, y: 3 },
-        { x: 2, y: 10 },
-        { x: 17, y: 7 },
-        { x: 18, y: 10 }
+        { x: 0, y: 3 },
+        { x: 0, y: 9 },
+        { x: 12, y: 6 },
+        { x: 15, y: 9 }
     ];
     shuffleArray(possibleSlotPositions);
 
@@ -855,8 +874,8 @@ function _randomizeGamePlacement() {
     newGameState.obstacles = {
         obs1: { x: 3, y: 6, id: 'obs1'},
         obs2: { x: 6, y: 6, id: 'obs2' },
-        obs3: { x: 17, y: 5, id: 'obs3' },
-        obs4: { x: 15, y: 10, id: 'obs4'}
+        obs3: { x: 12, y: 5, id: 'obs3' },
+        obs4: { x: 13, y: 9, id: 'obs4'}
     };
 
     // Initialize player choices
