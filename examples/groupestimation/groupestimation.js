@@ -393,7 +393,7 @@ function finalizeVotes() {
 
     hideDirectionButtons();
     const turnMessage = document.getElementById('turnMessage');
-    turnMessage.innerText = `Moving the blocks now...`;
+    // turnMessage.innerText = `Moving the blocks now...`;
 
     const container = document.getElementById('image-container');
     const blocks = container.querySelectorAll('.block');
@@ -1236,10 +1236,16 @@ function receiveStateChange(pathNow, nodeName, newState, typeChange ) {
     
         if (currentPhase === 'voting') {
             showDirectionButtons();
-            msg.innerText = `Decide in ${timeRemaining}s`;
+            msg.innerText = `Decide which block you want to move in ${timeRemaining}s`;
+            msg.style.textShadow = '1px 1px 0 #000';
+            msg.style.imageRendering = 'pixelated';
+            msg.style.fontFamily = 'monospace'; 
         } else {
             hideDirectionButtons();
-            msg.innerText = `Moving…`;
+            msg.innerText = `Moving the blocks now...`;
+            msg.style.textShadow = '1px 1px 0 #000';
+            msg.style.imageRendering = 'pixelated';
+            msg.style.fontFamily = 'monospace'; 
             if(timeRemaining == breakDuration){
                 finalizeVotes();
             }
