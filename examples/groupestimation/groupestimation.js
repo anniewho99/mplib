@@ -118,7 +118,7 @@ let funList = {
 };
 
 // List the node names where we place listeners for any changes to the children of these nodes; set to '' if listening to changes for children of the root
-let listenerPaths = [ 'players', 'blocks', 'slots', 'obs' ];
+let listenerPaths = [ 'players', 'blocks', 'slots', 'obs', 'phase' ];
 
 //  Initialize the Game Session with all Configs
 initializeMPLIB( sessionConfig , studyId , funList, listenerPaths, verbosity );
@@ -137,6 +137,10 @@ Initialize all game variables that will be used. This includes:
 //  Game Global Variables
 let thisPlayerID = getCurrentPlayerId();
 let allPlayerIDs;
+let currentPhase = null;
+let localCountdown = 0;
+
+let playerName;
 console.log("Game Starting...", thisPlayerID);
 
 // let gameState = {
@@ -192,6 +196,12 @@ instructionsText.innerHTML = `<p>Move some block with friends!</p>`;
 
 //      Join Button
 joinButton.addEventListener('click', function () {
+
+    playerName = document.getElementById('playerName').value.trim();
+    if (!playerName) {
+        alert("Please enter your name before proceeding.");
+        return;
+    }
     /*
     Call the library function to attempt to join a session.
     
@@ -233,17 +243,58 @@ let playerColorMap = {};
 
 
 function assignAvatarColors() {
+    const arrivalIndex = getCurrentPlayerArrivalIndex(); // 1-based
+    const name = document.getElementById('playerName')?.value.trim() || `Player ${arrivalIndex}`;
+    const playerId = getCurrentPlayerId();
 
-    arrivalIndex = getCurrentPlayerArrivalIndex(); // 1-based
-
-
-    updateStateDirect(`players/${getCurrentPlayerId()}`, {
-        color: arrivalIndex 
+    updateStateDirect(`players/${playerId}`, {
+        color: arrivalIndex,
+        name: name
     });
 
-    playerColorMap[getCurrentPlayerId()] = arrivalIndex;
-
+    playerColorMap[playerId] = {
+        color: arrivalIndex,
+        name: name
+    };
 }
+
+
+function tickPhaseOwner() {
+    if (getCurrentPlayerArrivalIndex() !== 1) return;
+
+    localCountdown--;
+
+    if (localCountdown >= 0) {
+        updateStateDirect("phase", {
+            current: currentPhase,
+            timeRemaining: localCountdown
+        });
+    }
+
+    if (localCountdown === 0) {
+        if (currentPhase === "voting") {
+            //finalizeVotes();
+            startPhase("moving", breakDuration);
+        } else {
+            startPhase("voting", votingDuration);
+        }
+    }
+}
+
+function startPhase(phaseName, duration) {
+    // currentPhase = { current: phaseName, timeRemaining: duration };
+    currentPhase = phaseName;
+    localCountdown = duration;
+
+    if (getCurrentPlayerArrivalIndex() === 1) {
+        updateStateDirect("phase", {
+            current: phaseName,
+            timeRemaining: duration
+    });
+    }
+}
+
+
 
 // let playerColorMap = {}; 
 
@@ -328,11 +379,11 @@ function startVotingPhase() {
     }, 1000);
 
 
-    // Start 15 second timer
-    roundTimer = setTimeout(() => {
-        clearInterval(countdownInterval);
-        finalizeVotes();
-    }, countdown * 1000);
+    // // Start 15 second timer
+    // roundTimer = setTimeout(() => {
+    //     clearInterval(countdownInterval);
+    //     finalizeVotes();
+    // }, countdown * 1000);
 }
 
 function finalizeVotes() {
@@ -409,10 +460,10 @@ function finalizeVotes() {
         }
     });
 
-    setTimeout(() => {
-        showDirectionButtons();
-        startVotingPhase();
-    }, breakDuration * 1000);
+    // setTimeout(() => {
+    //     showDirectionButtons();
+    //     startVotingPhase();
+    // }, breakDuration * 1000);
 }
 
 
@@ -735,7 +786,7 @@ function addArrowToBlock(color, direction, playerId) {
     removeArrowFromPlayer(playerId);
 
     // Get the arrival index to determine the correct image
-    const arrivalIndex = playerColorMap[playerId]; // assumes 1-based index
+    const arrivalIndex = playerColorMap[playerId]?.color; // assumes 1-based index
     const imgSrc = `./images/player${arrivalIndex}_arrow.png`;
 
 
@@ -970,7 +1021,7 @@ function _createThisPlayerAvatar() {
     container.innerHTML = `
         <div class="row" id="${playerId}-container">
             <div class="col-12" id="${playerId}-content">
-                <h3 id="${playerId}-name" style="font-size: 16px;">You</h3>
+                <h3 id="${playerId}-name" style="font-size: 16px;">${playerName} (You)</h3>
             </div>
         </div>
         <div class="row" id="${playerId}-avatar-container">
@@ -989,39 +1040,36 @@ function _createOtherPlayerAvatar() {
     const thisPlayerID = getCurrentPlayerId();
     const allPlayerIDs = getCurrentPlayerIds();
 
-    // Create a list of indices 1–5, remove this player's index
-    let avatarIndices = [1, 2, 3, 4, 5].filter(i => i !== arrivalIndex);
-
-    let avatarAssignIndex = 0;
-    let visualPlayerNumber = 2;
+    otherPlayerContainer.innerHTML = ''; // Clear any existing avatars
 
     allPlayerIDs.forEach((playerId) => {
         if (playerId !== thisPlayerID) {
+            const playerData = playerColorMap[playerId] || {};
+            const arrivalIndex = playerData.color;
+            const playerName = playerData.name;
+
             const columnSize = {
                 5: 3,
                 4: 4,
                 3: 6
             }[allPlayerIDs.length] || 12;
 
-            const avatarIndex = avatarIndices[avatarAssignIndex];
-            const avatarSrc = `./images/player${avatarIndex}.png`;
+            const avatarSrc = `./images/player${arrivalIndex}.png`;
 
             otherPlayerContainer.innerHTML += `
                 <div class="col-${columnSize}" id="${playerId}-container">
                     <div class="row" id="${playerId}-name-container">
                         <div class="col-12" id="${playerId}-name-content">
-                            <h3 id="${playerId}-name" style="font-size: 16px;">Player ${visualPlayerNumber}</h3>
+                            <h3 id="${playerId}-name" style="font-size: 16px;">${playerName}</h3>
                         </div>
                     </div>
                     <div class="row" id="${playerId}-avatar-container">
                         <div class="col-12" id="${playerId}-avatar-content">
-                            <img src="${avatarSrc}" class="player-avatar" id="player${visualPlayerNumber}" style="width: 50px; height: 50px;">
+                            <img src="${avatarSrc}" class="player-avatar" style="width: 50px; height: 50px;">
                         </div>
                     </div>
                 </div>
             `;
-            avatarAssignIndex++;
-            visualPlayerNumber++;
         }
     });
 }
@@ -1062,7 +1110,6 @@ function newGame() {
     assignAvatarColors();
     _setPlayerAvatarCSS();
     _createThisPlayerAvatar();
-    _createOtherPlayerAvatar();
 
 
     GameState = _randomizeGamePlacement();
@@ -1085,10 +1132,14 @@ function newGame() {
         Object.values(GameState.obstacles).forEach(obstacles => {
             drawBlock(obstacles, true);
         });
+
+        setInterval(tickPhaseOwner, 1000); // centralized tick
+        startPhase("voting", votingDuration);
         
     }
 
     console.log("Initialized GameState:", GameState);
+    //_createOtherPlayerAvatar();
 }
 
 
@@ -1113,10 +1164,20 @@ function receiveStateChange(pathNow, nodeName, newState, typeChange ) {
         const playerId = nodeName; // nodeName is the player ID
         const playerData = newState; // newState contains { selectedBlock, selectedDirection }
 
-        if (playerData.color) {
-            playerColorMap[playerId] = playerData.color;
-            console.log("color received");
+        if (playerData.color || playerData.name) {
+            playerColorMap[playerId] = {
+                color: playerData.color ?? playerColorMap[playerId]?.color,
+                name: playerData.name ?? playerColorMap[playerId]?.name
+            };
+    
+            console.log("Player data received:");
             console.log(playerColorMap);
+
+            console.log(Object.keys(playerColorMap).length);
+
+            if (Object.keys(playerColorMap).length === NumPlayers) {
+                _createOtherPlayerAvatar();
+            }
         }
     
         // 2. Draw the new arrow if both block and direction are selected
@@ -1148,6 +1209,40 @@ function receiveStateChange(pathNow, nodeName, newState, typeChange ) {
         if(arrivalIndex != 1){
             GameState.obstacles[newState.id] = newState; 
             drawBlock(newState, true);
+        }
+    }else if (pathNow === 'phase') {
+        // if (!currentPhase) currentPhase = {};
+        let timeRemaining;
+
+        if (nodeName === 'current') {
+            currentPhase = newState;
+        } else if (nodeName === 'timeRemaining') {
+            timeRemaining = newState;
+            localCountdown = newState;
+        }
+        console.log("current Phase");
+        console.log(currentPhase);
+
+        console.log("tme left");
+        console.log(timeRemaining);
+    
+        // const { current, timeRemaining } = currentPhase;
+
+        // const prev = currentPhase?.current;
+        // currentPhase = newState;
+        // localCountdown = timeRemaining;
+    
+        const msg = document.getElementById('turnMessage');
+    
+        if (currentPhase === 'voting') {
+            showDirectionButtons();
+            msg.innerText = `Decide in ${timeRemaining}s`;
+        } else {
+            hideDirectionButtons();
+            msg.innerText = `Moving…`;
+            if(timeRemaining == breakDuration){
+                finalizeVotes();
+            }
         }
     }
 
@@ -1264,7 +1359,7 @@ function startSession() {
     allPlayerIDs = getCurrentPlayerIds();
     console.log("Session Starts here...", allPlayerIDs);
     newGame();
-    startVotingPhase();
+    //startVotingPhase();
 }
 
 
