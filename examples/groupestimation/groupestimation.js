@@ -68,7 +68,7 @@ function getNumPlayersFromURL() {
 }
 
 let GameName = "groupestimation";
-let NumPlayers = getNumPlayersFromURL();
+let NumPlayers = 2;
 let MinPlayers = NumPlayers;
 let MaxPlayers = NumPlayers;
 let MaxSessions = 0;
@@ -118,7 +118,7 @@ let funList = {
 };
 
 // List the node names where we place listeners for any changes to the children of these nodes; set to '' if listening to changes for children of the root
-let listenerPaths = [ 'players', 'blocks', 'slots', 'obs', 'phase' ];
+let listenerPaths = [ 'players', 'blocks', 'slots', 'obs', 'phase', 'moveBlock' ];
 
 //  Initialize the Game Session with all Configs
 initializeMPLIB( sessionConfig , studyId , funList, listenerPaths, verbosity );
@@ -259,39 +259,52 @@ function assignAvatarColors() {
 }
 
 
-function tickPhaseOwner() {
-    if (getCurrentPlayerArrivalIndex() !== 1) return;
+// function tickPhaseOwner() {
+//     if (getCurrentPlayerArrivalIndex() !== 1) return;
 
-    localCountdown--;
+//     localCountdown--;
 
-    if (localCountdown >= 0) {
-        updateStateDirect("phase", {
-            current: currentPhase,
-            timeRemaining: localCountdown
-        });
-    }
+//     if (localCountdown >= 0) {
+//         updateStateDirect("phase", {
+//             current: currentPhase,
+//             timeRemaining: localCountdown
+//         });
+//     }
 
-    if (localCountdown === 0) {
-        if (currentPhase === "voting") {
-            //finalizeVotes();
-            startPhase("moving", breakDuration);
-        } else {
-            startPhase("voting", votingDuration);
-        }
-    }
-}
+//     if (localCountdown === 0) {
+//         if (currentPhase === "voting") {
+//             //finalizeVotes();
+//             startPhase("moving", breakDuration);
+//         } else {
+//             startPhase("voting", votingDuration);
+//         }
+//     }
+// }
 
-function startPhase(phaseName, duration) {
-    // currentPhase = { current: phaseName, timeRemaining: duration };
+// function startPhase(phaseName, duration) {
+//     // currentPhase = { current: phaseName, timeRemaining: duration };
+//     currentPhase = phaseName;
+//     localCountdown = duration;
+
+//     if (getCurrentPlayerArrivalIndex() === 1) {
+//         updateStateDirect("phase", {
+//             current: phaseName,
+//             timeRemaining: duration
+//     });
+//     }
+// }
+function startPhase(phaseName, durationInSeconds) {
+    const now = Date.now();
+    const endTime = now + durationInSeconds * 1000;
+
     currentPhase = phaseName;
-    localCountdown = duration;
+    localCountdown = durationInSeconds;
 
-    if (getCurrentPlayerArrivalIndex() === 1) {
-        updateStateDirect("phase", {
-            current: phaseName,
-            timeRemaining: duration
+    updateStateDirect("phase", {
+        current: phaseName,
+        endTime: endTime,
+        controllerId: getCurrentPlayerId()
     });
-    }
 }
 
 
@@ -391,8 +404,8 @@ function finalizeVotes() {
         updateStateDirect(`players/${pid}`, { block: null, direction: null, obstacle: null });
     });
 
-    hideDirectionButtons();
-    const turnMessage = document.getElementById('turnMessage');
+    //hideDirectionButtons();
+    //const turnMessage = document.getElementById('turnMessage');
     // turnMessage.innerText = `Moving the blocks now...`;
 
     const container = document.getElementById('image-container');
@@ -434,7 +447,7 @@ function finalizeVotes() {
             futureCoords: getOccupiedCells(targetX, targetY, size)
         });
 
-        arrows.forEach(arrow => arrow.remove());
+        //arrows.forEach(arrow => arrow.remove());
     });
 
     for (let i = 0; i < futurePlans.length; i++) {
@@ -456,7 +469,27 @@ function finalizeVotes() {
     
     futurePlans.forEach(plan => {
         if (plan.willMove) {
-            moveBlock(plan.block, plan.direction);
+
+            let x = parseInt(plan.block.dataset.x);
+            let y = parseInt(plan.block.dataset.y);
+        
+            if (plan.direction === 'up') y -= 1;
+            if (plan.direction === 'down') y += 1;
+            if (plan.direction === 'left') x -= 1;
+            if (plan.direction === 'right') x += 1;
+        
+            x = Math.max(0, Math.min(17, x));
+            y = Math.max(0, Math.min(11, y));
+        
+
+            updateStateDirect(`moveBlock/${plan.block.dataset.color}`, {
+                location: {x, y}
+            });
+
+            console.log(`Pushing moveBlock for ${plan.block.dataset.color}: ${x, y}`);
+
+            
+            //moveBlock(plan.block, plan.direction);
         }
     });
 
@@ -531,7 +564,9 @@ function getMinRequiredVotes(color) {
 }
 
 
-function moveBlock(block, direction) {
+function moveBlock(block, x, y) {
+    console.log(`moveBlock called for ${block.dataset.color}, direction: ${x, y}`);
+
     const color = block.dataset.color;
 
     // Skip slot locking logic if it's an obstacle
@@ -540,16 +575,16 @@ function moveBlock(block, direction) {
     // Don't move if already locked (only applies to non-obstacles)
     if (!isObstacle && lockedBlocks[color]) return;
 
-    let x = parseInt(block.dataset.x);
-    let y = parseInt(block.dataset.y);
+    // let x = parseInt(block.dataset.x);
+    // let y = parseInt(block.dataset.y);
 
-    if (direction === 'up') y -= 1;
-    if (direction === 'down') y += 1;
-    if (direction === 'left') x -= 1;
-    if (direction === 'right') x += 1;
+    // if (direction === 'up') y -= 1;
+    // if (direction === 'down') y += 1;
+    // if (direction === 'left') x -= 1;
+    // if (direction === 'right') x += 1;
 
-    x = Math.max(0, Math.min(17, x));
-    y = Math.max(0, Math.min(11, y));
+    // x = Math.max(0, Math.min(17, x));
+    // y = Math.max(0, Math.min(11, y));
 
     block.dataset.x = x;
     block.dataset.y = y;
@@ -597,6 +632,13 @@ function moveBlock(block, direction) {
             }
         }
     }
+        const container = document.getElementById('image-container');
+        const blocks = container.querySelectorAll('.block');
+        blocks.forEach(block => {
+
+            const arrows = block.querySelectorAll('.arrow');
+            arrows.forEach(arrow => arrow.remove());
+        });
 }
 
 
@@ -1133,7 +1175,7 @@ function newGame() {
             drawBlock(obstacles, true);
         });
 
-        setInterval(tickPhaseOwner, 1000); // centralized tick
+        //setInterval(tickPhaseOwner, 1000); // centralized tick
         startPhase("voting", votingDuration);
         
     }
@@ -1210,47 +1252,91 @@ function receiveStateChange(pathNow, nodeName, newState, typeChange ) {
             GameState.obstacles[newState.id] = newState; 
             drawBlock(newState, true);
         }
-    }else if (pathNow === 'phase') {
-        // if (!currentPhase) currentPhase = {};
-        let timeRemaining;
-
+    } else if (pathNow === 'phase') {
         if (nodeName === 'current') {
             currentPhase = newState;
-        } else if (nodeName === 'timeRemaining') {
-            timeRemaining = newState;
-            localCountdown = newState;
-        }
-        console.log("current Phase");
-        console.log(currentPhase);
-
-        console.log("tme left");
-        console.log(timeRemaining);
-    
-        // const { current, timeRemaining } = currentPhase;
-
-        // const prev = currentPhase?.current;
-        // currentPhase = newState;
-        // localCountdown = timeRemaining;
-    
-        const msg = document.getElementById('turnMessage');
-    
-        if (currentPhase === 'voting') {
-            showDirectionButtons();
-            msg.innerText = `Decide which block you want to move in ${timeRemaining}s`;
-            msg.style.textShadow = '1px 1px 0 #000';
-            msg.style.imageRendering = 'pixelated';
-            msg.style.fontFamily = 'monospace'; 
-        } else {
-            hideDirectionButtons();
-            msg.innerText = `Moving the blocks now...`;
-            msg.style.textShadow = '1px 1px 0 #000';
-            msg.style.imageRendering = 'pixelated';
-            msg.style.fontFamily = 'monospace'; 
-            if(timeRemaining == breakDuration){
-                finalizeVotes();
+            if (currentPhase === 'voting') {
+                showDirectionButtons();
+            } else if (currentPhase === 'moving') {
+                hideDirectionButtons();
             }
+        } else if (nodeName === 'endTime') {
+            const endTime = newState;
+    
+            clearInterval(countdownInterval);
+    
+            countdownInterval = setInterval(() => {
+                const timeLeft = Math.max(0, Math.ceil((endTime - Date.now()) / 1000));
+                localCountdown = timeLeft;
+    
+                const msg = document.getElementById('turnMessage');
+                msg.innerText = (currentPhase === 'voting')
+                    ? `Decide which block you want to move in ${timeLeft}s`
+                    : `Moving the blocks now...`;
+                msg.style.textShadow = '1px 1px 0 #000';
+                msg.style.imageRendering = 'pixelated';
+                msg.style.fontFamily = 'monospace';
+    
+                // If time is up
+                if (timeLeft <= 0) {
+                    clearInterval(countdownInterval);
+    
+                    // Check if this player should take over phase control
+                    const myId = getCurrentPlayerId();
+                    const sortedIds = getCurrentPlayerIds().sort(); // consistent ordering
+                    const fallbackLeader = sortedIds[0]; // always first alphabetically
+                    //const nextPhase = (currentPhase === 'voting') ? 'moving' : 'voting';
+                    // if (nextPhase === 'moving'){
+
+                    //     hideDirectionButtons();
+                    //         // const container = document.getElementById('image-container');
+                    //         // const blocks = container.querySelectorAll('.block');
+                    //         // blocks.forEach(block => {
+        
+                    //         //     const arrows = block.querySelectorAll('.arrow');
+                    //         //     arrows.forEach(arrow => arrow.remove());
+                    //         // });
+
+                    // }else{
+                    //     showDirectionButtons();
+                    // }
+
+    
+                    if (myId === fallbackLeader) {
+                        console.warn("Fallback or primary controller is advancing phase.");
+    
+                        const nextPhase = (currentPhase === 'voting') ? 'moving' : 'voting';
+                        const duration = (nextPhase === 'voting') ? votingDuration : breakDuration;
+                        if (nextPhase === 'moving'){
+                            finalizeVotes(); 
+                        }
+    
+    
+                        startPhase(nextPhase, duration);
+                    }
+                }
+            }, 500);
+        }
+    } else if (pathNow === 'moveBlock' && 
+            (typeChange === 'onChildAdded' || typeChange === 'onChildChanged')) {
+
+        const color = nodeName;
+        const { location } = newState;
+
+        if (!location) return;
+
+        const block = document.querySelector(`.block[data-color="${color}"]`);
+        if (block) {
+            let x = location.x;
+            let y = location.y;
+
+            moveBlock(block, x, y); 
+        } else {
+            console.warn(`Block not found for ${color}`);
         }
     }
+
+    
 
 }
 
