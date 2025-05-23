@@ -68,7 +68,7 @@ function getNumPlayersFromURL() {
 }
 
 let GameName = "groupestimation";
-let NumPlayers = 1;
+let NumPlayers = getNumPlayersFromURL();
 let MinPlayers = NumPlayers;
 let MaxPlayers = NumPlayers;
 let MaxSessions = 0;
@@ -483,13 +483,21 @@ function finalizeVotes() {
         
 
             updateStateDirect(`moveBlock/${plan.block.dataset.color}`, {
-                location: {x, y}
+                location: {x, y},
+                direction: plan.direction,
+                move: true
             });
 
             console.log(`Pushing moveBlock for ${plan.block.dataset.color}: ${x, y}`);
 
             
             //moveBlock(plan.block, plan.direction);
+        }else{
+            updateStateDirect(`moveBlock/${plan.block.dataset.color}`, {
+                move: false,
+                version: Date.now()
+            });
+
         }
     });
 
@@ -564,7 +572,7 @@ function getMinRequiredVotes(color) {
 }
 
 
-function moveBlock(block, x, y) {
+function moveBlock(block, x, y, direction) {
     console.log(`moveBlock called for ${block.dataset.color}, direction: ${x, y}`);
 
     const color = block.dataset.color;
@@ -588,6 +596,38 @@ function moveBlock(block, x, y) {
 
     block.dataset.x = x;
     block.dataset.y = y;
+    const arrow = block.querySelector('.arrow');
+    if (arrow) {
+        const arrowOffset = {
+            up:    { dx: 0, dy: -1 },
+            down:  { dx: 0, dy: 1 },
+            left:  { dx: -1, dy: 0 },
+            right: { dx: 1, dy: 0 }
+        };
+
+        const offset = arrowOffset[direction];
+        if (offset && arrow) {
+            // Get current left/top position in pixels
+            const currentLeft = parseFloat(arrow.style.left || 0);
+            const currentTop = parseFloat(arrow.style.top || 0);
+        
+            // Add one-cell offset
+            const newLeft = currentLeft + offset.dx * 40;
+            const newTop = currentTop + offset.dy * 40;
+        
+            // Apply movement
+            arrow.style.transition = 'top 0.2s ease, left 0.2s ease';
+            arrow.style.left = `${newLeft}px`;
+            arrow.style.top = `${newTop}px`;
+        }
+        
+    }
+
+    setTimeout(() => {
+        if (arrow) arrow.remove();
+    }, 500);
+    
+
 
     block.style.left = (x * CELL_WIDTH) + 'px';
     block.style.top = (y * CELL_HEIGHT) + 'px';
@@ -632,13 +672,7 @@ function moveBlock(block, x, y) {
             }
         }
     }
-        const container = document.getElementById('image-container');
-        const blocks = container.querySelectorAll('.block');
-        blocks.forEach(block => {
 
-            const arrows = block.querySelectorAll('.arrow');
-            arrows.forEach(arrow => arrow.remove());
-        });
 }
 
 
@@ -882,7 +916,7 @@ function addArrowToBlock(color, direction, playerId) {
     arrow.dataset.rotation = rotationMap[visualPosition[direction]] || 'rotate(0deg)';
     arrow.dataset.playerId = playerId;
     arrow.dataset.direction = direction;
-    animateSpriteOnce(arrow, 6, 50, 50, 6);
+    animateSpriteLoop(arrow, 6, 50, 50, 6);
 
     block.appendChild(arrow);
 
@@ -941,19 +975,20 @@ function layoutDirectionalArrows(block, direction) {
     });
 }
 
-function animateSpriteOnce(arrowDiv, frameCount = 6, frameWidth = 45, frameHeight = 45, fps = 6) {
-    let currentFrame = frameCount - 1; // Start from the rightmost frame
+function animateSpriteLoop(arrowDiv, frameCount = 6, frameWidth = 45, frameHeight = 45, fps = 6) {
+    let currentFrame = 0;
 
-    const interval = setInterval(() => {
+    function step() {
         const xOffset = -currentFrame * frameWidth;
         arrowDiv.style.backgroundPosition = `${xOffset}px 0px`;
-        currentFrame--;
 
-        if (currentFrame < 0) {
-            clearInterval(interval); // Stop after reaching the first frame
-        }
-    }, 1000 / fps);
+        currentFrame = (currentFrame + 1) % frameCount; // Loop back to 0
+        setTimeout(step, 1000 / fps);
+    }
+
+    step(); // Start the loop
 }
+
 
 
 
@@ -1352,16 +1387,25 @@ function receiveStateChange(pathNow, nodeName, newState, typeChange ) {
             (typeChange === 'onChildAdded' || typeChange === 'onChildChanged')) {
 
         const color = nodeName;
-        const { location } = newState;
+        const blockState = newState;
+        console.log("blockState:", blockState);
 
-        if (!location) return;
-
+        if (!blockState) return;
         const block = document.querySelector(`.block[data-color="${color}"]`);
-        if (block) {
-            let x = location.x;
-            let y = location.y;
+        const arrows = block.querySelectorAll('.arrow');
+        if(blockState.move == false){
+            arrows.forEach(a => a.remove());
+            return;
+        }
 
-            moveBlock(block, x, y); 
+        if (block) {
+            arrows.forEach(a => {
+                if (a.dataset.direction !== blockState.direction) a.remove();
+            });
+            let x = blockState.location.x;
+            let y = blockState.location.y;
+
+            moveBlock(block, x, y, blockState.direction); 
         } else {
             console.warn(`Block not found for ${color}`);
         }
