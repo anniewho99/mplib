@@ -68,7 +68,7 @@ function getNumPlayersFromURL() {
 }
 
 let GameName = "groupestimation";
-let NumPlayers = 2;
+let NumPlayers = 1;
 let MinPlayers = NumPlayers;
 let MaxPlayers = NumPlayers;
 let MaxSessions = 0;
@@ -760,7 +760,7 @@ function drawBlock(block, isObstacle) {
         // div.style.borderRadius = '50%';
         const minText = document.createElement('div');
         minText.innerText = `min: 1`;
-        minText.style.fontSize = '11.5px';
+        minText.style.fontSize = '11px';
         minText.style.fontWeight = 'bold';
         minText.style.textShadow = '1px 1px 0 #000';
         minText.style.color = 'white';
@@ -771,27 +771,46 @@ function drawBlock(block, isObstacle) {
 
     }
 
-
+    const visualPosition = {
+        up:    { top: '82%', left: '50%', transform: 'translate(-50%, -50%)' },
+        down:  { top: '18%', left: '50%', transform: 'translate(-50%, -50%)' },
+        left:  { top: '50%', left: '82%', transform: 'translate(-50%, -50%)' },
+        right: { top: '50%', left: '18%', transform: 'translate(-50%, -50%)' }
+    };
+    
+    const obstaclePosition = {
+        up:    { top: '70%', left: '50%', transform: 'translate(-50%, -50%)' },
+        down:  { top: '30%', left: '50%', transform: 'translate(-50%, -50%)' },
+        left:  { top: '50%', left: '75%', transform: 'translate(-50%, -50%)' },
+        right: { top: '50%', left: '25%', transform: 'translate(-50%, -50%)' }
+    };
+    
+    
     const directions = ['up', 'right', 'down', 'left'];
     directions.forEach(dir => {
         const arrow = document.createElement('div');
         arrow.classList.add('triangle', dir, 'direction-button');
+        const pos = isObstacle ? obstaclePosition[dir] : visualPosition[dir];
+        arrow.style.position = 'absolute';
+        arrow.style.top = pos.top;
+        arrow.style.left = pos.left;
+        arrow.style.transform = pos.transform;
         arrow.dataset.direction = dir;
         arrow.dataset.targetId = id;
         arrow.dataset.isObstacle = isObstacle;
         if (isObstacle) {
             switch (dir) {
                 case 'up':
-                    arrow.style.borderWidth = '12px 15px 20px 15px';
+                    arrow.style.borderWidth = '12px 15px 16px 15px';
                     break;
                 case 'down':
-                    arrow.style.borderWidth = '20px 15px 12px 15px';
+                    arrow.style.borderWidth = '16px 15px 12px 15px';
                     break;
                 case 'left':
-                    arrow.style.borderWidth = '15px 17px 15px 12px';
+                    arrow.style.borderWidth = '15px 15px 15px 12px';
                     break;
                 case 'right':
-                    arrow.style.borderWidth = '15px 12px 15px 17px';
+                    arrow.style.borderWidth = '15px 12px 15px 15px';
                     break;
             }
         }
@@ -853,8 +872,14 @@ function addArrowToBlock(color, direction, playerId) {
         down: 'rotate(270deg)',
         left: 'rotate(0deg)'
     };
-    arrow.dataset.rotation = rotationMap[direction] || 'rotate(0deg)';
+    const visualPosition = {
+        up: 'down',
+        down: 'up',
+        left: 'right',
+        right: 'left'
+    };
 
+    arrow.dataset.rotation = rotationMap[visualPosition[direction]] || 'rotate(0deg)';
     arrow.dataset.playerId = playerId;
     arrow.dataset.direction = direction;
     animateSpriteOnce(arrow, 6, 50, 50, 6);
@@ -873,8 +898,14 @@ function layoutDirectionalArrows(block, direction) {
     arrows.forEach((arrow, i) => {
         // Only rotation string from previous transform
         const rotation = arrow.dataset.rotation || 'rotate(0deg)';
+        const visualPosition = {
+            up: 'down',
+            down: 'up',
+            left: 'right',
+            right: 'left'
+        };
 
-        switch (direction) {
+        switch (visualPosition[direction]) {
             case 'up':
                 arrow.style.top = '0'; // anchor to top of block
                 arrow.style.left = `${i * OFFSET_STEP}px`;
@@ -904,7 +935,7 @@ function layoutDirectionalArrows(block, direction) {
                 arrow.style.left = 'calc(100% - 10px)';
                 arrow.style.right = '';
                 arrow.style.bottom = '';
-                arrow.style.transform = `${rotation} translate(-5%, -10%)`;
+                arrow.style.transform = `${rotation} translate(-5%, -10%) scaleY(-1)`;
                 break;
         }
     });
