@@ -596,47 +596,75 @@ function moveBlock(block, x, y, direction) {
 
     block.dataset.x = x;
     block.dataset.y = y;
-    const arrow = block.querySelector('.arrow');
-    if (arrow) {
-        const arrowOffset = {
+    const arrows = block.querySelectorAll('.arrow');
+    arrows.forEach(arrow => {
+        const direction = arrow.dataset.direction;
+    
+        const offsetMap = {
             up:    { dx: 0, dy: -1 },
             down:  { dx: 0, dy: 1 },
             left:  { dx: -1, dy: 0 },
             right: { dx: 1, dy: 0 }
         };
-
-        const offset = arrowOffset[direction];
-        if (offset && arrow) {
-            // Get current left/top position in pixels
-            const currentLeft = parseFloat(arrow.style.left || 0);
-            const currentTop = parseFloat(arrow.style.top || 0);
-        
-            // Add one-cell offset
-            const newLeft = currentLeft + offset.dx * 40;
-            const newTop = currentTop + offset.dy * 40;
-        
-            // Apply movement
-            arrow.style.transition = 'top 0.2s ease, left 0.2s ease';
-            arrow.style.left = `${newLeft}px`;
-            arrow.style.top = `${newTop}px`;
-        }
-        
-    }
-
-    setTimeout(() => {
-        if (arrow) arrow.remove();
-    }, 500);
+        const offset = offsetMap[direction];
+        if (!offset) return;
     
+        const arrowRect = arrow.getBoundingClientRect();
+    
+        // Create floating clone
+        const clone = arrow.cloneNode(true);
+        clone.style.position = 'absolute';
+        clone.style.pointerEvents = 'none';
+        clone.style.left = `${arrowRect.left}px`;
+        clone.style.top = `${arrowRect.top}px`;
+        clone.style.margin = '0';
+        clone.style.transform = 'none';
+        clone.style.transition = 'top 0.5s ease, left 0.5s ease';
+        document.body.appendChild(clone);
+        // Map direction to rotation
+        const rotationMap = {
+            down: 'rotate(90deg)',
+            left: 'rotate(180deg)',
+            up: 'rotate(270deg)',
+            right: 'rotate(0deg)'
+        };
+
+        // Apply rotation to match the direction
+        clone.style.transform = rotationMap[direction];
+        clone.style.transformOrigin = 'center center';
+        if (direction === 'left') {
+            clone.style.transform += ' scaleY(-1)';
+        }
+
+    
+        // Animate clone
+        requestAnimationFrame(() => {
+            clone.style.left = `${arrowRect.left + offset.dx * CELL_WIDTH}px`;
+            clone.style.top = `${arrowRect.top + offset.dy * CELL_HEIGHT}px`;
+        });
+    
+        // Animate sprite
+        animateSpriteOnce(clone, 6, 50, 50, 6);
+    
+        // Clean up
+        setTimeout(() => clone.remove(), 1500);
+    });
+    
+    // Remove original static arrows
+    block.querySelectorAll('.arrow').forEach(a => a.remove());
+    
+    const ANIMATION_DURATION = 500; // Match arrow timing
 
 
+    block.style.transition = `top ${ANIMATION_DURATION}ms ease, left ${ANIMATION_DURATION}ms ease, transform 0.2s`;
     block.style.left = (x * CELL_WIDTH) + 'px';
     block.style.top = (y * CELL_HEIGHT) + 'px';
-
-    block.style.transition = 'top 0.2s ease, left 0.2s ease, transform 0.2s';
-    block.style.transform = 'scale(1.1)';
-    setTimeout(() => {
-        block.style.transform = 'scale(1)';
-    }, 200);
+    
+//         // Trigger slight scale effect after moving
+//     setTimeout(() => {
+//             block.style.transform = 'scale(1)';
+//         }, 200);
+// ;
 
 
     // Only check slot match if it's not an obstacle
@@ -855,15 +883,18 @@ function drawBlock(block, isObstacle) {
             if (isObstacle) {
                 updateStateDirect(`players/${playerId}`, {
                     obstacle: id,
+                    block: null, 
                     direction: dir
                 });
             } else {
                 updateStateDirect(`players/${playerId}`, {
                     block: id,
+                    obstacle: null,
                     direction: dir
                 });
             }
         });
+        
 
         div.appendChild(arrow);
     });
@@ -879,6 +910,7 @@ function addArrowToBlock(color, direction, playerId) {
 
     // Remove this player's previous arrow from any block
     removeArrowFromPlayer(playerId);
+    console.log(`[addArrowToBlock] Adding arrow for player ${playerId} to color ${color}`);
 
     // Get the arrival index to determine the correct image
     const arrivalIndex = playerColorMap[playerId]?.color; // assumes 1-based index
@@ -895,7 +927,7 @@ function addArrowToBlock(color, direction, playerId) {
     arrow.style.transformOrigin = 'center center';
     arrow.style.backgroundImage = `url(${imgSrc}) `;
     arrow.style.backgroundRepeat = 'no-repeat';
-    arrow.style.backgroundSize = `${6 * 50}px 50px`; // assumes 32 frames of 45px
+    arrow.style.backgroundSize = `${6 * 50}px 50px`;
     arrow.style.imageRendering = 'pixelated';
 
 
@@ -916,80 +948,88 @@ function addArrowToBlock(color, direction, playerId) {
     arrow.dataset.rotation = rotationMap[visualPosition[direction]] || 'rotate(0deg)';
     arrow.dataset.playerId = playerId;
     arrow.dataset.direction = direction;
-    animateSpriteLoop(arrow, 6, 50, 50, 6);
+    arrow.style.backgroundPosition = '0px 0px';
+    //animateSpriteLoop(arrow, 6, 50, 50, 6);
 
     block.appendChild(arrow);
+    const isObstacle = block.dataset.obstacle === "true";
 
     // Re-layout all arrows of this direction in the block
-    layoutDirectionalArrows(block, direction);
+    layoutDirectionalArrows(block, direction,isObstacle );
 }
 
 
-function layoutDirectionalArrows(block, direction) {
+function layoutDirectionalArrows(block, direction, isObstacle) {
     const arrows = Array.from(block.querySelectorAll(`.arrow[data-direction="${direction}"]`));
     const OFFSET_STEP = 30;
 
+    const rotation = arrow => arrow.dataset.rotation || 'rotate(0deg)';
+    const visualPosition = {
+        up: 'down',
+        down: 'up',
+        left: 'right',
+        right: 'left'
+    };
+
     arrows.forEach((arrow, i) => {
-        // Only rotation string from previous transform
-        const rotation = arrow.dataset.rotation || 'rotate(0deg)';
-        const visualPosition = {
-            up: 'down',
-            down: 'up',
-            left: 'right',
-            right: 'left'
-        };
+        let topPx = 0;
+        let leftPx = 0;
+        let transform = rotation(arrow);
 
         switch (visualPosition[direction]) {
             case 'up':
-                arrow.style.top = '0'; // anchor to top of block
-                arrow.style.left = `${i * OFFSET_STEP}px`;
-                arrow.style.right = '';
-                arrow.style.bottom = '';
-                arrow.style.transform = `${rotation} translate(-90%, -10%)`; 
+                topPx = 0;
+                leftPx = i * OFFSET_STEP;
+                transform += ' translate(-90%, -10%)';
                 break;
 
             case 'down':
-                arrow.style.top = '100%'; // anchor to bottom of block
-                arrow.style.left = `${i * OFFSET_STEP}px`;
-                arrow.style.right = '';
-                arrow.style.bottom = '';
-                arrow.style.transform = `${rotation} translate(5%, -10%)`; // match up styling
+                topPx = isObstacle ? 90 : 135; 
+                leftPx = i * OFFSET_STEP;
+                transform += ' translate(5%, -10%)';
                 break;
 
             case 'left':
-                arrow.style.top = `${15 + i * OFFSET_STEP}px`;
-                arrow.style.left = '5px';
-                arrow.style.right = '';
-                arrow.style.bottom = '';
-                arrow.style.transform = `${rotation} translate(-100%, -50%)`;
+                topPx = 15 + i * OFFSET_STEP;
+                leftPx = 5;
+                transform += ' translate(-100%, -50%)';
                 break;
 
             case 'right':
-                arrow.style.top = `${i * OFFSET_STEP}px`;
-                arrow.style.left = 'calc(100% - 10px)';
-                arrow.style.right = '';
-                arrow.style.bottom = '';
-                arrow.style.transform = `${rotation} translate(-5%, -10%) scaleY(-1)`;
+                topPx = i * OFFSET_STEP;
+                leftPx = isObstacle ? 80 : 125; 
+                transform += ' translate(-5%, -10%) scaleY(-1)';
                 break;
         }
+
+        arrow.style.top = `${topPx}px`;
+        arrow.style.left = `${leftPx}px`;
+        arrow.style.right = '';
+        arrow.style.bottom = '';
+        arrow.style.transform = transform;
+
+        // ✅ Optional: Save px values for later animation use
+        arrow.dataset.topPx = topPx;
+        arrow.dataset.leftPx = leftPx;
     });
 }
 
-function animateSpriteLoop(arrowDiv, frameCount = 6, frameWidth = 45, frameHeight = 45, fps = 6) {
+
+function animateSpriteOnce(arrowDiv, frameCount = 6, frameWidth = 45, frameHeight = 45, fps = 6) {
     let currentFrame = 0;
 
     function step() {
         const xOffset = -currentFrame * frameWidth;
         arrowDiv.style.backgroundPosition = `${xOffset}px 0px`;
 
-        currentFrame = (currentFrame + 1) % frameCount; // Loop back to 0
-        setTimeout(step, 1000 / fps);
+        currentFrame++;
+        if (currentFrame < frameCount) {
+            setTimeout(step, 1000 / fps);
+        }
     }
 
-    step(); // Start the loop
+    step();
 }
-
-
 
 
 function directionToArrowSymbol(direction) {
@@ -1003,15 +1043,12 @@ function directionToArrowSymbol(direction) {
 }
 
 function removeArrowFromPlayer(playerId) {
-    const container = document.getElementById('image-container');
-    const allArrows = container.querySelectorAll('.arrow');
+    console.log(`[removeArrowFromPlayer] Removing arrows for player ${playerId}`);
 
-    allArrows.forEach(arrow => {
-        if (arrow.dataset.playerId === playerId) {
-            arrow.remove();
-        }
-    });
+    const arrows = document.querySelectorAll(`.arrow[data-player-id="${playerId}"]`);
+    arrows.forEach(arrow => arrow.remove());
 }
+
 
 
 function _randomizeGamePlacement() {
@@ -1289,14 +1326,14 @@ function receiveStateChange(pathNow, nodeName, newState, typeChange ) {
         }
     
         // 2. Draw the new arrow if both block and direction are selected
-        if (playerData.block && playerData.direction) {
-            console.log(`player ${playerId} decided to move ${playerData.block} to ${playerData.direction} .`);
-            addArrowToBlock(playerData.block, playerData.direction, playerId);
-        }else if (playerData.block && playerData.direction) {
-            addArrowToBlock(playerData.block, playerData.direction, playerId);
-        } else if (playerData.obstacle && playerData.direction) {
+        if (playerData.obstacle && playerData.direction) {
+            console.log(`playerData.block = ${playerData.block}, playerData.obstacle = ${playerData.obstacle}, direction = ${playerData.direction}`);
             addArrowToBlock(playerData.obstacle, playerData.direction, playerId);
+        } else if (playerData.block && playerData.direction) {
+            console.log(`playerData.block = ${playerData.block}, playerData.obstacle = ${playerData.obstacle}, direction = ${playerData.direction}`);
+            addArrowToBlock(playerData.block, playerData.direction, playerId);
         }
+        
 
     } else if(pathNow == "blocks" && (typeChange == 'onChildAdded' ||typeChange == 'onChildChanged')){
         let arrivalIndex = getCurrentPlayerArrivalIndex();
@@ -1325,6 +1362,11 @@ function receiveStateChange(pathNow, nodeName, newState, typeChange ) {
                 showDirectionButtons();
             } else if (currentPhase === 'moving') {
                 hideDirectionButtons();
+                const msg = document.getElementById('turnMessage');
+                msg.innerText = `Moving the blocks now...`;
+                msg.style.textShadow = '1px 1px 0 #000';
+                msg.style.imageRendering = 'pixelated';
+                msg.style.fontFamily = 'monospace';
             }
         } else if (nodeName === 'endTime') {
             const endTime = newState;
@@ -1405,7 +1447,10 @@ function receiveStateChange(pathNow, nodeName, newState, typeChange ) {
             let x = blockState.location.x;
             let y = blockState.location.y;
 
-            moveBlock(block, x, y, blockState.direction); 
+            setTimeout(() => {
+                moveBlock(block, x, y, blockState.direction);
+            }, 500);
+            
         } else {
             console.warn(`Block not found for ${color}`);
         }
