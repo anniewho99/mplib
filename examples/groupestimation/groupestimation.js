@@ -381,13 +381,13 @@ function startVotingPhase() {
 
     let countdown = votingDuration;
     const turnMessage = document.getElementById('turnMessage');
-    turnMessage.innerText = `Decide which block you want to move in ${countdown} seconds`;
+    turnMessage.innerText = `Choose which block you want to move in ${countdown} seconds. You can change your vote at any time.`;
 
     // Update the countdown every second
     countdownInterval = setInterval(() => {
         countdown--;
         if (countdown > 0) {
-            turnMessage.innerText = `Decide which block you want to move in ${countdown} seconds`;
+            turnMessage.innerText = `Decide which block you want to move in ${countdown} seconds. You can change your vote at any time.`;
         }
     }, 1000);
 
@@ -669,37 +669,40 @@ function moveBlock(block, x, y, direction) {
 
     // Only check slot match if it's not an obstacle
     if (!isObstacle) {
-        for (let slotColor in GameState.slots) {
-            const slot = GameState.slots[slotColor];
-            if (slot && slot.x === x && slot.y === y) {
-                console.log(`Block ${color} reached slot at (${x}, ${y}). Locking.`);
+        setTimeout(() => {
+            for (let slotColor in GameState.slots) {
+                const slot = GameState.slots[slotColor];
+                if (slot && slot.x === x && slot.y === y) {
+                    console.log(`Block ${color} reached slot at (${x}, ${y}). Locking.`);
 
-                lockedBlocks[color] = true;
+                    lockedBlocks[color] = true;
 
-                // // Visually indicate it's locked
-                // block.style.border = '4px solid gold';
-                // block.style.backgroundColor = 'lightgray';
+                    // // Visually indicate it's locked
+                    // block.style.border = '4px solid gold';
+                    // block.style.backgroundColor = 'lightgray';
 
-                const arrows = block.querySelectorAll('.direction-button');
-                arrows.forEach(btn => btn.remove());
+                    const arrows = block.querySelectorAll('.direction-button');
+                    arrows.forEach(btn => btn.remove());
 
-                block.style.backgroundImage = "url('./images/slot.png')"; // or a tinted version
-                block.style.backgroundSize = 'cover';
-                block.style.boxShadow = '0 0 6px gold';
-                block.style.border = '2px solid gold';
+                    block.style.backgroundImage = "url('./images/slot.png')"; // or a tinted version
+                    block.style.backgroundSize = 'cover';
+                    block.style.boxShadow = '0 0 6px gold';
+                    block.style.border = '2px solid gold';
 
-                block.style.transition = 'opacity 2s';
-                block.style.opacity = '0';
+                    block.style.transition = 'opacity 2s';
+                    block.style.opacity = '0';
 
-                setTimeout(() => {
-                    block.remove(); // Remove from DOM
-                    delete GameState.blocks[color]; // Remove from state
-                }, 2000);
-                // delete GameState.slots[slotColor];
-                break;
+                    setTimeout(() => {
+                        block.remove(); // Remove from DOM
+                        delete GameState.blocks[color]; // Remove from state
+                    }, 2000);
+                    // delete GameState.slots[slotColor];
+                    break;
+                }
             }
-        }
+     }, 500); 
     }
+    
 
 }
 
@@ -1379,7 +1382,7 @@ function receiveStateChange(pathNow, nodeName, newState, typeChange ) {
     
                 const msg = document.getElementById('turnMessage');
                 msg.innerText = (currentPhase === 'voting')
-                    ? `Decide which block you want to move in ${timeLeft}s`
+                    ? `Choose which block you want to move in ${timeLeft}s. You can change your vote at any time.`
                     : `Moving the blocks now...`;
                 msg.style.textShadow = '1px 1px 0 #000';
                 msg.style.imageRendering = 'pixelated';
