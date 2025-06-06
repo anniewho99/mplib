@@ -62,11 +62,11 @@ Configure all of the game settings. This includes:
 //Instruction
 const instructionSteps = [
     {
-        text: "Welcome! In this game, you’ll work with others to move blocks into slots.",
+        text: "Welcome! In this game, you'll work with others to move blocks into slots.",
         demo: '', 
     },{
         text: `
-There are three key elements in the game: Blocks, Obstacles, and Slots — shown below in that order.
+There are three key elements in the game: Blocks, Obstacles, and Slots. They are shown below in that order.
 
 \n🔹 Blocks are the main objects to move.
 
@@ -112,11 +112,11 @@ There are three key elements in the game: Blocks, Obstacles, and Slots — shown
         text: `
        White arrows around each object show the directions you can vote to move it.
 
-        \nThe center number shows how many players must agree. The top direction must beat all others by at least that number.
+        \nThe center number shows how many players must agree for the object to be moved. The direction most people voted for must beat the sum of all other votes by at least that number.
 
-        \nFor example, if the number is 1, one more player must vote for a direction than any other direction for the object to move in that direction.
+        \nFor example, if one person votes to move the object to the right, and one person votes to move the object to the left, three people need to vote to move the object up for the object to move up in the case where the minimum number of agreement is 1 (the number you see on the object).
 
-        \nBelow is an example of how the arrows and voting look in the game.`,
+        \nBelow is an example of how the arrows look in the game on a Block.`,
         demo: `
         <div id="arrow-demo-container" style="position: relative; width: 100px; height: 100px; margin: auto;">
             <div id="demo-block" style="
@@ -148,20 +148,60 @@ There are three key elements in the game: Blocks, Obstacles, and Slots — shown
         text: `
         Each round has two phases: **Voting** and **Moving**.
 
-        \nIn the **Voting phase**, you have 5 seconds to vote. During this time, you can freely change your vote — pick any block or obstacle, and vote in any direction.
+        \nIn the **Voting phase**, you have 5 seconds to vote. During this time, you can freely change your vote — pick any Block or Obstacle, and vote in any direction.
 
-        \nYou’ll see other players' votes update in real time.
+        \nYou'll see other players' votes update in real time.
 
         \nAfter 5 seconds, the game enters the **Moving phase**. Any object that meets the requirement will move **one step** in the direction with the most net votes.
         `,
         demo: ''
     },
     {
-        text: "You’ll play multiple levels with a time limit. Work together efficiently!",
-        demo: '⏱️ Time will count down in each level!'
+        text: `
+        Here's an example of a full round, showing both the **Voting** and **Moving** phases.
+        
+        \nIn this demo, two players vote to push a **min: 2** Block to the left, and one player votes to push a **min: 1** Block in the same direction.
+        
+        \nDuring the 5-second **Voting phase**, players can click arrows on different blocks or obstacles to cast their votes — and change them freely.
+        
+        \nAfter voting ends, the game enters the **Moving phase**. Any object with enough agreement moves **one step** in the direction with the highest net votes.
+        
+        \nWatch how the Blocks move when the voting requirement is met.
+        `,
+        demo: `
+        <div style="text-align: center;">
+            <video width="480" autoplay loop muted playsinline style="border: 2px solid #ccc; border-radius: 8px;">
+                <source src="./images/demo.mov" type="video/mp4">
+                Your browser does not support the video tag.
+            </video>
+        </div>
+`
+
     },
     {
-        text: "Now, enter your name and click Join to begin.",
+        text: `
+        There are four levels in total.
+        
+        \nYou'll advance to the next level as soon as all Blocks are placed into Slots. A Block disappears when it reaches a Slot.
+        
+        \nEach level has a time limit to keep the game moving. Try to complete the level before time runs out — otherwise, the game will move you forward automatically.
+        
+        \nWork together and think strategically to finish as efficiently as possible!
+        `
+        ,
+        demo: '',
+    },
+    {
+        text: `
+        You're all set!
+        
+        \nYou'll now be **paired with two other players** to complete all four levels together.
+        
+        \nClick Join below when you're ready to start.
+        
+        \nYou'll have 5 minutes to finish Level 1. Have fun!
+        `
+        ,
         demo: '',
         showNameEntry: true
     }
@@ -294,8 +334,8 @@ const levelPlacements = {
     },
     1: {
         blocks: {
-            // blue: { x: 7, y: 1, color: 'blue', minVotes: 3 },
-            // red: { x: 7, y: 5, color: 'red', minVotes: 2 },
+            blue: { x: 7, y: 1, color: 'blue', minVotes: 3 },
+            red: { x: 7, y: 5, color: 'red', minVotes: 2 },
             yellow: { x: 7, y: 9, color: 'yellow', minVotes: 1 }
         },
         slots: {
@@ -309,8 +349,8 @@ const levelPlacements = {
     },
     2: {
         blocks: {
-            // blue: { x: 7, y: 1, color: 'blue', minVotes: 3 },
-            // red: { x: 7, y: 5, color: 'red', minVotes: 2 },
+            blue: { x: 7, y: 1, color: 'blue', minVotes: 3 },
+            red: { x: 7, y: 5, color: 'red', minVotes: 2 },
             yellow: { x: 7, y: 9, color: 'yellow', minVotes: 1 }
         },
         slots: {
@@ -326,8 +366,8 @@ const levelPlacements = {
     },
     3: {
         blocks: {
-            // blue: { x: 8, y: 3, color: 'blue', minVotes: 3 },
-            // red: { x: 6, y: 0, color: 'red', minVotes: 2 },
+            blue: { x: 8, y: 3, color: 'blue', minVotes: 3 },
+            red: { x: 6, y: 0, color: 'red', minVotes: 2 },
             yellow: { x: 10, y: 0, color: 'yellow', minVotes: 1 }
         },
         slots: {
@@ -431,11 +471,11 @@ function showLevelCompleteMessage(levelNumber, callback) {
 
 function getLevelTimeLimit(levelNumber) {
     if (levelNumber === 0 || levelNumber === 1) {
-        return 3 * 60 * 1000; // 3 minutes
+        return 5 * 60 * 1000; // 3 minutes
     } else if (levelNumber === 2 || levelNumber === 3) {
-        return 5 * 60 * 1000; // 5 minutes
+        return 7 * 60 * 1000; // 5 minutes
     } else {
-        return 3 * 60 * 1000; // default fallback
+        return 5 * 60 * 1000; // default fallback
     }
 }
 
@@ -583,7 +623,7 @@ Game logic and functionality. All functions for gameplay. This includes:
 
 let roundTimer;
 
-let votingDuration = 10; 
+let votingDuration = 5; 
 let breakDuration = 2; 
 
 let countdownInterval;
@@ -911,23 +951,23 @@ function getMajorityDirection(votes, minRequired) {
 }
 
 
-// function getMinRequiredVotes(color) {
-//     const minVotesMap = {
-//         blue: 3,
-//         red: 2,
-//         yellow: 1,
-//     };
-//     return minVotesMap[color] || 1; // default to 1 if undefined
-// }
-
 function getMinRequiredVotes(color) {
     const minVotesMap = {
-        blue: 1,
-        red: 1,
+        blue: 3,
+        red: 2,
         yellow: 1,
     };
     return minVotesMap[color] || 1; // default to 1 if undefined
 }
+
+// function getMinRequiredVotes(color) {
+//     const minVotesMap = {
+//         blue: 1,
+//         red: 1,
+//         yellow: 1,
+//     };
+//     return minVotesMap[color] || 1; // default to 1 if undefined
+// }
 
 
 function moveBlock(block, x, y, direction) {
@@ -1054,7 +1094,7 @@ function moveBlock(block, x, y, direction) {
                         block.remove(); // Remove from DOM
                         delete GameState.blocks[color]; // Remove from state
 
-                        if (Object.keys(lockedBlocks).length === 1) {
+                        if (Object.keys(lockedBlocks).length === 3) {
                             console.log("All blocks locked — advancing level...");
                             currentLevel++;
                             lockedBlocks = {};  
