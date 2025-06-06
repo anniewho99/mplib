@@ -1309,14 +1309,16 @@ function drawBlock(block, isObstacle) {
                     obstacle: id,
                     block: null, 
                     direction: dir,
-                    event: eventNumber
+                    event: eventNumber,
+                    level: currentLevel
                 });
             } else {
                 updateStateDirect(`players/${playerId}`, {
                     block: id,
                     obstacle: null,
                     direction: dir,
-                    event: eventNumber
+                    event: eventNumber,
+                    level: currentLevel
                 });
             }
         });
