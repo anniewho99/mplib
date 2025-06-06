@@ -59,6 +59,139 @@ Configure all of the game settings. This includes:
     - Initialize Game Session with Library
 */
 
+//Instruction
+const instructionSteps = [
+    {
+        text: "Welcome! In this game, you’ll work with others to move blocks into slots.",
+        demo: '', 
+    },{
+        text: `
+There are three key elements in the game: Blocks, Obstacles, and Slots — shown below in that order.
+
+\n🔹 Blocks are the main objects to move.
+
+\n🔹 Obstacles can also be moved but are not required to complete the level.
+
+\n🔹 Slots are the target zones. Every block must end up in a slot to complete the level.
+`,
+        demo: `
+        <div style="display: flex; gap: 20px; justify-content: center; align-items: center; flex-wrap: wrap;">
+    
+            <!-- Block -->
+            <div style="
+                width: 90px;
+                height: 90px;
+                background-image: url('./images/block.png');
+                background-size: cover;
+                image-rendering: pixelated;
+            " title="Block"></div>
+    
+            <!-- Obstacle -->
+            <div style="
+                width: 60px;
+                height: 60px;
+                background-image: url('./images/obstacle.png');
+                background-size: cover;
+                image-rendering: pixelated;
+            " title="Obstacle"></div>
+    
+            <!-- Slot -->
+            <div style="
+                width: 90px;
+                height: 90px;
+                border: 5px dashed #3090c7;
+                background-color: rgba(0,0,0,0.1);
+                box-shadow: 0 0 6px rgba(0, 255, 255, 0.7), inset 0 0 6px rgba(0, 255, 255, 0.3);
+                image-rendering: pixelated;
+            " title="Slot"></div>
+    
+        </div>
+        `
+    },     
+    {
+        text: `
+       White arrows around each object show the directions you can vote to move it.
+
+        \nThe center number shows how many players must agree. The top direction must beat all others by at least that number.
+
+        \nFor example, if the number is 1, one more player must vote for a direction than any other direction for the object to move in that direction.
+
+        \nBelow is an example of how the arrows and voting look in the game.`,
+        demo: `
+        <div id="arrow-demo-container" style="position: relative; width: 100px; height: 100px; margin: auto;">
+            <div id="demo-block" style="
+                width: 120px;
+                height: 120px;
+                background: url('./images/block.png');
+                background-size: cover;
+                position: absolute;
+                left: 20px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-family: monospace;
+                font-size: 16px;
+                font-weight: bold;
+                color: white;
+                text-shadow: 1px 1px 2px black;
+            ">
+                min: 1
+            </div>
+            <div class="triangle up" style="top: 85px; left: 82px;"></div>
+            <div class="triangle down" style="top: 5px; left: 82px; position: absolute;"></div>
+            <div class="triangle left" style="top: 60px; left: 105px; position: absolute;"></div>
+            <div class="triangle right" style="top: 60px; left: 25px; position: absolute;"></div>
+        </div>
+        `
+    },
+    {
+        text: `
+        Each round has two phases: **Voting** and **Moving**.
+
+        \nIn the **Voting phase**, you have 5 seconds to vote. During this time, you can freely change your vote — pick any block or obstacle, and vote in any direction.
+
+        \nYou’ll see other players' votes update in real time.
+
+        \nAfter 5 seconds, the game enters the **Moving phase**. Any object that meets the requirement will move **one step** in the direction with the most net votes.
+        `,
+        demo: ''
+    },
+    {
+        text: "You’ll play multiple levels with a time limit. Work together efficiently!",
+        demo: '⏱️ Time will count down in each level!'
+    },
+    {
+        text: "Now, enter your name and click Join to begin.",
+        demo: '',
+        showNameEntry: true
+    }
+];
+
+let currentStep = 0;
+
+function renderInstructionStep() {
+    const step = instructionSteps[currentStep];
+    document.getElementById('instructionText').innerHTML = step.text;
+    document.getElementById('instructionDemo').innerHTML = step.demo || '';
+
+    document.getElementById('prevInstruction').style.display = currentStep > 0 ? 'inline-block' : 'none';
+    document.getElementById('nextInstruction').style.display = currentStep < instructionSteps.length - 1 ? 'inline-block' : 'none';
+    document.getElementById('name-entry').style.display = step.showNameEntry ? 'block' : 'none';
+}
+
+document.getElementById('prevInstruction').onclick = () => {
+    if (currentStep > 0) currentStep--;
+    renderInstructionStep();
+};
+
+document.getElementById('nextInstruction').onclick = () => {
+    if (currentStep < instructionSteps.length - 1) currentStep++;
+    renderInstructionStep();
+};
+
+renderInstructionStep();
+
+
 //  Conatant Game Variables
 
 function getNumPlayersFromURL() {
@@ -68,7 +201,7 @@ function getNumPlayersFromURL() {
 }
 
 let GameName = "groupestimation";
-let NumPlayers = getNumPlayersFromURL();
+let NumPlayers = 3;
 let MinPlayers = NumPlayers;
 let MaxPlayers = NumPlayers;
 let MaxSessions = 0;
@@ -140,6 +273,222 @@ let allPlayerIDs;
 let currentPhase = null;
 let localCountdown = 0;
 
+let currentLevel = 0;
+
+let eventNumber = 0;
+
+const levelPlacements = {
+    0: {
+        blocks: {
+            blue: { x: 7, y: 1, color: 'blue', minVotes: 3 },
+            red: { x: 7, y: 5, color: 'red', minVotes: 2},
+            yellow: { x: 7, y: 9, color: 'yellow', minVotes: 1 }
+        },
+        slots: {
+            slot0: { x: 0, y: 5 },
+            slot1: { x: 15, y: 5 }
+        },
+        obstacles: {
+            obs1: { x: 0, y: 0, id: 'obs1' }
+        }
+    },
+    1: {
+        blocks: {
+            // blue: { x: 7, y: 1, color: 'blue', minVotes: 3 },
+            // red: { x: 7, y: 5, color: 'red', minVotes: 2 },
+            yellow: { x: 7, y: 9, color: 'yellow', minVotes: 1 }
+        },
+        slots: {
+            slot0: { x: 0, y: 5 },
+            slot1: { x: 15, y: 5 }
+        },
+        obstacles: {
+            obs1: { x: 4, y: 2, id: 'obs1' },
+            obs2: { x: 11, y: 2, id: 'obs2' }
+        }
+    },
+    2: {
+        blocks: {
+            // blue: { x: 7, y: 1, color: 'blue', minVotes: 3 },
+            // red: { x: 7, y: 5, color: 'red', minVotes: 2 },
+            yellow: { x: 7, y: 9, color: 'yellow', minVotes: 1 }
+        },
+        slots: {
+            slot0: { x: 0, y: 5 },
+            slot1: { x: 15, y: 5 }
+        },
+        obstacles: {
+            obs1: { x: 1, y: 2, id: 'obs1' },
+            obs2: { x: 3, y: 4, id: 'obs2' },
+            obs3: { x: 15, y: 2, id: 'obs3' },
+            obs4: { x: 13, y: 4, id: 'obs4' }
+        }
+    },
+    3: {
+        blocks: {
+            // blue: { x: 8, y: 3, color: 'blue', minVotes: 3 },
+            // red: { x: 6, y: 0, color: 'red', minVotes: 2 },
+            yellow: { x: 10, y: 0, color: 'yellow', minVotes: 1 }
+        },
+        slots: {
+            slot0: { x: 0, y: 5 },
+            slot1: { x: 15, y: 5 }
+        },
+        obstacles: {
+            obs1: { x: 1, y: 1, id: 'obs1' },
+            obs2: { x: 4, y: 4, id: 'obs2' },
+            obs3: { x: 4, y: 8, id: 'obs3' },
+            obs4: { x: 15, y: 1, id: 'obs4' },
+            obs5: { x: 13, y: 4, id: 'obs5' },
+            obs6: { x: 12, y: 8, id: 'obs6' }
+        }
+    },
+};
+
+function loadLevel(levelNumber) {
+    const config = levelPlacements[levelNumber];
+    if (!config) {
+        console.warn("No config for level", levelNumber);
+        return;
+    }
+
+    GameState.blocks = config.blocks;
+    GameState.slots = config.slots;
+    GameState.obstacles = config.obstacles;
+
+    // let allPlayerIDs = getCurrentPlayerIds();
+    // allPlayerIDs.forEach(player => {
+    //     newGameState.players[player] = {
+    //         selectedBlock: null,
+    //         selectedPosition: null
+    //     };
+    // });
+    updateStateDirect('blocks', GameState.blocks, 'initalizeBlock');
+    updateStateDirect('slots', GameState.slots, 'initalizeSlots');
+    //updateStateDirect('obs', GameState.obstacles, 'initalizeObstacle');
+
+    Object.values(GameState.slots).forEach(slot => {
+        drawSlot(slot);
+    });
+        
+    Object.values(GameState.blocks).forEach(block => {
+        drawBlock(block, false);
+    });
+
+    // Object.values(GameState.obstacles).forEach(obstacles => {
+    //     drawBlock(obstacles, true);
+    //  });
+
+    if (GameState.obstacles && Object.keys(GameState.obstacles).length > 0) {
+        updateStateDirect('obs', GameState.obstacles, 'initializeObstacle');
+    
+        Object.values(GameState.obstacles).forEach(obstacle => {
+            drawBlock(obstacle, true);
+        });
+    }
+    startLevelTimer(levelNumber);
+}
+
+function showLevelCompleteMessage(levelNumber, callback) {
+    const screen = document.getElementById('levelCompleteScreen');
+
+    // Clear any previous content
+    screen.innerHTML = '';
+
+    // Create a new message element
+    const message = document.createElement('div');
+    message.style.fontSize = '32px';
+    message.style.fontWeight = 'bold';
+    message.style.color = '#333';
+    message.style.padding = '20px';
+    message.style.fontFamily = 'monospace';
+    message.style.textAlign = 'center';
+
+    if (currentLevel === 4) {
+        message.innerHTML = `🎉 You've completed all levels!<br>You will be redirected to Prolific shortly.`;
+        screen.appendChild(message);
+        screen.style.display = 'flex';
+
+        setTimeout(() => {
+            window.location.href = 'https://app.prolific.co/submissions/complete?cc=XXXXXXX'; // Replace with your real code
+        }, 3000);
+    } else {
+        const timeLimitMs = getLevelTimeLimit(levelNumber);
+        const timeLimitMin = Math.floor(timeLimitMs / 60000);
+
+        message.innerHTML = `🎉 You've completed Level ${levelNumber}!<br>Loading Level ${levelNumber + 1}...<br><br>⏱ You will have ${timeLimitMin} minutes to complete it.`;
+        screen.appendChild(message);
+        screen.style.display = 'flex';
+
+        setTimeout(() => {
+            screen.style.display = 'none';
+            callback(); // Proceed to next level
+        }, 3000);
+    }
+}
+
+
+
+function getLevelTimeLimit(levelNumber) {
+    if (levelNumber === 0 || levelNumber === 1) {
+        return 3 * 60 * 1000; // 3 minutes
+    } else if (levelNumber === 2 || levelNumber === 3) {
+        return 5 * 60 * 1000; // 5 minutes
+    } else {
+        return 3 * 60 * 1000; // default fallback
+    }
+}
+
+let currentLevelTimer = null;
+
+// Helper: start timer for the level
+function startLevelTimer(levelNumber) {
+    if (currentLevelTimer) {
+        clearInterval(currentLevelTimer);
+        currentLevelTimer = null;
+    }
+
+    const duration = getLevelTimeLimit(levelNumber);
+    const startTime = Date.now();
+
+    currentLevelTimer = setInterval(() => {
+        const elapsed = Date.now() - startTime;
+        const remaining = duration - elapsed;
+
+        if (remaining <= 0) {
+            clearInterval(currentLevelTimer);
+            currentLevelTimer = null;
+
+            currentLevel += 1;
+            if (currentLevel === 5) {
+                showLevelCompleteMessage(currentLevel - 1, () => {}); // Prolific redirect
+            } else {
+                showLevelCompleteMessage(currentLevel - 1, () => {
+                    loadLevel(currentLevel);
+                });
+            }
+        } else {
+            const minutes = Math.floor(remaining / 60000);
+            const seconds = Math.floor((remaining % 60000) / 1000);
+            updateTimerDisplay(minutes, seconds);
+        }
+    }, 1000);
+}
+
+// Helper: updates only the timer line under the turn message
+function updateTimerDisplay(min, sec) {
+    const timerEl = document.getElementById('levelTimerDisplay');
+    timerEl.textContent = `⏱ Time remaining: ${min}:${sec.toString().padStart(2, '0')}`;
+}
+
+// Helper: use this in level-completion logic to stop the timer
+function stopLevelTimer() {
+    if (currentLevelTimer) {
+        clearInterval(currentLevelTimer);
+        currentLevelTimer = null;
+    }
+}
+
 let playerName;
 console.log("Game Starting...", thisPlayerID);
 
@@ -189,7 +538,7 @@ let messageFinish = document.getElementById('messageFinish');
 //imageContainer.src = images[selectedImages[trialNumber]].path;
 
 // Set up correct instructions
-instructionsText.innerHTML = `<p>Move some block with friends!</p>`;
+instructionsText.innerHTML = `<p>Welcome! In this game, you'll work with others to move blocks into slots!</p>`;
 
 
 //  Game Event Listeners
@@ -234,7 +583,7 @@ Game logic and functionality. All functions for gameplay. This includes:
 
 let roundTimer;
 
-let votingDuration = 5; 
+let votingDuration = 10; 
 let breakDuration = 2; 
 
 let countdownInterval;
@@ -375,29 +724,29 @@ function hideDirectionButtons() {
 }
 
 
-function startVotingPhase() {
-    clearTimeout(roundTimer);
-    clearInterval(countdownInterval);
+// function startVotingPhase() {
+//     clearTimeout(roundTimer);
+//     clearInterval(countdownInterval);
 
-    let countdown = votingDuration;
-    const turnMessage = document.getElementById('turnMessage');
-    turnMessage.innerText = `Choose which block you want to move in ${countdown} seconds. You can change your vote at any time.`;
+//     let countdown = votingDuration;
+//     const turnMessage = document.getElementById('turnMessage');
+//     turnMessage.innerText = `Choose which block you want to move in ${countdown} seconds. You can change your vote at any time.`;
 
-    // Update the countdown every second
-    countdownInterval = setInterval(() => {
-        countdown--;
-        if (countdown > 0) {
-            turnMessage.innerText = `Decide which block you want to move in ${countdown} seconds. You can change your vote at any time.`;
-        }
-    }, 1000);
+//     // Update the countdown every second
+//     countdownInterval = setInterval(() => {
+//         countdown--;
+//         if (countdown > 0) {
+//             turnMessage.innerText = `Decide which block you want to move in ${countdown} seconds. You can change your vote at any time.`;
+//         }
+//     }, 1000);
 
 
-    // // Start 15 second timer
-    // roundTimer = setTimeout(() => {
-    //     clearInterval(countdownInterval);
-    //     finalizeVotes();
-    // }, countdown * 1000);
-}
+//     // // Start 15 second timer
+//     // roundTimer = setTimeout(() => {
+//     //     clearInterval(countdownInterval);
+//     //     finalizeVotes();
+//     // }, countdown * 1000);
+// }
 
 function finalizeVotes() {
     getCurrentPlayerIds().forEach(pid => {
@@ -562,10 +911,19 @@ function getMajorityDirection(votes, minRequired) {
 }
 
 
+// function getMinRequiredVotes(color) {
+//     const minVotesMap = {
+//         blue: 3,
+//         red: 2,
+//         yellow: 1,
+//     };
+//     return minVotesMap[color] || 1; // default to 1 if undefined
+// }
+
 function getMinRequiredVotes(color) {
     const minVotesMap = {
-        blue: 3,
-        red: 2,
+        blue: 1,
+        red: 1,
         yellow: 1,
     };
     return minVotesMap[color] || 1; // default to 1 if undefined
@@ -695,6 +1053,29 @@ function moveBlock(block, x, y, direction) {
                     setTimeout(() => {
                         block.remove(); // Remove from DOM
                         delete GameState.blocks[color]; // Remove from state
+
+                        if (Object.keys(lockedBlocks).length === 1) {
+                            console.log("All blocks locked — advancing level...");
+                            currentLevel++;
+                            lockedBlocks = {};  
+                        
+                            showLevelCompleteMessage(currentLevel, () => {
+                                clearImageContainer();
+                                stopLevelTimer();
+                                
+                                if (currentLevel != 4){
+                                    loadLevel(currentLevel);
+                                    startPhase("voting", votingDuration);
+                                }
+                            });
+
+                            // setTimeout(() => {
+                            //     clearImageContainer();
+                            //     loadLevel(currentLevel);
+
+                            //     startPhase("voting", votingDuration);
+                            // }, 2000);  // Give time for animations
+                        }
                     }, 2000);
                     // delete GameState.slots[slotColor];
                     break;
@@ -887,13 +1268,15 @@ function drawBlock(block, isObstacle) {
                 updateStateDirect(`players/${playerId}`, {
                     obstacle: id,
                     block: null, 
-                    direction: dir
+                    direction: dir,
+                    event: eventNumber
                 });
             } else {
                 updateStateDirect(`players/${playerId}`, {
                     block: id,
                     obstacle: null,
-                    direction: dir
+                    direction: dir,
+                    event: eventNumber
                 });
             }
         });
@@ -1011,7 +1394,7 @@ function layoutDirectionalArrows(block, direction, isObstacle) {
         arrow.style.bottom = '';
         arrow.style.transform = transform;
 
-        // ✅ Optional: Save px values for later animation use
+        // Optional: Save px values for later animation use
         arrow.dataset.topPx = topPx;
         arrow.dataset.leftPx = leftPx;
     });
@@ -1105,14 +1488,14 @@ function _randomizeGamePlacement() {
         obs4: { x: 13, y: 9, id: 'obs4'}
     };
 
-    // Initialize player choices
-    let allPlayerIDs = getCurrentPlayerIds();
-    allPlayerIDs.forEach(player => {
-        newGameState.players[player] = {
-            selectedBlock: null,
-            selectedPosition: null
-        };
-    });
+    // // Initialize player choices
+    // let allPlayerIDs = getCurrentPlayerIds();
+    // allPlayerIDs.forEach(player => {
+    //     newGameState.players[player] = {
+    //         selectedBlock: null,
+    //         selectedPosition: null
+    //     };
+    // });
 
     return newGameState;
 }
@@ -1143,6 +1526,12 @@ function _setPlayerAvatarCSS() {
     console.log("set this player as black");
 
 };
+
+function clearImageContainer() {
+    const container = document.getElementById('image-container');
+    container.innerHTML = '';
+}
+
 
 // function _createThisPlayerAvatar() {
 //     let thisPlayerContainer = document.getElementById('player1-container');
@@ -1265,26 +1654,27 @@ function newGame() {
     let arrivalIndex = getCurrentPlayerArrivalIndex();
 
     if (arrivalIndex == 1){
-        updateStateDirect('blocks', GameState.blocks, 'initalizeBlock');
-        updateStateDirect('slots', GameState.slots, 'initalizeSlots');
-        updateStateDirect('obs', GameState.obstacles, 'initalizeObstacle');
+        // updateStateDirect('blocks', GameState.blocks, 'initalizeBlock');
+        // updateStateDirect('slots', GameState.slots, 'initalizeSlots');
+        // updateStateDirect('obs', GameState.obstacles, 'initalizeObstacle');
 
-        Object.values(GameState.slots).forEach(slot => {
-            drawSlot(slot);
-        });
+        // Object.values(GameState.slots).forEach(slot => {
+        //     drawSlot(slot);
+        // });
         
-        Object.values(GameState.blocks).forEach(block => {
-            drawBlock(block, false);
-        });
+        // Object.values(GameState.blocks).forEach(block => {
+        //     drawBlock(block, false);
+        // });
 
-        Object.values(GameState.obstacles).forEach(obstacles => {
-            drawBlock(obstacles, true);
-        });
+        // Object.values(GameState.obstacles).forEach(obstacles => {
+        //     drawBlock(obstacles, true);
+        // });
 
         //setInterval(tickPhaseOwner, 1000); // centralized tick
         startPhase("voting", votingDuration);
         
     }
+    loadLevel(currentLevel);
 
     console.log("Initialized GameState:", GameState);
     //_createOtherPlayerAvatar();
@@ -1339,25 +1729,27 @@ function receiveStateChange(pathNow, nodeName, newState, typeChange ) {
         
 
     } else if(pathNow == "blocks" && (typeChange == 'onChildAdded' ||typeChange == 'onChildChanged')){
-        let arrivalIndex = getCurrentPlayerArrivalIndex();
-        if(arrivalIndex != 1){
-            GameState.blocks[nodeName] = newState;  // update your local GameState
-            drawBlock(newState, false)
-        }
+        console.log("Block update received:", nodeName, newState);
+        // let arrivalIndex = getCurrentPlayerArrivalIndex();
+        // if(arrivalIndex != 1){
+        //     GameState.blocks[nodeName] = newState;  // update your local GameState
+        //     drawBlock(newState, false)
+        // }
 
     }else if(pathNow == "slots" && (typeChange == 'onChildAdded' ||typeChange == 'onChildChanged')){
-        let arrivalIndex = getCurrentPlayerArrivalIndex();
-        if(arrivalIndex != 1){
-            GameState.slots[nodeName] = newState; // update your local GameState
-            drawSlot(newState);
-        }
+        // console.log("Slots update received:", nodeName, newState);
+        // let arrivalIndex = getCurrentPlayerArrivalIndex();
+        // if(arrivalIndex != 1){
+        //     GameState.slots[nodeName] = newState; // update your local GameState
+        //     drawSlot(newState);
+        // }
     }else if(pathNow == "obs" && (typeChange == 'onChildAdded' ||typeChange == 'onChildChanged')){
-        console.log("received obstacle update");
-        let arrivalIndex = getCurrentPlayerArrivalIndex();
-        if(arrivalIndex != 1){
-            GameState.obstacles[newState.id] = newState; 
-            drawBlock(newState, true);
-        }
+        // console.log("received obstacle update");
+        // let arrivalIndex = getCurrentPlayerArrivalIndex();
+        // if(arrivalIndex != 1){
+        //     GameState.obstacles[newState.id] = newState; 
+        //     drawBlock(newState, true);
+        // }
     } else if (pathNow === 'phase') {
         if (nodeName === 'current') {
             currentPhase = newState;
@@ -1396,7 +1788,7 @@ function receiveStateChange(pathNow, nodeName, newState, typeChange ) {
                     const myId = getCurrentPlayerId();
                     const sortedIds = getCurrentPlayerIds().sort(); // consistent ordering
                     const fallbackLeader = sortedIds[0]; // always first alphabetically
-                    //const nextPhase = (currentPhase === 'voting') ? 'moving' : 'voting';
+                    let nextPhase = (currentPhase === 'voting') ? 'moving' : 'voting';
                     // if (nextPhase === 'moving'){
 
                     //     hideDirectionButtons();
@@ -1412,6 +1804,9 @@ function receiveStateChange(pathNow, nodeName, newState, typeChange ) {
                     //     showDirectionButtons();
                     // }
 
+                    if (nextPhase === 'moving'){
+                        eventNumber++; 
+                    }
     
                     if (myId === fallbackLeader) {
                         console.warn("Fallback or primary controller is advancing phase.");

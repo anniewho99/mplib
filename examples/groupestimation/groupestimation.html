@@ -275,6 +275,12 @@
             border-color: transparent transparent transparent white;
         }
 
+        #turnMessage {
+            font-size: 18px;
+            font-family: sans-serif;
+        }
+
+
 
 
 
@@ -285,28 +291,65 @@
 
 <body>
     
-    <div class="container" id="instructionsScreen"><!-- style="display: none;">-->
+    <div class="container" id="instructionsScreen">
         <h1>Instructions</h1>
+    
         <div class="containertext" id="instructionText">
-        
+            <!-- Steps will be loaded dynamically -->
         </div>
-        <div id="name-entry" style="margin-top: 20px;">
+    
+        <!-- Game Element Demo Container -->
+        <div id="instructionDemo" style="margin: 20px 0;"></div>
+    
+        <!-- Navigation -->
+        <div id="instructionNav">
+            <button id="prevInstruction" class="button" style="display:none;">Back</button>
+            <button id="nextInstruction" class="button">Next</button>
+        </div>
+    
+        <!-- Name Entry (Hidden until last step) -->
+        <div id="name-entry" style="margin-top: 20px; display: none;">
             <label for="playerName">Enter your player name:</label><br>
             <input type="text" id="playerName" placeholder="e.g., SpotShin" style="padding: 5px; margin-top: 5px;" />
+            <a href="#" class="button" id="joinBtn">Join Game</a>
         </div>
-        <a href="#" class="button" id="joinBtn">Proceed</a> 
     </div>
+    
     <div class="container" id="waitingRoomScreen" style="display:none">
         <h1>Waiting Room</h1>  
         <div class="containertext" id="messageWaitingRoom"></div>
     </div>
-    <div class="container" id="gameScreen" style="caret-color: transparent; display:none;">
+    <div class="container" id="gameScreen" style="position: relative; caret-color: transparent; display:none;">
+    
         <!-- <h1>What do you want to do this turn <span id="numPlayers"></span></h1> -->
         <div class="textturn" id="turnMessage">
             <!-- You are Player -->
             <!-- <span id="playerID"></span>: -->
             <!--<br />-->
             <!-- <span id="messageToPlayer">make your guess</span> -->
+        </div>
+        <div id="levelTimerDisplay" style="text-align: center; font-family: monospace; font-size: 16px; color: #444; margin-bottom: 10px;"></div>
+        <div id="levelCompleteScreen" style="
+        display: none;
+        position: absolute;
+        top: 0; left: 0;
+        width: 100%;
+        height: 100%;
+        background: #bcbcbc;
+        z-index: 1000;
+        align-items: center;
+        justify-content: center;
+        ">
+            <div style="
+                text-align: center;
+                font-size: 44px;
+                font-weight: bold;
+                font-family: monospace;
+                color: #333;
+                padding: 20px;
+            " id="levelCompleteText">
+                <!-- Message injected by JS -->
+            </div>
         </div>
         <div id="game">
 
