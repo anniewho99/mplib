@@ -62,88 +62,182 @@ Configure all of the game settings. This includes:
 //Instruction
 const instructionSteps = [
     {
-        text: "Welcome! In this game, you'll work with others to move blocks into slots.",
+        text: "Welcome! In this game, you’ll team up with two other participants to move blocks into slots. You’ll work together to complete four levels.",
+
         demo: '', 
     },{
         text: `
-There are three key elements in the game: Blocks, Obstacles, and Slots. They are shown below in that order.
-
-\n🔹 Blocks are the main objects to move.
-
-\n🔹 Obstacles can also be moved but are not required to complete the level.
-
-\n🔹 Slots are the target zones. Every block must end up in a slot to complete the level.
-`,
+    Blocks are the main objects you need to move in this game. This is what a block looks like.
+    
+    \nEach block must be pushed into a slot to complete the level.`,
         demo: `
-        <div style="display: flex; gap: 20px; justify-content: center; align-items: center; flex-wrap: wrap;">
-    
-            <!-- Block -->
-            <div style="
-                width: 90px;
-                height: 90px;
-                background-image: url('./images/block.png');
-                background-size: cover;
-                image-rendering: pixelated;
-            " title="Block"></div>
-    
-            <!-- Obstacle -->
-            <div style="
-                width: 60px;
-                height: 60px;
-                background-image: url('./images/obstacle.png');
-                background-size: cover;
-                image-rendering: pixelated;
-            " title="Obstacle"></div>
-    
-            <!-- Slot -->
-            <div style="
-                width: 90px;
-                height: 90px;
-                border: 5px dashed #3090c7;
-                background-color: rgba(0,0,0,0.1);
-                box-shadow: 0 0 6px rgba(0, 255, 255, 0.7), inset 0 0 6px rgba(0, 255, 255, 0.3);
-                image-rendering: pixelated;
-            " title="Slot"></div>
-    
-        </div>
-        `
-    },     
-    {
-        text: `
-       White arrows around each object show the directions you can vote to move it.
-
-        \nThe center number shows how many players must agree for the object to be moved. The direction most people voted for must beat the sum of all other votes by at least that number.
-
-        \nFor example, if one person votes to move the object to the right, and one person votes to move the object to the left, three people need to vote to move the object up for the object to move up in the case where the minimum number of agreement is 1 (the number you see on the object).
-
-        \nBelow is an example of how the arrows look in the game on a Block.`,
-        demo: `
-        <div id="arrow-demo-container" style="position: relative; width: 100px; height: 100px; margin: auto;">
-            <div id="demo-block" style="
-                width: 120px;
-                height: 120px;
-                background: url('./images/block.png');
-                background-size: cover;
-                position: absolute;
-                left: 20px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                font-family: monospace;
-                font-size: 16px;
-                font-weight: bold;
-                color: white;
-                text-shadow: 1px 1px 2px black;
-            ">
-                min: 1
-            </div>
-            <div class="triangle up" style="top: 85px; left: 82px;"></div>
-            <div class="triangle down" style="top: 5px; left: 82px; position: absolute;"></div>
-            <div class="triangle left" style="top: 60px; left: 105px; position: absolute;"></div>
-            <div class="triangle right" style="top: 60px; left: 25px; position: absolute;"></div>
-        </div>
+        <div style="
+            width: 90px;
+            height: 90px;
+            background-image: url('./images/block.png');
+            background-size: cover;
+            image-rendering: pixelated;
+            margin: auto;
+        " title="Block"></div>
         `
     },
+    {
+        text: `
+        Obstacles can be moved just like blocks. This is what an obstacle looks like.
+        
+        \nHowever, you don’t need to move them into slots to complete the level — they’re just in your way. If an obstacle ends up in a slot, nothing happens.
+        `,
+        demo: `
+        <div style="
+            width: 60px;
+            height: 60px;
+            background-image: url('./images/obstacle.png');
+            background-size: cover;
+            image-rendering: pixelated;
+            margin: auto;
+        " title="Obstacle"></div>
+        `
+    },
+    {
+        text: `
+    Slots are the target location for the blocks. A block disappears when it reaches a slot. A level is completed when all blocks are in slots.`,
+        demo: `
+        <div style="
+            width: 90px;
+            height: 90px;
+            border: 5px dashed #3090c7;
+            background-color: rgba(0,0,0,0.1);
+            box-shadow: 0 0 6px rgba(0, 255, 255, 0.7), inset 0 0 6px rgba(0, 255, 255, 0.3);
+            image-rendering: pixelated;
+            margin: auto;
+        " title="Slot"></div>
+        `
+    },        
+    {
+        text: `
+        To move a block or obstacle, click one of the white arrows around it. Each arrow shows a direction you can vote to push the object toward.
+        
+        \nThe number in the center (e.g., min: 1) tells you how many players must agree on the same direction for the object to move.
+        
+        \nFor example, the min: 1 block below means your vote alone is enough to move it.
+        
+        \nWhen you hover over a direction arrow, it will highlight — this shows which direction you're about to vote for.
+        `,
+        demo: `
+        <div id="arrow-demo-container" style="position: relative; width: 100px; height: 100px; margin: auto;">
+          <div style="
+            width: 120px;
+            height: 120px;
+            background: url('./images/block.png');
+            background-size: cover;
+            position: absolute;
+            left: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: monospace;
+            font-size: 16px;
+            font-weight: bold;
+            color: white;
+            text-shadow: 1px 1px 2px black;
+          ">
+            min: 1
+          </div>
+          <div class="triangle up" style="top: 85px; left: 82px;"></div>
+          <div class="triangle down" style="top: 5px; left: 82px; position: absolute;"></div>
+          <div class="triangle left" style="top: 60px; left: 105px; position: absolute;"></div>
+          <div class="triangle right" style="top: 60px; left: 25px; position: absolute;"></div>
+        </div>
+        `
+      },
+      {
+        text: `
+      Some blocks require more than one player to move. This one needs two players to vote the same way.
+      
+      \nWork together to make the same choice — the block won’t move unless enough players agree.
+      `,
+      demo: `
+      <div id="arrow-demo-container" style="position: relative; width: 100px; height: 100px; margin: auto;">
+        <div style="
+          width: 120px;
+          height: 120px;
+          background: url('./images/block.png');
+          background-size: cover;
+          position: absolute;
+          left: 20px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-family: monospace;
+          font-size: 16px;
+          font-weight: bold;
+          color: white;
+          text-shadow: 1px 1px 2px black;
+        ">
+          min: 2
+        </div>
+        <div class="triangle up" style="top: 85px; left: 82px;"></div>
+        <div class="triangle down" style="top: 5px; left: 82px; position: absolute;"></div>
+        <div class="triangle left" style="top: 60px; left: 105px; position: absolute;"></div>
+        <div class="triangle right" style="top: 60px; left: 25px; position: absolute;"></div>
+      </div>
+      `
+      },
+      {
+        text: `
+      This block shows min: 3 — that means three players need to agree on the same direction to move it.
+      
+      \nBut it's not just about having 3 votes total. What matters is net agreement: the number of players voting for a direction must be at least 3 more than the total voting for other directions.
+      
+      \nFor example, if 4 players vote right and 1 votes left, the net agreement is 3 — so the block moves right!
+      `,
+      demo: `
+      <div id="arrow-demo-container" style="position: relative; width: 100px; height: 100px; margin: auto;">
+        <div style="
+          width: 120px;
+          height: 120px;
+          background: url('./images/block.png');
+          background-size: cover;
+          position: absolute;
+          left: 20px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-family: monospace;
+          font-size: 16px;
+          font-weight: bold;
+          color: white;
+          text-shadow: 1px 1px 2px black;
+        ">
+          min: 3
+        </div>
+        <div class="triangle up" style="top: 85px; left: 82px;"></div>
+        <div class="triangle down" style="top: 5px; left: 82px; position: absolute;"></div>
+        <div class="triangle left" style="top: 60px; left: 105px; position: absolute;"></div>
+        <div class="triangle right" style="top: 60px; left: 25px; position: absolute;"></div>
+      </div>
+      `
+      },
+      {
+        text: `
+        Let's practice! Move the block into the slot (it disappears after 3 moves). 
+        Also move the obstacle down once.`,
+        demo: `<div id="practiceBoard" style="
+                width: 256px;
+                height: 256px;
+                background-color: #bcbcbc;
+                background-image: 
+                    linear-gradient(to right, darkgray 1px, transparent 1px),
+                    linear-gradient(to bottom, darkgray 1px, transparent 1px);
+                background-size: 32px 32px;
+                position: relative;
+                display: grid;
+                grid-template-columns: repeat(8, 32px);
+                grid-template-rows: repeat(8, 32px);
+                margin: auto;">
+            </div>
+`
+      },
     {
         text: `
         Each round has two phases: **Voting** and **Moving**.
@@ -157,7 +251,11 @@ There are three key elements in the game: Blocks, Obstacles, and Slots. They are
         demo: ''
     },
     {
-        text: `
+        text: ` In each level, you have multiple rounds to make your sugeestoins. When you click on an arrow, all other plaeyrs will see it. similary, when you click on an arrow, all other plaeyrs can see it.
+        After five seconds have ealpsed, the movements are exexuted. 
+        But again, note that, for a two minijum blocks, and a three minium blocks, the players needs to agree on the direction of the movment, otherwise the movment will not be executed. 
+        Here are what could happen in that five seconds. 
+        There are three players in this example. (refer to the player by the name)
         Here's an example of a full round, showing both the **Voting** and **Moving** phases.
         
         \nIn this demo, two players vote to push a **min: 2** Block to the left, and one player votes to push a **min: 1** Block in the same direction.
@@ -180,24 +278,23 @@ There are three key elements in the game: Blocks, Obstacles, and Slots. They are
     },
     {
         text: `
-        There are four levels in total.
         
-        \nYou'll advance to the next level as soon as all Blocks are placed into Slots. A Block disappears when it reaches a Slot.
-        
-        \nEach level has a time limit to keep the game moving. Try to complete the level before time runs out — otherwise, the game will move you forward automatically.
-        
+        \nYou'll advance to the next level as soon as all Blocks are placed into Slots. A Block disappears when it reaches a Slot. You will be playing four levels. 
+        The goal of this game is to coordinate and collaborate as best as possible. to finish each level as quicly as possible. 
+        The experiment is complet when you finsiehd all four levels.
         \nWork together and think strategically to finish as efficiently as possible!
+        \nEach level has a time limit to keep the game moving. Try to complete the level before time runs out — otherwise, the game will move you forward automatically.
         `
         ,
         demo: '',
     },
     {
         text: `
-        You're all set!
+        You're all set with the instruction!
         
-        \nYou'll now be **paired with two other players** to complete all four levels together.
+        \nYou'll now be paired with two other players to complete all four levels together.
         
-        \nClick Join below when you're ready to start.
+        \nClick Join Game below when you're ready to start.
         
         \nYou'll have 5 minutes to finish Level 1. Have fun!
         `
@@ -226,11 +323,139 @@ document.getElementById('prevInstruction').onclick = () => {
 
 document.getElementById('nextInstruction').onclick = () => {
     if (currentStep < instructionSteps.length - 1) currentStep++;
+    if (currentStep === 7) {
+        setTimeout(() => {
+            initPracticeBoard();
+        }, 50);
+      }
+      
     renderInstructionStep();
 };
 
 renderInstructionStep();
 
+
+function initPracticeBoard() {
+    const board = document.getElementById("practiceBoard");
+    console.log("Board found?", board);
+    console.log("board.childNodes:", board.childNodes);
+    console.log("board.children:", board.children);
+
+    if (board.children.length > 0) return;
+  
+    const CELL_SIZE = 32;
+    let blockPos = { x: 4, y: 3 };
+    let obstaclePos = { x: 0, y: 0 };
+    const slotPos = { x: 1, y: 3 };
+    let blockMoves = 0;
+    let obstacleMoved = false;
+
+    function createSlot(x, y) {
+        const div = document.createElement("div");
+        div.style.gridColumnStart = x + 1;
+        div.style.gridRowStart = y + 1;
+        div.style.gridColumnEnd = `span 3`;
+        div.style.gridRowEnd = `span 3`;
+        div.style.border = '4px dashed #3090c7';
+        div.style.backgroundColor = 'rgba(0, 0, 0, 0.1)';
+        div.style.boxShadow = '0 0 6px rgba(0, 255, 255, 0.7), inset 0 0 6px rgba(0, 255, 255, 0.3)';
+        board.appendChild(div);
+      }
+  
+    function createObject(id, image, x, y) {
+      const wrapper = document.createElement("div");
+      wrapper.id = id;
+      wrapper.style.gridColumnStart = x + 1;
+      wrapper.style.gridRowStart = y + 1;
+      wrapper.style.position = "relative";
+      wrapper.style.width = `${CELL_SIZE}px`;
+      wrapper.style.height = `${CELL_SIZE}px`;
+  
+      const obj = document.createElement("div");
+      obj.style.backgroundImage = `url(${image})`;
+      obj.style.backgroundSize = "cover";
+      obj.style.width = "100%";
+      obj.style.height = "100%";
+      obj.style.display = 'flex';
+      obj.style.alignItems = 'center';
+      obj.style.justifyContent = 'center';
+      obj.style.fontFamily = 'monospace';
+      obj.style.fontSize = '14px';
+      obj.style.fontWeight = 'bold';
+      obj.style.color = 'white';
+      obj.style.textShadow = '1px 1px 2px black';
+      obj.innerText = `min: 1`;
+  
+      wrapper.appendChild(obj);
+  
+      ['up', 'down', 'left', 'right'].forEach(dir => {
+        const arrow = document.createElement("div");
+        arrow.className = `triangle ${dir}`;
+        arrow.style.position = "absolute";
+        arrow.style.border = "10px solid transparent";
+        arrow.style.cursor = "pointer";
+        arrow.style.border[dir === 'up' ? 'BottomColor' : dir === 'down' ? 'TopColor' : dir === 'left' ? 'RightColor' : 'LeftColor'] = 'white';
+  
+        if (dir === 'up') Object.assign(arrow.style, { top: '-8px', left: '22px' });
+        if (dir === 'down') Object.assign(arrow.style, { bottom: '-8px', left: '22px' });
+        if (dir === 'left') Object.assign(arrow.style, { top: '22px', left: '-8px' });
+        if (dir === 'right') Object.assign(arrow.style, { top: '22px', right: '-8px' });
+  
+        arrow.onclick = () => handleMove(id, dir);
+        wrapper.appendChild(arrow);
+      });
+  
+      board.appendChild(wrapper);
+    }
+  
+    function updatePosition(id, pos) {
+      const el = document.getElementById(id);
+      el.style.gridColumnStart = pos.x + 1;
+      el.style.gridRowStart = pos.y + 1;
+    }
+  
+    function handleMove(id, dir) {
+      if (id === 'block') {
+        if (dir === 'up' && blockPos.y > 0) {
+          blockPos.y -= 1;
+          blockMoves++;
+          updatePosition(id, blockPos);
+          if (blockPos.x === slotPos.x && blockPos.y === slotPos.y) {
+            document.getElementById('block').remove();
+            checkPracticeComplete();
+          }
+        }
+      } else if (id === 'obstacle') {
+        if (dir === 'down' && !obstacleMoved && obstaclePos.y < 5) {
+          obstaclePos.y += 1;
+          obstacleMoved = true;
+          updatePosition(id, obstaclePos);
+          checkPracticeComplete();
+        }
+      }
+    }
+  
+    function checkPracticeComplete() {
+      if (blockMoves >= 3 && obstacleMoved) {
+        const msg = document.createElement('div');
+        msg.innerText = '✅ Practice complete! Click "Next" to continue.';
+        msg.style.textAlign = 'center';
+        msg.style.marginTop = '20px';
+        msg.style.fontFamily = 'monospace';
+        msg.style.fontWeight = 'bold';
+        board.appendChild(msg);
+      }
+    }
+  
+    // Setup
+    console.log(" Drawing slot...");
+    createSlot(slotPos.x, slotPos.y);
+    console.log(" Drawing block...");
+    createObject('block', './images/block.png', blockPos.x, blockPos.y);
+    console.log(" Drawing obstacle...");
+    createObject('obstacle', './images/obstacle.png', obstaclePos.x, obstaclePos.y);
+}
+  
 
 //  Conatant Game Variables
 
@@ -325,8 +550,8 @@ const levelPlacements = {
             yellow: { x: 7, y: 9, color: 'yellow', minVotes: 1 }
         },
         slots: {
-            slot0: { x: 0, y: 5 },
-            slot1: { x: 15, y: 5 }
+            slot0: { x: 1, y: 5 },
+            slot1: { x: 14, y: 5 }
         },
         obstacles: {
             obs1: { x: 0, y: 0, id: 'obs1' }
@@ -335,12 +560,12 @@ const levelPlacements = {
     1: {
         blocks: {
             blue: { x: 7, y: 1, color: 'blue', minVotes: 3 },
-            red: { x: 7, y: 5, color: 'red', minVotes: 2 },
+            red: { x: 7, y: 5, color: 'red', minVotes: 2},
             yellow: { x: 7, y: 9, color: 'yellow', minVotes: 1 }
         },
         slots: {
-            slot0: { x: 0, y: 5 },
-            slot1: { x: 15, y: 5 }
+            slot0: { x: 1, y: 5 },
+            slot1: { x: 14, y: 5 }
         },
         obstacles: {
             obs1: { x: 4, y: 2, id: 'obs1' },
@@ -350,12 +575,12 @@ const levelPlacements = {
     2: {
         blocks: {
             blue: { x: 7, y: 1, color: 'blue', minVotes: 3 },
-            red: { x: 7, y: 5, color: 'red', minVotes: 2 },
+            red: { x: 7, y: 5, color: 'red', minVotes: 2},
             yellow: { x: 7, y: 9, color: 'yellow', minVotes: 1 }
         },
         slots: {
-            slot0: { x: 0, y: 5 },
-            slot1: { x: 15, y: 5 }
+            slot0: { x: 1, y: 5 },
+            slot1: { x: 14, y: 5 }
         },
         obstacles: {
             obs1: { x: 1, y: 2, id: 'obs1' },
@@ -371,8 +596,8 @@ const levelPlacements = {
             yellow: { x: 10, y: 0, color: 'yellow', minVotes: 1 }
         },
         slots: {
-            slot0: { x: 0, y: 5 },
-            slot1: { x: 15, y: 5 }
+            slot0: { x: 1, y: 5 },
+            slot1: { x: 14, y: 5 }
         },
         obstacles: {
             obs1: { x: 1, y: 1, id: 'obs1' },
@@ -503,6 +728,7 @@ function startLevelTimer(levelNumber) {
             if (currentLevel === 5) {
                 showLevelCompleteMessage(currentLevel - 1, () => {}); // Prolific redirect
             } else {
+                clearImageContainer();
                 showLevelCompleteMessage(currentLevel - 1, () => {
                     loadLevel(currentLevel);
                 });
