@@ -60,14 +60,18 @@ Configure all of the game settings. This includes:
 */
 
 //Instruction
+let practiceSessionActive = false;
+
+let practiceCompleted = false;
+
 const instructionSteps = [
     {
-        text: "Welcome! In this game, you’ll team up with two other participants to move blocks into slots. You’ll work together to complete four levels.",
+        text: "Welcome! In this game, you will team up with two other participants to move blocks into slots. You’ll work together to complete four levels.",
 
         demo: '', 
     },{
         text: `
-    Blocks are the main objects you need to move in this game. This is what a block looks like.
+    Blocks are the main objects you need to move in this game. This is what a block looks like. 
     
     \nEach block must be pushed into a slot to complete the level.`,
         demo: `
@@ -83,9 +87,9 @@ const instructionSteps = [
     },
     {
         text: `
-        Obstacles can be moved just like blocks. This is what an obstacle looks like.
+        Obstacles can be moved just like blocks. This is what an obstacle looks like. 
         
-        \nHowever, you don’t need to move them into slots to complete the level — they’re just in your way. If an obstacle ends up in a slot, nothing happens.
+        \nHowever, you don’t need to move them into slots to complete the level — they’re just in your way. \nIf an obstacle ends up in a slot, nothing happens.
         `,
         demo: `
         <div style="
@@ -100,7 +104,11 @@ const instructionSteps = [
     },
     {
         text: `
-    Slots are the target location for the blocks. A block disappears when it reaches a slot. A level is completed when all blocks are in slots.`,
+    Slots are the target location for the blocks. 
+    
+    \nA block disappears when it reaches a slot. 
+    
+    \nA level is completed when all blocks are in slots.`,
         demo: `
         <div style="
             width: 90px;
@@ -115,13 +123,13 @@ const instructionSteps = [
     },        
     {
         text: `
-        To move a block or obstacle, click one of the white arrows around it. Each arrow shows a direction you can vote to push the object toward.
+        To move a block or obstacle, click one of the white arrows around it. 
+        
+        \nEach arrow shows a direction you can vote to push the object toward.
         
         \nThe number in the center (e.g., min: 1) tells you how many players must agree on the same direction for the object to move.
         
-        \nFor example, the min: 1 block below means your vote alone is enough to move it.
-        
-        \nWhen you hover over a direction arrow, it will highlight — this shows which direction you're about to vote for.
+        \nFor example, the min: 1 block below means your vote alone is enough to move it. \nWhen you hover over a direction arrow, it will highlight.
         `,
         demo: `
         <div id="arrow-demo-container" style="position: relative; width: 100px; height: 100px; margin: auto;">
@@ -220,56 +228,76 @@ const instructionSteps = [
       },
       {
         text: `
-        Let's practice! Move the block into the slot (it disappears after 3 moves). 
-        Also move the obstacle down once.`,
+          This is your avatar! You'll use it to interact with blocks and obstacles in the game.
+          
+          \nWhen you click on a direction you want to push an object toward, your avatar will appear next to that object.
+        `,
+        demo: `
+          <div style="
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            height: 80px; 
+            margin: auto;">
+            <img src="./images/player1.png" alt="Your Avatar" 
+                 style="width: 80px; height: 80px; image-rendering: pixelated;">
+          </div>
+        `
+      },      
+      {
+        text: `
+        Now let's practice! 
+
+        \nTry to move the obstacle away from the slot, and then move the block into the slot.
+        
+        \nYou will be able to proceed to the next step once you complete this task.`,
         demo: `<div id="practiceBoard" style="
-                width: 256px;
-                height: 256px;
+                width: 360px;
+                height: 360px;
                 background-color: #bcbcbc;
                 background-image: 
                     linear-gradient(to right, darkgray 1px, transparent 1px),
                     linear-gradient(to bottom, darkgray 1px, transparent 1px);
-                background-size: 32px 32px;
+                background-size: 45px 45px;
                 position: relative;
                 display: grid;
-                grid-template-columns: repeat(8, 32px);
-                grid-template-rows: repeat(8, 32px);
+                grid-template-columns: repeat(8, 45px);
+                grid-template-rows: repeat(8, 45px);
                 margin: auto;">
             </div>
-`
+        `
+        
       },
     {
-        text: `
-        Each round has two phases: **Voting** and **Moving**.
-
-        \nIn the **Voting phase**, you have 5 seconds to vote. During this time, you can freely change your vote — pick any Block or Obstacle, and vote in any direction.
-
-        \nYou'll see other players' votes update in real time.
-
-        \nAfter 5 seconds, the game enters the **Moving phase**. Any object that meets the requirement will move **one step** in the direction with the most net votes.
+        text:  `
+        Unlike in the practice round, you won't be able to move a block directly in the game.
+        
+        \nInstead, in each level, you'll go through multiple rounds where you suggest how you want the blocks or obstacles to move.
+        
+        \nWhen you click an arrow, your suggestion becomes visible to all players — and you'll also see theirs.
+    
+        \nAfter five seconds, the game checks the suggestions and executes movements only if enough players agree.
+      
+        \nFor example:
+        - A block that requires 2 players will move only if at least 2 players vote for the same direction.
+        - A block that requires 3 players will move only if all 3 players agree.
+      
+        \nIf there isn't enough agreement, the object won't move.
         `,
         demo: ''
     },
     {
-        text: ` In each level, you have multiple rounds to make your sugeestoins. When you click on an arrow, all other plaeyrs will see it. similary, when you click on an arrow, all other plaeyrs can see it.
-        After five seconds have ealpsed, the movements are exexuted. 
-        But again, note that, for a two minijum blocks, and a three minium blocks, the players needs to agree on the direction of the movment, otherwise the movment will not be executed. 
-        Here are what could happen in that five seconds. 
-        There are three players in this example. (refer to the player by the name)
-        Here's an example of a full round, showing both the **Voting** and **Moving** phases.
+        text: `Here’s what could happen during those five seconds. There are three players in this example: playerOne, playerTwo, and playerThree.
         
-        \nIn this demo, two players vote to push a **min: 2** Block to the left, and one player votes to push a **min: 1** Block in the same direction.
+        \nIn this video, playerTwo and playerThree vote to push a min: 2 block to the left, and playerOne votes to push a min: 1 block in the same direction.
         
-        \nDuring the 5-second **Voting phase**, players can click arrows on different blocks or obstacles to cast their votes — and change them freely.
+        \nDuring the 5 seconds, players can click arrows on different blocks or obstacles to cast their votes — and change them freely. After voting ends, any object with enough agreement moves one step in the direction with the highest net votes.
         
-        \nAfter voting ends, the game enters the **Moving phase**. Any object with enough agreement moves **one step** in the direction with the highest net votes.
-        
-        \nWatch how the Blocks move when the voting requirement is met.
-        `,
+        \nSo here, the min: 2 block and the min: 1 block both move one step to the left.`,        
         demo: `
         <div style="text-align: center;">
             <video width="480" autoplay loop muted playsinline style="border: 2px solid #ccc; border-radius: 8px;">
-                <source src="./images/demo.mov" type="video/mp4">
+                <source src="./images/demo.mp4" type="video/mp4">
                 Your browser does not support the video tag.
             </video>
         </div>
@@ -278,13 +306,16 @@ const instructionSteps = [
     },
     {
         text: `
+        You'll advance to the next level as soon as all blocks are placed into slots. You will be playing all four levels with the same two participants.
         
-        \nYou'll advance to the next level as soon as all Blocks are placed into Slots. A Block disappears when it reaches a Slot. You will be playing four levels. 
-        The goal of this game is to coordinate and collaborate as best as possible. to finish each level as quicly as possible. 
-        The experiment is complet when you finsiehd all four levels.
+        \nThe goal of this game is to coordinate and collaborate as effectively as possible to complete each level quickly.
+        
+       \n The experiment is complete once you finish all four levels.
+        
         \nWork together and think strategically to finish as efficiently as possible!
-        \nEach level has a time limit to keep the game moving. Try to complete the level before time runs out — otherwise, the game will move you forward automatically.
-        `
+        
+        \nEach level has a time limit to keep the game moving. Try to complete the level before time runs out — otherwise, the game will automatically advance you to the next level.
+        `        
         ,
         demo: '',
     },
@@ -308,11 +339,17 @@ let currentStep = 0;
 
 function renderInstructionStep() {
     const step = instructionSteps[currentStep];
-    document.getElementById('instructionText').innerHTML = step.text;
+    document.getElementById('instructionText').innerText = step.text;
     document.getElementById('instructionDemo').innerHTML = step.demo || '';
 
     document.getElementById('prevInstruction').style.display = currentStep > 0 ? 'inline-block' : 'none';
-    document.getElementById('nextInstruction').style.display = currentStep < instructionSteps.length - 1 ? 'inline-block' : 'none';
+    // document.getElementById('nextInstruction').style.display = currentStep < instructionSteps.length - 1 ? 'inline-block' : 'none';
+    const nextBtn = document.getElementById('nextInstruction');
+    if (!practiceSessionActive && currentStep < instructionSteps.length - 1) {
+        nextBtn.style.display = 'inline-block';
+    } else {
+        nextBtn.style.display = 'none';
+    }
     document.getElementById('name-entry').style.display = step.showNameEntry ? 'block' : 'none';
 }
 
@@ -323,16 +360,22 @@ document.getElementById('prevInstruction').onclick = () => {
 
 document.getElementById('nextInstruction').onclick = () => {
     if (currentStep < instructionSteps.length - 1) currentStep++;
-    if (currentStep === 7) {
-        setTimeout(() => {
-            initPracticeBoard();
-        }, 50);
+    if (currentStep === 8) {
+            if (!practiceCompleted) {
+              practiceSessionActive = true;
+              hideNextButton();
+              setTimeout(() => {
+                initPracticeBoard();
+            }, 50);
+            } else {
+              showNextButton(); // If completed, just show it again
+            }
       }
       
     renderInstructionStep();
 };
 
-renderInstructionStep();
+//renderInstructionStep();
 
 
 function initPracticeBoard() {
@@ -343,12 +386,10 @@ function initPracticeBoard() {
 
     if (board.children.length > 0) return;
   
-    const CELL_SIZE = 32;
-    let blockPos = { x: 4, y: 3 };
-    let obstaclePos = { x: 0, y: 0 };
+    const CELL_SIZE = 45;
+    let practiceBlock = { x: 4, y: 3, color: 'yellow', minVotes: 1 };
+    let practiceObstacle = { x: 1, y: 2, id: 'obs1' };
     const slotPos = { x: 1, y: 3 };
-    let blockMoves = 0;
-    let obstacleMoved = false;
 
     function createSlot(x, y) {
         const div = document.createElement("div");
@@ -361,101 +402,400 @@ function initPracticeBoard() {
         div.style.boxShadow = '0 0 6px rgba(0, 255, 255, 0.7), inset 0 0 6px rgba(0, 255, 255, 0.3)';
         board.appendChild(div);
       }
-  
-    function createObject(id, image, x, y) {
-      const wrapper = document.createElement("div");
-      wrapper.id = id;
-      wrapper.style.gridColumnStart = x + 1;
-      wrapper.style.gridRowStart = y + 1;
-      wrapper.style.position = "relative";
-      wrapper.style.width = `${CELL_SIZE}px`;
-      wrapper.style.height = `${CELL_SIZE}px`;
-  
-      const obj = document.createElement("div");
-      obj.style.backgroundImage = `url(${image})`;
-      obj.style.backgroundSize = "cover";
-      obj.style.width = "100%";
-      obj.style.height = "100%";
-      obj.style.display = 'flex';
-      obj.style.alignItems = 'center';
-      obj.style.justifyContent = 'center';
-      obj.style.fontFamily = 'monospace';
-      obj.style.fontSize = '14px';
-      obj.style.fontWeight = 'bold';
-      obj.style.color = 'white';
-      obj.style.textShadow = '1px 1px 2px black';
-      obj.innerText = `min: 1`;
-  
-      wrapper.appendChild(obj);
-  
-      ['up', 'down', 'left', 'right'].forEach(dir => {
-        const arrow = document.createElement("div");
-        arrow.className = `triangle ${dir}`;
-        arrow.style.position = "absolute";
-        arrow.style.border = "10px solid transparent";
-        arrow.style.cursor = "pointer";
-        arrow.style.border[dir === 'up' ? 'BottomColor' : dir === 'down' ? 'TopColor' : dir === 'left' ? 'RightColor' : 'LeftColor'] = 'white';
-  
-        if (dir === 'up') Object.assign(arrow.style, { top: '-8px', left: '22px' });
-        if (dir === 'down') Object.assign(arrow.style, { bottom: '-8px', left: '22px' });
-        if (dir === 'left') Object.assign(arrow.style, { top: '22px', left: '-8px' });
-        if (dir === 'right') Object.assign(arrow.style, { top: '22px', right: '-8px' });
-  
-        arrow.onclick = () => handleMove(id, dir);
-        wrapper.appendChild(arrow);
-      });
-  
-      board.appendChild(wrapper);
-    }
-  
-    function updatePosition(id, pos) {
-      const el = document.getElementById(id);
-      el.style.gridColumnStart = pos.x + 1;
-      el.style.gridRowStart = pos.y + 1;
-    }
-  
-    function handleMove(id, dir) {
-      if (id === 'block') {
-        if (dir === 'up' && blockPos.y > 0) {
-          blockPos.y -= 1;
-          blockMoves++;
-          updatePosition(id, blockPos);
-          if (blockPos.x === slotPos.x && blockPos.y === slotPos.y) {
-            document.getElementById('block').remove();
-            checkPracticeComplete();
-          }
+      
+
+    function drawPracticeBlock(block, isObstacle) {
+        const container = document.getElementById('practiceBoard'); 
+        const div = document.createElement('div');
+        div.classList.add('block');
+        let width;
+        let height;
+        if(isObstacle){
+            width = CELL_SIZE * 2.3;
+            height = CELL_SIZE * 2.3;
+        }else{
+            width = CELL_SIZE * 3;
+            height = CELL_SIZE * 3;
         }
-      } else if (id === 'obstacle') {
-        if (dir === 'down' && !obstacleMoved && obstaclePos.y < 5) {
-          obstaclePos.y += 1;
-          obstacleMoved = true;
-          updatePosition(id, obstaclePos);
-          checkPracticeComplete();
+    
+        const id = isObstacle ? block.id : block.color;
+    
+        div.setAttribute('data-color', id);
+        if(!isObstacle){
+            div.dataset.color = block.color;
         }
-      }
+        div.dataset.x = block.x; 
+        div.dataset.y = block.y;
+        div.dataset.obstacle = isObstacle;
+    
+        // Align with top-left grid cell
+        div.style.position = 'absolute';
+        div.style.left = (block.x * CELL_SIZE) + 'px';
+        div.style.top = (block.y * CELL_SIZE) + 'px';
+        div.style.width = `${width}px`;
+        div.style.height = `${height}px`;
+    
+        div.style.display = 'flex';
+        div.style.alignItems = 'center';
+        div.style.justifyContent = 'center';
+        div.style.flexDirection = 'column';
+        div.style.zIndex = '1';
+        div.style.backgroundRepeat = 'no-repeat';
+        div.style.backgroundSize = 'cover';
+        div.style.imageRendering = 'pixelated';
+    
+        div.style.backgroundImage = isObstacle
+        ? "url('./images/obstacle.png')"
+        : "url('./images/block.png')";
+    
+    
+        if(isObstacle == false){
+            // div.style.backgroundColor = '#8ab6d6'; 
+            // div.style.borderRadius = '10px';
+            const minPlayersMap = {
+                blue: 3,
+                red: 2,
+                yellow: 1
+            };
+            const minRequired = minPlayersMap[block.color] || 1;
+        
+            const minText = document.createElement('div');
+            minText.innerText = `min: ${minRequired}`;
+            minText.style.fontSize = '14px';
+            minText.style.fontWeight = 'bold';
+            minText.style.color = 'white';
+            minText.style.marginBottom = '4px';
+            minText.style.textShadow = '1px 1px 0 #000';
+            minText.style.padding = '2px 6px';
+            minText.style.borderRadius = '3px';
+            minText.style.imageRendering = 'pixelated';
+            minText.style.fontFamily = 'monospace'; 
+        
+            div.appendChild(minText);
+    
+        }else{
+            // div.style.backgroundColor = '#555'; // dark gray
+            // div.style.borderRadius = '50%';
+            const minText = document.createElement('div');
+            minText.innerText = `min: 1`;
+            minText.style.fontSize = '11px';
+            minText.style.fontWeight = 'bold';
+            minText.style.textShadow = '1px 1px 0 #000';
+            minText.style.color = 'white';
+            minText.style.marginBottom = '2px';
+            minText.style.imageRendering = 'pixelated';
+            minText.style.fontFamily = 'monospace'; 
+            div.appendChild(minText);
+    
+        }
+    
+        const visualPosition = {
+            up:    { top: '82%', left: '50%', transform: 'translate(-50%, -50%)' },
+            down:  { top: '18%', left: '50%', transform: 'translate(-50%, -50%)' },
+            left:  { top: '50%', left: '82%', transform: 'translate(-50%, -50%)' },
+            right: { top: '50%', left: '18%', transform: 'translate(-50%, -50%)' }
+        };
+        
+        const obstaclePosition = {
+            up:    { top: '70%', left: '50%', transform: 'translate(-50%, -50%)' },
+            down:  { top: '30%', left: '50%', transform: 'translate(-50%, -50%)' },
+            left:  { top: '50%', left: '75%', transform: 'translate(-50%, -50%)' },
+            right: { top: '50%', left: '25%', transform: 'translate(-50%, -50%)' }
+        };
+        
+        
+        const directions = ['up', 'right', 'down', 'left'];
+        directions.forEach(dir => {
+            const arrow = document.createElement('div');
+            arrow.classList.add('triangle', dir, 'direction-button');
+            const pos = isObstacle ? obstaclePosition[dir] : visualPosition[dir];
+            arrow.style.position = 'absolute';
+            arrow.style.top = pos.top;
+            arrow.style.left = pos.left;
+            arrow.style.transform = pos.transform;
+            arrow.dataset.direction = dir;
+            arrow.dataset.targetId = id;
+            arrow.dataset.isObstacle = isObstacle;
+            if (isObstacle) {
+                switch (dir) {
+                    case 'up':
+                        arrow.style.borderWidth = '12px 15px 16px 15px';
+                        break;
+                    case 'down':
+                        arrow.style.borderWidth = '16px 15px 12px 15px';
+                        break;
+                    case 'left':
+                        arrow.style.borderWidth = '15px 15px 15px 12px';
+                        break;
+                    case 'right':
+                        arrow.style.borderWidth = '15px 12px 15px 15px';
+                        break;
+                }
+            }
+            
+    
+            arrow.addEventListener('click', () => {
+                addPracticeArrowToBlock(div, dir);
+            });
+            
+    
+            div.appendChild(arrow);
+        });
+    
+        container.appendChild(div);
     }
-  
-    function checkPracticeComplete() {
-      if (blockMoves >= 3 && obstacleMoved) {
-        const msg = document.createElement('div');
-        msg.innerText = '✅ Practice complete! Click "Next" to continue.';
-        msg.style.textAlign = 'center';
-        msg.style.marginTop = '20px';
-        msg.style.fontFamily = 'monospace';
-        msg.style.fontWeight = 'bold';
-        board.appendChild(msg);
-      }
+
+    function addPracticeArrowToBlock(block, dir) {
+        // Remove all existing arrows from any block
+        document.querySelectorAll('.arrow').forEach(arrow => arrow.remove());
+    
+        // Clear all directions
+        document.querySelectorAll('.block').forEach(b => delete b.dataset.direction);
+    
+        // Add a new arrow to the selected block
+        const arrow = document.createElement('div');
+        // arrow.src = './images/player1_arrow.png';
+        arrow.classList.add('arrow');
+        arrow.style.position = 'absolute';
+        arrow.style.pointerEvents = 'none';
+
+
+        arrow.style.width = '50px';
+        arrow.style.height = '50px';
+        arrow.style.position = 'absolute';
+        arrow.style.pointerEvents = 'none';
+        arrow.style.zIndex = '10000';
+        arrow.style.transformOrigin = 'center center';
+        arrow.style.backgroundImage = `url(./images/player1_arrow.png) `;
+        arrow.style.backgroundRepeat = 'no-repeat';
+        arrow.style.backgroundSize = `${6 * 50}px 50px`;
+        arrow.style.imageRendering = 'pixelated';
+    
+        // Rotate based on direction
+        const rotationMap = {
+            up: 'rotate(90deg)',
+            right: 'rotate(180deg)',
+            down: 'rotate(270deg)',
+            left: 'rotate(0deg)'
+        };
+        const visualPosition = {
+            up: 'down',
+            down: 'up',
+            left: 'right',
+            right: 'left'
+        };
+    
+        arrow.dataset.rotation = rotationMap[visualPosition[dir]] || 'rotate(0deg)';
+        arrow.dataset.direction = dir;
+        arrow.style.backgroundPosition = '0px 0px';
+        block.dataset.direction = dir;
+        //animateSpriteLoop(arrow, 6, 50, 50, 6);
+    
+        block.appendChild(arrow);
+        const isObstacle = block.dataset.obstacle === "true";
+    
+        // Re-layout all arrows of this direction in the block
+        layoutDirectionalArrows(block, dir,isObstacle);
+        finalizePracticeVotes();
+    }    
+    
+
+    function finalizePracticeVotes() {
+        const container = document.getElementById('practiceBoard');
+        const blocks = container.querySelectorAll('.block');
+        const futurePlans = [];
+    
+        blocks.forEach(block => {
+            const direction = block.dataset.direction; // assume each block stores it on click
+    
+            const x = parseInt(block.dataset.x);
+            const y = parseInt(block.dataset.y);
+    
+            let targetX = x;
+            let targetY = y;
+    
+            if (direction === 'up') targetY -= 1;
+            if (direction === 'down') targetY += 1;
+            if (direction === 'left') targetX -= 1;
+            if (direction === 'right') targetX += 1;
+    
+            const size = block.dataset.obstacle === 'true' ? 2 : 3;
+    
+            futurePlans.push({
+                id: block.dataset.color,
+                block,
+                direction,
+                size,
+                willMove: true,
+                futureCoords: getOccupiedCells(targetX, targetY, size)
+            });
+        });
+    
+        // Collision detection
+        for (let i = 0; i < futurePlans.length; i++) {
+            for (let j = i + 1; j < futurePlans.length; j++) {
+                const a = futurePlans[i];
+                const b = futurePlans[j];
+    
+                const overlap = a.futureCoords.some(posA =>
+                    b.futureCoords.some(posB => posA.x === posB.x && posA.y === posB.y)
+                );
+    
+                if (overlap) {
+                    a.willMove = false;
+                    b.willMove = false;
+                    console.log(`Collision between ${a.id} and ${b.id}`);
+                }
+            }
+        }
+    
+        // Move if allowed
+        futurePlans.forEach(plan => {
+            if (plan.willMove) {
+                movePracticeBlock(plan.block, plan.direction);
+            }
+        });
     }
-  
+
+    function movePracticeBlock(block, direction) {
+        const container = document.getElementById('practiceBoard');
+    
+        // Disable all direction buttons
+        container.querySelectorAll('.direction-button').forEach(btn => btn.style.pointerEvents = 'none');
+    
+        const arrow = block.querySelector('.arrow');
+        if (!arrow) return;
+    
+        const arrowRect = arrow.getBoundingClientRect();
+        const clone = arrow.cloneNode(true);
+        clone.classList.add('arrow-clone');
+        clone.style.position = 'absolute';
+        clone.style.pointerEvents = 'none';
+        clone.style.transform = 'none';
+        clone.style.left = `${arrowRect.left}px`;
+        clone.style.top = `${arrowRect.top}px`;
+        clone.style.margin = '0';
+        clone.style.transition = 'top 0.5s ease, left 0.5s ease';
+        clone.style.zIndex = '10000';
+    
+        // Apply rotation
+        const rotationMap = {
+            down: 'rotate(90deg)',
+            left: 'rotate(180deg)',
+            up: 'rotate(270deg)',
+            right: 'rotate(0deg)'
+        };
+        clone.style.transform = rotationMap[direction];
+        clone.style.transformOrigin = 'center center';
+        if (direction === 'left') {
+            clone.style.transform += ' scaleY(-1)';
+        }
+    
+        document.body.appendChild(clone);
+    
+        const offsetMap = {
+            up:    { dx: 0, dy: -1 },
+            down:  { dx: 0, dy: 1 },
+            left:  { dx: -1, dy: 0 },
+            right: { dx: 1, dy: 0 }
+        };
+        const offset = offsetMap[direction];
+    
+        // Force reflow before triggering transition
+        clone.offsetWidth;
+    
+        // Animate clone
+        requestAnimationFrame(() => {
+            clone.style.left = `${arrowRect.left + offset.dx * CELL_WIDTH}px`;
+            clone.style.top = `${arrowRect.top + offset.dy * CELL_HEIGHT}px`;
+        });
+    
+        // Optional: animate sprite
+        animateSpriteOnce(clone, 6, 50, 50, 6);
+
+        let x = parseInt(block.dataset.x);
+        let y = parseInt(block.dataset.y);
+
+        if (direction === 'up') y -= 1;
+        if (direction === 'down') y += 1;
+        if (direction === 'left') x -= 1;
+        if (direction === 'right') x += 1;
+
+        x = Math.max(0, Math.min(7, x));
+        y = Math.max(0, Math.min(7, y));
+
+        block.dataset.x = x;
+        block.dataset.y = y;
+        block.style.transition = 'top 0.5s ease, left 0.5s ease';
+        block.style.left = `${x * CELL_SIZE}px`;
+        block.style.top = `${y * CELL_SIZE}px`;
+    
+        // Move block after animation
+        setTimeout(() => {
+            document.body.removeChild(clone);
+    
+    
+            const existing = block.querySelector('.practice-arrow');
+            if (existing) existing.remove();
+            block.dataset.direction = '';
+    
+            container.querySelectorAll('.direction-button').forEach(btn => btn.style.pointerEvents = 'auto');
+            console.log("x:", x, "y:", y, "obstacle:", block.dataset.obstacle);
+    
+            if (block.dataset.obstacle !== "true" && x === 1 && y === 3){
+   
+                block.style.backgroundImage = "url('./images/slot.png')"; // or a tinted version
+                block.style.backgroundSize = 'cover';
+                block.style.boxShadow = '0 0 6px gold';
+                block.style.border = '2px solid gold';
+
+                block.style.transition = 'opacity 2s';
+                block.style.opacity = '0';
+                setTimeout(() => {
+                    block.remove();
+                    if (practiceSessionActive) {
+                        showNextButton();
+                        cleanupPracticeBoard();
+                        practiceSessionActive = false;
+                        practiceCompleted = true;  
+                    }
+                }, 2000);
+            }
+        }, 500); // match with transition duration
+    }
+    
     // Setup
     console.log(" Drawing slot...");
     createSlot(slotPos.x, slotPos.y);
     console.log(" Drawing block...");
-    createObject('block', './images/block.png', blockPos.x, blockPos.y);
+    drawPracticeBlock(practiceBlock, false);
     console.log(" Drawing obstacle...");
-    createObject('obstacle', './images/obstacle.png', obstaclePos.x, obstaclePos.y);
+    drawPracticeBlock(practiceObstacle, true);
 }
+
+function hideNextButton() {
+    const btn = document.getElementById('nextInstruction');
+    if (btn) {
+      btn.style.display = 'none'; // or use btn.classList.add('hidden') if your CSS handles it
+    } else {
+      console.warn('Could not find #nextInstruction');
+    }
+  }
   
+
+function showNextButton() {
+    const btn = document.getElementById('nextInstruction');
+    if (btn) {
+      btn.style.display = 'inline-block'; // or 'inline-block' depending on your layout
+    }
+  }
+  
+
+function cleanupPracticeBoard() {
+    const board = document.getElementById('practiceBoard');
+    if (board) board.innerHTML = '';
+}
+
 
 //  Conatant Game Variables
 
@@ -792,7 +1132,7 @@ let submitSelection;
 let playerID = document.getElementById('playerID');
 //let messageToPlayer = document.getElementById('messageToPlayer');
 let imageContainer = document.getElementById('image-to-estimate');
-let leaveButton = document.getElementById('leaveBtn');
+//let leaveButton = document.getElementById('leaveBtn');
 
 //      Complete Screen
 let messageFinish = document.getElementById('messageFinish');
@@ -804,7 +1144,7 @@ let messageFinish = document.getElementById('messageFinish');
 //imageContainer.src = images[selectedImages[trialNumber]].path;
 
 // Set up correct instructions
-instructionsText.innerHTML = `<p>Welcome! In this game, you'll work with others to move blocks into slots!</p>`;
+instructionsText.innerHTML = `<p>Welcome! In this game, you will team up with two other participants to move blocks into slots. You’ll work together to complete four levels.</p>`;
 
 
 //  Game Event Listeners
@@ -827,15 +1167,15 @@ joinButton.addEventListener('click', function () {
     joinSession();
 });
 
-//      Leave Button (End Session Button)
-leaveButton.addEventListener('click', function () {
-    /*
-    Call the library function to leave a session.
+// //      Leave Button (End Session Button)
+// leaveButton.addEventListener('click', function () {
+//     /*
+//     Call the library function to leave a session.
     
-    This then triggers the local function endSession.
-    */
-    leaveSession();
-});
+//     This then triggers the local function endSession.
+//     */
+//     leaveSession();
+// });
 
 /*
     Game Logic and UI
