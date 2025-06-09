@@ -856,7 +856,7 @@ let funList = {
 };
 
 // List the node names where we place listeners for any changes to the children of these nodes; set to '' if listening to changes for children of the root
-let listenerPaths = [ 'players', 'blocks', 'slots', 'obs', 'phase', 'moveBlock', 'event' ];
+let listenerPaths = [ 'players', 'blocks', 'slots', 'obs', 'phase', 'moveBlock' ];
 
 //  Initialize the Game Session with all Configs
 initializeMPLIB( sessionConfig , studyId , funList, listenerPaths, verbosity );
@@ -996,6 +996,142 @@ function loadLevel(levelNumber) {
     startLevelTimer(levelNumber);
 }
 
+function getTeammates() {
+    const myId = getCurrentPlayerId();
+    const teammates = [];
+  
+    for (const [id, info] of Object.entries(playerColorMap)) {
+      if (id !== myId) {
+        teammates.push({ id, name: info.name, color: info.color });
+      }
+    }
+  
+    return teammates;
+  }
+
+  function showFinishScreenWithQuestions(teammates) {
+    document.getElementById('levelCompleteScreen').style.display = 'none';
+    document.getElementById('gameScreen').style.display = 'none';
+    const container = document.getElementById("teammate-questions");
+    container.innerHTML = "";
+  
+    teammates.forEach(teammate => {
+      const id = teammate.id;
+      const name = teammate.name;
+      const color = teammate.color;
+  
+      const block = document.createElement("div");
+      block.className = "teammate-block";
+      block.innerHTML = `
+      <img src="./images/player${color}.png" class="avatar-icon" alt="Player Icon">
+      <div class="text-center"><strong>${name}</strong></div>
+    
+        <label><strong>How collaborative was this teammate?</strong></label>
+        <div>
+        <span>Not at all</span>
+        <label><input type="radio" name="collab-${id}" value="1"> </label>
+        <label><input type="radio" name="collab-${id}" value="2"> </label>
+        <label><input type="radio" name="collab-${id}" value="3"> </label>
+        <label><input type="radio" name="collab-${id}" value="4"> </label>
+        <label><input type="radio" name="collab-${id}" value="5"> </label>
+        <label><input type="radio" name="collab-${id}" value="6"> </label>
+        <label><input type="radio" name="collab-${id}" value="7"> </label>
+        <span>Very collaborative</span>
+        </div>
+
+
+        </div>
+
+    
+      <label>How would you describe this teammate?</label>
+      <textarea id="desc-${id}" class="form-control" rows="2" style="width: 100%; max-width: 500px; margin: 0 auto;"></textarea>
+    `;    
+    
+      container.appendChild(block);
+    });
+  
+    //Create and append the submit button
+    const form = document.getElementById("postTrialForm");
+
+    const submitButton = document.createElement("button");
+    submitButton.className = "button";
+    submitButton.textContent = "Submit";
+    submitButton.type = "button"; // important: prevent accidental submit
+    submitButton.onclick = submitPostTrial;
+    
+    form.appendChild(submitButton);
+  
+    container.appendChild(submitButton);
+  
+    document.getElementById("finishScreen").style.display = "block";
+  }
+  
+
+  function submitPostTrial() {
+    const myId = getCurrentPlayerId();
+
+    // Simple validation
+    const satisfactionEl = document.querySelector('input[name="satisfaction"]:checked');
+    const satisfaction = satisfactionEl ? satisfactionEl.value : null;
+
+    const difficultyEl = document.querySelector('input[name="difficulty"]:checked');
+    const difficulty = difficultyEl ? difficultyEl.value : null;
+
+    const contributionEl = document.querySelector('input[name="contribution"]:checked');
+    const contribution = contributionEl ? contributionEl.value : null;
+
+    if (!satisfaction || !difficulty || !contribution) {
+        alert("Please answer all general questions before submitting.");
+        return;
+    }
+
+    const teammateResponses = {};
+    let incompleteTeammate = false;
+
+    Object.entries(playerColorMap).forEach(([pid, data]) => {
+        if (pid === myId) return;
+
+        const collabEl = document.querySelector(`input[name="collab-${pid}"]:checked`);
+        const collab = collabEl ? collabEl.value : null;
+
+        const desc = document.getElementById(`desc-${pid}`).value.trim();
+
+        if (!collab || desc === '') {
+            incompleteTeammate = true;
+        }
+
+        teammateResponses[pid] = {
+            collaborative: collab,
+            description: desc
+        };
+    });
+
+    if (incompleteTeammate) {
+        alert('Please answer all questions about your teammates.');
+        return;
+    }
+
+    const dataToSave = {
+        satisfaction,
+        difficulty,
+        contribution,
+        teammates: teammateResponses
+    };
+
+    updateStateDirect(`players/${myId}`, dataToSave, 'postTrial');
+
+    const container = document.getElementById('messageFinish');
+    container.innerHTML = `<p>✅ Thank you! Your responses have been recorded.<br>Redirecting to Prolific...</p>`;
+
+    setTimeout(() => {
+        window.location.href = 'https://app.prolific.co/submissions/complete?cc=XXXXXXX'; // Replace with your code
+        endSession();
+    }, 3000);
+}
+
+
+
+
 function showLevelCompleteMessage(levelNumber, callback) {
     const screen = document.getElementById('levelCompleteScreen');
 
@@ -1012,12 +1148,14 @@ function showLevelCompleteMessage(levelNumber, callback) {
     message.style.textAlign = 'center';
 
     if (currentLevel === 4) {
-        message.innerHTML = `🎉 You've completed all levels!<br>You will be redirected to Prolific shortly.`;
+        message.innerHTML = `🎉 You've completed all levels!<br>You will be redirected to a post-trial questionnaire.`;
         screen.appendChild(message);
         screen.style.display = 'flex';
 
         setTimeout(() => {
-            window.location.href = 'https://app.prolific.co/submissions/complete?cc=XXXXXXX'; // Replace with your real code
+            const teammates = getTeammates();
+            showFinishScreenWithQuestions(teammates);
+            //window.location.href = 'https://app.prolific.co/submissions/complete?cc=XXXXXXX'; // Replace with your real code
         }, 3000);
     } else {
         const timeLimitMs = getLevelTimeLimit(levelNumber);
@@ -1044,11 +1182,11 @@ function showLevelCompleteMessage(levelNumber, callback) {
 
 function getLevelTimeLimit(levelNumber) {
     if (levelNumber === 0 || levelNumber === 1) {
-        return 1 * 60 * 1000; // 3 minutes
+        return 5 * 60 * 1000; // 3 minutes
     } else if (levelNumber === 2 || levelNumber === 3) {
-        return 1 * 60 * 1000; // 5 minutes
+        return 7 * 60 * 1000; // 5 minutes
     } else {
-        return 1 * 60 * 1000; // default fallback
+        return 7 * 60 * 1000; // default fallback
     }
 }
 
@@ -1197,7 +1335,7 @@ Game logic and functionality. All functions for gameplay. This includes:
 
 let roundTimer;
 
-let votingDuration = 15; 
+let votingDuration = 5; 
 let breakDuration = 2; 
 
 let countdownInterval;
@@ -1212,7 +1350,7 @@ function assignAvatarColors() {
 
     updateStateDirect(`players/${playerId}`, {
         name: name
-    });
+    }, 'update player name');
 
     playerColorMap[playerId] = {
         color: 1,
@@ -1276,7 +1414,7 @@ function startPhase(phaseName, durationInSeconds) {
         current: phaseName,
         endTime: endTime,
         controllerId: getCurrentPlayerId()
-    });
+    }, 'start phase');
 }
 
 
@@ -1373,9 +1511,9 @@ function hideDirectionButtons() {
 
 function finalizeVotes() {
     getCurrentPlayerIds().forEach(pid => {
-        updateStateDirect(`players/${pid}`, { block: null, direction: null, obstacle: null });
+        updateStateDirect(`players/${pid}`, { block: null, direction: null, obstacle: null }, 'start new event');
     });
-
+    updateStateDirect('players/events', eventNumber + 1, 'update event number');
     //hideDirectionButtons();
     //const turnMessage = document.getElementById('turnMessage');
     // turnMessage.innerText = `Moving the blocks now...`;
@@ -1458,7 +1596,7 @@ function finalizeVotes() {
                 location: {x, y},
                 direction: plan.direction,
                 move: true
-            });
+            }, 'movable block');
 
             console.log(`Pushing moveBlock for ${plan.block.dataset.color}: ${x, y}`);
 
@@ -1468,7 +1606,7 @@ function finalizeVotes() {
             updateStateDirect(`moveBlock/${plan.block.dataset.color}`, {
                 move: false,
                 version: Date.now()
-            });
+            }, 'not movable block');
 
         }
     });
@@ -1895,7 +2033,7 @@ function drawBlock(block, isObstacle) {
                     direction: dir,
                     event: eventNumber,
                     level: currentLevel
-                });
+                }, 'vote obs');
             } else {
                 updateStateDirect(`players/${playerId}`, {
                     block: id,
@@ -1903,7 +2041,7 @@ function drawBlock(block, isObstacle) {
                     direction: dir,
                     event: eventNumber,
                     level: currentLevel
-                });
+                }, 'vote blocks');
             }
         });
         
@@ -2354,6 +2492,10 @@ function receiveStateChange(pathNow, nodeName, newState, typeChange ) {
             console.log(`playerData.block = ${playerData.block}, playerData.obstacle = ${playerData.obstacle}, direction = ${playerData.direction}`);
             addArrowToBlock(playerData.block, playerData.direction, playerId);
         }
+        if(playerId == "events"){
+            eventNumber = newState;
+            console.log("the current event number is ", eventNumber);
+        }
         
 
     } else if(pathNow == "blocks" && (typeChange == 'onChildAdded' ||typeChange == 'onChildChanged')){
@@ -2438,7 +2580,6 @@ function receiveStateChange(pathNow, nodeName, newState, typeChange ) {
                         const nextPhase = (currentPhase === 'voting') ? 'moving' : 'voting';
                         const duration = (nextPhase === 'voting') ? votingDuration : breakDuration;
                         if (nextPhase === 'moving'){
-                            updateStateDirect('event', eventNumber + 1);
                             finalizeVotes(); 
                         }
     
@@ -2477,11 +2618,6 @@ function receiveStateChange(pathNow, nodeName, newState, typeChange ) {
         } else {
             console.warn(`Block not found for ${color}`);
         }
-    }else if(pathNow === 'event' && 
-        (typeChange === 'onChildAdded' || typeChange === 'onChildChanged')){
-        eventNumber = newState;
-        console.log("the current event number is ", eventNumber);
-
     }
 
 }

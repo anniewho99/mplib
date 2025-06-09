@@ -279,9 +279,66 @@
             font-size: 18px;
             font-family: sans-serif;
         }
+        .teammate-block {
+        text-align: center;
+        margin-bottom: 30px;
+        padding: 20px;
+        border-radius: 12px;
+        max-width: 410px;
+        margin-left: auto;
+        margin-right: auto;
+        }
 
+        .avatar-icon {
+        width: 60px;
+        height: 60px;
+        display: block;
+        margin: 0 auto 10px auto;
+        }
 
+        .teammate-block .text-center {
+        margin-bottom: 10px;
+        }
 
+        .likert-group {
+        display: flex;
+        justify-content: center;
+        gap: 10px;
+        margin: 10px 0;
+        }
+
+        .likert-option {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        font-size: 14px;
+        }
+        .likert-scale-wrapper {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin: 10px 0;
+        }
+
+        .likert-end-label {
+        font-size: 13px;
+        min-width: 120px;
+        text-align: center;
+        }
+
+        .likert-group {
+        display: flex;
+        gap: 10px;
+        }
+
+        .likert-option {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        font-size: 13px;
+        }
 
 
 
@@ -385,10 +442,59 @@
         <div class="containertext" id="messageGame"></div>
         <!-- <a href="#" class="button" id="leaveBtn">End Session</a>  -->
     </div>
-    <div class="container" id="finishScreen" style="display:none">
-        <h1>Completion</h1>  
+    <div class="container" id="finishScreen" style="display: none; max-height: 80vh; overflow-y: auto;">
+        <h1>Completion</h1>
         <div class="containertext" id="messageFinish"></div>
-    </div>
+      
+        <form id="postTrialForm">
+               <div class="mb-4">
+                <label><strong>How satisfied are you with the gameplay?</strong></label>
+                <div>
+                  <span>Not at all</span>
+                  <label><input type="radio" name="satisfaction" value="1"> </label>
+                  <label><input type="radio" name="satisfaction" value="2"> </label>
+                  <label><input type="radio" name="satisfaction" value="3"> </label>
+                  <label><input type="radio" name="satisfaction" value="4"> </label>
+                  <label><input type="radio" name="satisfaction" value="5"> </label>
+                  <label><input type="radio" name="satisfaction" value="6"> </label>
+                  <label><input type="radio" name="satisfaction" value="7"> </label>
+                  <span>Very satisfied</span>
+                </div>
+              </div>
+              <div class="mb-4">
+                <label><strong>How difficult was the task?</strong></label>
+                <div>
+                  <span>Not difficult at all</span>
+                  <label><input type="radio" name="difficulty" value="1"> </label>
+                  <label><input type="radio" name="difficulty" value="2"> </label>
+                  <label><input type="radio" name="difficulty" value="3"> </label>
+                  <label><input type="radio" name="difficulty" value="4"> </label>
+                  <label><input type="radio" name="difficulty" value="5"> </label>
+                  <label><input type="radio" name="difficulty" value="6"> </label>
+                  <label><input type="radio" name="difficulty" value="7"> </label>
+                  <span>Extremely difficult</span>
+                </div>
+              </div>
+              <div class="mb-4">
+                <label><strong>Did you feel like you contributed to the outcome?</strong></label>
+                <div>
+                  <span>Not at all</span>
+                  <label><input type="radio" name="contribution" value="1"> </label>
+                  <label><input type="radio" name="contribution" value="2"> </label>
+                  <label><input type="radio" name="contribution" value="3"> </label>
+                  <label><input type="radio" name="contribution"value="4"> </label>
+                  <label><input type="radio" name="contribution" value="5"> </label>
+                  <label><input type="radio" name="contribution" value="6"> </label>
+                  <label><input type="radio" name="contribution" value="7"> </label>
+                  <span>A lot</span>
+                </div>
+              </div>
+                            
+          <div id="teammate-questions"></div>
+
+        </form>
+      </div>      
+    
     
     
     <script src="/mplib/src/mpconfig.js"></script>
