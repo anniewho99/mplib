@@ -856,7 +856,7 @@ let funList = {
 };
 
 // List the node names where we place listeners for any changes to the children of these nodes; set to '' if listening to changes for children of the root
-let listenerPaths = [ 'players', 'blocks', 'slots', 'obs', 'phase', 'moveBlock' ];
+let listenerPaths = [ 'players', 'blocks', 'slots', 'obs', 'phase', 'moveBlock', 'event' ];
 
 //  Initialize the Game Session with all Configs
 initializeMPLIB( sessionConfig , studyId , funList, listenerPaths, verbosity );
@@ -882,6 +882,8 @@ let currentLevel = 0;
 
 let eventNumber = 0;
 
+let completedLevel = false;
+
 const levelPlacements = {
     0: {
         blocks: {
@@ -890,11 +892,11 @@ const levelPlacements = {
             yellow: { x: 7, y: 9, color: 'yellow', minVotes: 1 }
         },
         slots: {
-            slot0: { x: 1, y: 5 },
-            slot1: { x: 14, y: 5 }
+            slot0: { x: 2, y: 5 },
+            slot1: { x: 13, y: 5 }
         },
         obstacles: {
-            obs1: { x: 0, y: 0, id: 'obs1' }
+            obs1: { x: 2, y: 2, id: 'obs1' }
         }
     },
     1: {
@@ -904,12 +906,12 @@ const levelPlacements = {
             yellow: { x: 7, y: 9, color: 'yellow', minVotes: 1 }
         },
         slots: {
-            slot0: { x: 1, y: 5 },
-            slot1: { x: 14, y: 5 }
+            slot0: { x: 2, y: 5 },
+            slot1: { x: 13, y: 5 }
         },
         obstacles: {
-            obs1: { x: 4, y: 2, id: 'obs1' },
-            obs2: { x: 11, y: 2, id: 'obs2' }
+            obs1: { x: 5, y: 2, id: 'obs1' },
+            obs2: { x: 10, y: 2, id: 'obs2' }
         }
     },
     2: {
@@ -919,14 +921,14 @@ const levelPlacements = {
             yellow: { x: 7, y: 9, color: 'yellow', minVotes: 1 }
         },
         slots: {
-            slot0: { x: 1, y: 5 },
-            slot1: { x: 14, y: 5 }
+            slot0: { x: 2, y: 5 },
+            slot1: { x: 13, y: 5 }
         },
         obstacles: {
-            obs1: { x: 1, y: 2, id: 'obs1' },
-            obs2: { x: 3, y: 4, id: 'obs2' },
-            obs3: { x: 15, y: 2, id: 'obs3' },
-            obs4: { x: 13, y: 4, id: 'obs4' }
+            obs1: { x: 2, y: 2, id: 'obs1' },
+            obs2: { x: 4, y: 4, id: 'obs2' },
+            obs3: { x: 14, y: 2, id: 'obs3' },
+            obs4: { x: 12, y: 4, id: 'obs4' }
         }
     },
     3: {
@@ -936,16 +938,16 @@ const levelPlacements = {
             yellow: { x: 10, y: 0, color: 'yellow', minVotes: 1 }
         },
         slots: {
-            slot0: { x: 1, y: 5 },
-            slot1: { x: 14, y: 5 }
+            slot0: { x: 2, y: 5 },
+            slot1: { x: 13, y: 5 }
         },
         obstacles: {
-            obs1: { x: 1, y: 1, id: 'obs1' },
-            obs2: { x: 4, y: 4, id: 'obs2' },
-            obs3: { x: 4, y: 8, id: 'obs3' },
-            obs4: { x: 15, y: 1, id: 'obs4' },
-            obs5: { x: 13, y: 4, id: 'obs5' },
-            obs6: { x: 12, y: 8, id: 'obs6' }
+            obs1: { x: 2, y: 1, id: 'obs1' },
+            obs2: { x: 5, y: 4, id: 'obs2' },
+            obs3: { x: 5, y: 8, id: 'obs3' },
+            obs4: { x: 14, y: 1, id: 'obs4' },
+            obs5: { x: 11, y: 4, id: 'obs5' },
+            obs6: { x: 11, y: 8, id: 'obs6' }
         }
     },
 };
@@ -1021,7 +1023,13 @@ function showLevelCompleteMessage(levelNumber, callback) {
         const timeLimitMs = getLevelTimeLimit(levelNumber);
         const timeLimitMin = Math.floor(timeLimitMs / 60000);
 
-        message.innerHTML = `🎉 You've completed Level ${levelNumber}!<br>Loading Level ${levelNumber + 1}...<br><br>⏱ You will have ${timeLimitMin} minutes to complete it.`;
+        if(completedLevel){
+            message.innerHTML = `🎉 You've completed Level ${levelNumber + 1}!<br>Loading Level ${levelNumber + 2}...<br><br>⏱ You will have ${timeLimitMin} minutes to complete it.`;
+            completedLevel = false;
+        }else{
+            message.innerHTML = `Time is out on Level ${levelNumber + 1}.<br>Loading Level ${levelNumber + 2}...<br><br>⏱ You will have ${timeLimitMin} minutes to complete it.`;
+        }
+
         screen.appendChild(message);
         screen.style.display = 'flex';
 
@@ -1036,11 +1044,11 @@ function showLevelCompleteMessage(levelNumber, callback) {
 
 function getLevelTimeLimit(levelNumber) {
     if (levelNumber === 0 || levelNumber === 1) {
-        return 5 * 60 * 1000; // 3 minutes
+        return 1 * 60 * 1000; // 3 minutes
     } else if (levelNumber === 2 || levelNumber === 3) {
-        return 7 * 60 * 1000; // 5 minutes
+        return 1 * 60 * 1000; // 5 minutes
     } else {
-        return 5 * 60 * 1000; // default fallback
+        return 1 * 60 * 1000; // default fallback
     }
 }
 
@@ -1189,7 +1197,7 @@ Game logic and functionality. All functions for gameplay. This includes:
 
 let roundTimer;
 
-let votingDuration = 5; 
+let votingDuration = 15; 
 let breakDuration = 2; 
 
 let countdownInterval;
@@ -1203,14 +1211,23 @@ function assignAvatarColors() {
     const playerId = getCurrentPlayerId();
 
     updateStateDirect(`players/${playerId}`, {
-        color: arrivalIndex,
         name: name
     });
 
     playerColorMap[playerId] = {
-        color: arrivalIndex,
+        color: 1,
         name: name
     };
+    const allPlayerIds = getAllPlayerIds().sort(); // This should return array of 3 IDs, including local
+
+    let index = 2;
+    allPlayerIds.forEach((id, i) => {
+        if (id !== playerId) {
+            playerColorMap[id] = { name: "", color: index };
+            index++;
+        }
+    });
+    _createThisPlayerAvatar(); 
 }
 
 
@@ -1664,6 +1681,7 @@ function moveBlock(block, x, y, direction) {
                             console.log("All blocks locked — advancing level...");
                             currentLevel++;
                             lockedBlocks = {};  
+                            completedLevel = true;
                         
                             showLevelCompleteMessage(currentLevel, () => {
                                 clearImageContainer();
@@ -2160,8 +2178,7 @@ function clearImageContainer() {
 
 function _createThisPlayerAvatar() {
     const container = document.getElementById('player1-container');
-    arrivalIndex = getCurrentPlayerArrivalIndex();
-    const imgSrc = `./images/player${arrivalIndex}.png`;
+    const imgSrc = `./images/player1.png`;
 
     container.innerHTML = `
         <div class="row" id="${playerId}-container">
@@ -2310,21 +2327,24 @@ function receiveStateChange(pathNow, nodeName, newState, typeChange ) {
         const playerId = nodeName; // nodeName is the player ID
         const playerData = newState; // newState contains { selectedBlock, selectedDirection }
 
-        if (playerData.color || playerData.name) {
+        if (playerData.name) {
             playerColorMap[playerId] = {
-                color: playerData.color ?? playerColorMap[playerId]?.color,
-                name: playerData.name ?? playerColorMap[playerId]?.name
+                color: playerColorMap[playerId]?.color ?? null,
+                name: playerData.name
             };
-    
+        
             console.log("Player data received:");
             console.log(playerColorMap);
-
-            console.log(Object.keys(playerColorMap).length);
-
-            if (Object.keys(playerColorMap).length === NumPlayers) {
+        
+            // Check if all players have names
+            const allHaveNames = Object.values(playerColorMap)
+                .filter(p => p && typeof p.name === 'string')
+                .length === NumPlayers;
+        
+            if (allHaveNames) {
                 _createOtherPlayerAvatar();
             }
-        }
+        }        
     
         // 2. Draw the new arrow if both block and direction are selected
         if (playerData.obstacle && playerData.direction) {
@@ -2366,7 +2386,7 @@ function receiveStateChange(pathNow, nodeName, newState, typeChange ) {
             } else if (currentPhase === 'moving') {
                 hideDirectionButtons();
                 const msg = document.getElementById('turnMessage');
-                msg.innerText = `Moving the blocks now...`;
+                msg.innerText = `Moving the objects now...`;
                 msg.style.textShadow = '1px 1px 0 #000';
                 msg.style.imageRendering = 'pixelated';
                 msg.style.fontFamily = 'monospace';
@@ -2382,8 +2402,8 @@ function receiveStateChange(pathNow, nodeName, newState, typeChange ) {
     
                 const msg = document.getElementById('turnMessage');
                 msg.innerText = (currentPhase === 'voting')
-                    ? `Choose which block you want to move in ${timeLeft}s. You can change your vote at any time.`
-                    : `Moving the blocks now...`;
+                    ? `Choose which block/obstacle you want to move in ${timeLeft}s. You can change your vote at any time.`
+                    : `Moving the objects now...`;
                 msg.style.textShadow = '1px 1px 0 #000';
                 msg.style.imageRendering = 'pixelated';
                 msg.style.fontFamily = 'monospace';
@@ -2411,10 +2431,6 @@ function receiveStateChange(pathNow, nodeName, newState, typeChange ) {
                     // }else{
                     //     showDirectionButtons();
                     // }
-
-                    if (nextPhase === 'moving'){
-                        eventNumber++; 
-                    }
     
                     if (myId === fallbackLeader) {
                         console.warn("Fallback or primary controller is advancing phase.");
@@ -2422,6 +2438,7 @@ function receiveStateChange(pathNow, nodeName, newState, typeChange ) {
                         const nextPhase = (currentPhase === 'voting') ? 'moving' : 'voting';
                         const duration = (nextPhase === 'voting') ? votingDuration : breakDuration;
                         if (nextPhase === 'moving'){
+                            updateStateDirect('event', eventNumber + 1);
                             finalizeVotes(); 
                         }
     
@@ -2460,9 +2477,12 @@ function receiveStateChange(pathNow, nodeName, newState, typeChange ) {
         } else {
             console.warn(`Block not found for ${color}`);
         }
-    }
+    }else if(pathNow === 'event' && 
+        (typeChange === 'onChildAdded' || typeChange === 'onChildChanged')){
+        eventNumber = newState;
+        console.log("the current event number is ", eventNumber);
 
-    
+    }
 
 }
 
