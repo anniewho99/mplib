@@ -80,7 +80,7 @@ const instructionSteps = [
     },
     {
         text: `
-        This is your avatar, and your player name is ${playerName}.\nYou'll use both during the practice session and the actual game.
+        This is your avatar, and your player name is ${playerName}.
       `,
         demo: `
           <div style="
@@ -95,7 +95,7 @@ const instructionSteps = [
         `
       },  
     {
-        text: `Here's a block on the board. You'll see arrow buttons on it — click one to choose the direction you want to push the block. The text 'min: 1' means that only one person is needed to move this block. `,
+        text: `Here's a block on the board. You'll see arrow buttons on it — click one to choose the direction you want to push the block. The number '1' means that only one person is needed to move this block. `,
         demo: `<div id="practiceBoard" style="
                 width: 360px;
                 height: 360px;
@@ -132,7 +132,7 @@ const instructionSteps = [
         `
     },    
     {
-        text: `Now let's try pushing a block into a slot! \nIn the game, there's a timer that counts down every five seconds. During that time, you can choose a direction to push an object, and you can change your choice whenver you want. Once the time runs out, your choice will be executed.\nKeep an eye on the timer below — it shows how much time you have left to make your move.
+        text: `In the game, there's a timer that counts down every five seconds. During that time, you can choose a direction to push an object, and you can change your choice whenver you want. Once the time runs out, your choice will be executed.\nKeep an eye on the timer below — it shows how much time you have left to make your move. \nNow let's try pushing a block into a slot! 
         `,
         demo: `<div id="practiceBoard" style="
                 width: 360px;
@@ -169,7 +169,7 @@ const instructionSteps = [
                <div id="practiceTimer" style="text-align:center; font-size:18px; margin-top:10px;"></div>`
       },   
       {
-        text: `Some blocks require two players to move — like this one. You'll see another player's choice as soon as they click a direction. In this case, another player has already chosen to move the block to the left. Try coordinating with them to move this min: 2 block into the slot.`,
+        text: `Some blocks require two players to move — like this one. You'll see another player's choice as soon as they click a direction. In this case, another player has already chosen to move the block to the left. Try coordinating with them to move this 2 block into the slot.`,
         demo: `<div id="practiceBoard" style="
                 width: 360px;
                 height: 360px;
@@ -187,7 +187,7 @@ const instructionSteps = [
                <div id="practiceTimer" style="text-align:center; font-size:18px; margin-top:10px;"></div>`
       },     
       {
-        text: `This last type of block requires three players to coordinate in order to move it. One player has already decided to push the block to the left. Another is still deciding — they initially chose to push it down but are now switching to the left as well. Remember, you can change your choice between different blocks and directions in the five seconds countdown. Try coordinating with them to move this min: 3 block into the slot.`,
+        text: `Finally, there is also a block that requires three players to coordinate in order to move it. One player has already decided to push the block to the left. Another is still deciding — they initially chose to push it down but are now switching to the left as well. Remember, you can change your choice between different blocks and directions in the five seconds countdown. Try coordinating with them to move this 3 block into the slot.`,
         demo: `<div id="practiceBoard" style="
                 width: 360px;
                 height: 360px;
@@ -209,7 +209,7 @@ const instructionSteps = [
               Great job finishing the practice session! You will now be paired with two other participants to finish four levels together.\n
               Here's a quick recap before you join the real game:\n
               • Use arrow buttons to choose a direction you want to push a block or obstacle.\n
-              • Some blocks need teamwork — look for the "min: 2" or "min: 3" labels to know how many players are required.\n
+              • Some blocks need teamwork — look for the "2" or "3" labels to know how many players are required.\n
               • You'll have 5 seconds to vote, and your last choice will be carried out when the timer ends.\n
               • You can change your vote during the countdown — don't be afraid to coordinate!\n\n
               Your name is ${playerName}.\n
@@ -484,8 +484,8 @@ function drawPracticeBlock(block, isObstacle) {
         const minRequired = minPlayersMap[block.color] || 1;
     
         const minText = document.createElement('div');
-        minText.innerText = `min: ${minRequired}`;
-        minText.style.fontSize = '14px';
+        minText.innerText = `${minRequired}`;
+        minText.style.fontSize = '36px';
         minText.style.fontWeight = 'bold';
         minText.style.color = 'white';
         minText.style.marginBottom = '4px';
@@ -501,8 +501,8 @@ function drawPracticeBlock(block, isObstacle) {
         // div.style.backgroundColor = '#555'; // dark gray
         // div.style.borderRadius = '50%';
         const minText = document.createElement('div');
-        minText.innerText = `min: 1`;
-        minText.style.fontSize = '11px';
+        minText.innerText = `1`;
+        minText.style.fontSize = '24px';
         minText.style.fontWeight = 'bold';
         minText.style.textShadow = '1px 1px 0 #000';
         minText.style.color = 'white';
@@ -1213,7 +1213,7 @@ function showLevelCompleteMessage(levelNumber, callback) {
         // Header based on completion status
         let headerText = completedLevel
           ? `🎉 You've completed Level ${levelNumber + 1}!`
-          : `Time is out on Level ${levelNumber + 1}.`;
+          : `Time is up on Level ${levelNumber + 1}.`;
         
         // Reset the flag for the next round
         completedLevel = false;
@@ -2053,8 +2053,8 @@ function drawBlock(block, isObstacle) {
         const minRequired = minPlayersMap[block.color] || 1;
     
         const minText = document.createElement('div');
-        minText.innerText = `min: ${minRequired}`;
-        minText.style.fontSize = '14px';
+        minText.innerText = `${minRequired}`;
+        minText.style.fontSize = '36px';
         minText.style.fontWeight = 'bold';
         minText.style.color = 'white';
         minText.style.marginBottom = '4px';
@@ -2070,8 +2070,8 @@ function drawBlock(block, isObstacle) {
         // div.style.backgroundColor = '#555'; // dark gray
         // div.style.borderRadius = '50%';
         const minText = document.createElement('div');
-        minText.innerText = `min: 1`;
-        minText.style.fontSize = '11px';
+        minText.innerText = `1`;
+        minText.style.fontSize = '24px';
         minText.style.fontWeight = 'bold';
         minText.style.textShadow = '1px 1px 0 #000';
         minText.style.color = 'white';
