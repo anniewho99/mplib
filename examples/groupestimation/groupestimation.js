@@ -1211,9 +1211,10 @@ function showLevelCompleteMessage(levelNumber, callback) {
         const timeLimitMin = Math.floor(timeLimitMs / 60000);
         
         // Header based on completion status
+        let fnished = completedLevel;
         let headerText = completedLevel
-          ? `🎉 You've completed Level ${levelNumber + 1}!`
-          : `Time is up on Level ${levelNumber + 1}.`;
+          ? `🎉 You've completed Level ${levelNumber}!`
+          : `Time is up on Level ${levelNumber}.`;
         
         // Reset the flag for the next round
         completedLevel = false;
@@ -1221,7 +1222,7 @@ function showLevelCompleteMessage(levelNumber, callback) {
         // Full message with header and questionnaire
         message.innerHTML = `
           ${headerText}<br>
-          Before moving on to Level ${levelNumber + 2}, please answer a few quick questions about your experience.<br><br>
+          Before moving on to Level ${levelNumber + 1}, please answer a few quick questions about your experience.<br><br>
         
           <div>
             <label><strong>1. How satisfied are you with the gameplay in the last level?</strong></label><br>
@@ -1268,7 +1269,8 @@ function showLevelCompleteMessage(levelNumber, callback) {
         
             let myId = getCurrentPlayerId();
             updateStateDirect(`players/${myId}`, {
-                level: levelNumber + 1,
+                level: levelNumber - 1,
+                completed: fnished,
                 satisfaction,
                 difficulty,
                 contribution
