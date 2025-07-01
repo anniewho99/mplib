@@ -349,7 +349,19 @@ document.getElementById('nextInstruction').onclick = () => {
     renderInstructionStep();
 };
 
-renderInstructionStep();
+// renderInstructionStep();
+
+document.getElementById('consentProceed').addEventListener('click', function () {
+    const consentChecked = document.getElementById('consentcheckbox').checked;
+
+    if (consentChecked) {
+      document.getElementById('consentScreen').style.display = 'none';
+      document.getElementById('instructionsScreen').style.display = 'block';
+      renderInstructionStep(); // call your actual instruction-starting function here
+    } else {
+      alert("Please check the box to confirm your consent before proceeding.");
+    }
+  });
 
 function generateRandomName() {
     const firstWords = [

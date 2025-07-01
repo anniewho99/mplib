@@ -348,7 +348,41 @@
 
 <body>
     
-    <div class="container" id="instructionsScreen">
+    <div id="consentScreen" style="max-width: 600px; margin: 40px auto; font-family: sans-serif; text-align: left; display: block;">
+        <h3>Participant Information</h3>
+        <p>Welcome to the coordination game! Please, carefully read the information below before you decide to participate in
+            this study.</p>
+        <h4>Project Summary</h4>
+        <p>The aim of this study is to examine people's strategy in a multi-player game.</p>
+        <h4>Time Commitment</h4>
+        <p>The study typically takes 30 minutes to complete.</p>
+        <h4>Benefits & Risks</h4>
+        <p>There are no direct benefits or risk from your participation in this study.</p>
+        <h4>Eligibility Requirements</h4>
+        <p>You can participate only once in this study.</p>
+        <p>United States citizen/resident.</p>
+        <p>18 years or older.</p>
+        <p>English speaker.</p>
+        </ul>
+        <h4>Reimbursement & Compensation</h4>
+        <p>You will receive $6.00 US in return for your participation.
+        Note: If your data are below a minimal threshold for quality, you will not be compensated.</p>
+        <h4>Confidentiality & Anonymity</h4>
+        <p>All research data collected will be stored securely and confidentially on a password protected server indefinitely.
+        Identifying details will not be associated with any data provided by you as part of any publication or presentation.</p>
+        <p></p>
+        <div id="consentbox">
+            <input type="checkbox" name="terms" id="consentcheckbox">
+            <b>Check here</b> to confirm that: you have read and understood the <i>Participant Information Sheet</i>, you
+            are taking part in this research study voluntarily, you meet the eligibility requirements, and you are agreeing
+            that your anonymized data may be shared in public repositories.
+        </div>
+        <div class="buttonplacement">
+            <button id="consentProceed">Proceed</button>
+        </div>
+    </div>
+   
+    <div class="container" id="instructionsScreen" style="display: none;">
         <h1>Instructions</h1>
     
         <div class="containertext" id="instructionText">
