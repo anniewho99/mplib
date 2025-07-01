@@ -1176,7 +1176,7 @@ function getTeammates() {
     container.innerHTML = `<p> Thank you! Your responses have been recorded.<br>Redirecting to Prolific...</p>`;
 
     setTimeout(() => {
-        window.location.href = 'https://app.prolific.co/submissions/complete?cc=XXXXXXX'; // Replace with your code
+        window.location.href = 'https://app.prolific.com/submissions/complete?cc=C1HMHHYQ'; // Replace with your code
         endSession();
     }, 3000);
 }
