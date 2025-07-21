@@ -1091,8 +1091,64 @@ function getTeammates() {
           ${[1,2,3,4,5,6,7].map(v => `<label><input type="radio" name="collab-${id}" value="${v}"></label>`).join('')}
           <span>Very collaborative</span>
         </div>
+
+        <label><strong>This player and I were a team.</strong></label>
+        <div style="margin-bottom: 10px;">
+          <span>Completely agree</span>
+          ${[1,2,3,4,5,6,7].map(v => `<label><input type="radio" name="team-${id}" value="${v}"></label>`).join('')}
+          <span>Completely disagree</span>
+        </div>
+
+        <label><strong>This player was competent.</strong></label>
+        <div style="margin-bottom: 10px;">
+          <span>Completely agree</span>
+          ${[1,2,3,4,5,6,7].map(v => `<label><input type="radio" name="competent-${id}" value="${v}"></label>`).join('')}
+          <span>Completely disagree</span>
+        </div>
+
+        <label><strong>I understood this player's intentions.</strong></label>
+        <div style="margin-bottom: 10px;">
+          <span>Completely agree</span>
+          ${[1,2,3,4,5,6,7].map(v => `<label><input type="radio" name="intentionthem-${id}" value="${v}"></label>`).join('')}
+          <span>Completely disagree</span>
+        </div>
+
+        <label><strong>This player understood my intentions.</strong></label>
+        <div style="margin-bottom: 10px;">
+          <span>Completely agree</span>
+          ${[1,2,3,4,5,6,7].map(v => `<label><input type="radio" name="intentionmy-${id}" value="${v}"></label>`).join('')}
+          <span>Completely disagree</span>
+        </div>
+
+        <label><strong>This player was easy to play with.</strong></label>
+        <div style="margin-bottom: 10px;">
+          <span>Completely agree</span>
+          ${[1,2,3,4,5,6,7].map(v => `<label><input type="radio" name="easy-${id}" value="${v}"></label>`).join('')}
+          <span>Completely disagree</span>
+        </div>
+
+        <label><strong>This player was fun to play with.</strong></label>
+        <div style="margin-bottom: 10px;">
+          <span>Completely agree</span>
+          ${[1,2,3,4,5,6,7].map(v => `<label><input type="radio" name="fun-${id}" value="${v}"></label>`).join('')}
+          <span>Completely disagree</span>
+        </div>
+
+        <label><strong>This player and I had a similar playing style.</strong></label>
+        <div style="margin-bottom: 10px;">
+          <span>Completely agree</span>
+          ${[1,2,3,4,5,6,7].map(v => `<label><input type="radio" name="similar-${id}" value="${v}"></label>`).join('')}
+          <span>Completely disagree</span>
+        </div>
+
+        <label><strong>This player was human-like.</strong></label>
+        <div style="margin-bottom: 10px;">
+          <span>Completely agree</span>
+          ${[1,2,3,4,5,6,7].map(v => `<label><input type="radio" name="human-${id}" value="${v}"></label>`).join('')}
+          <span>Completely disagree</span>
+        </div>
     
-        <label><strong>How would you describe this teammate? (minimum 50 characters)</strong></label><br>
+        <label><strong>How would you describe this teammate? (minimum 20 characters)</strong></label><br>
         <textarea id="desc-${id}" class="form-control" rows="3" style="width: 100%; max-width: 500px; margin-top: 5px;"></textarea>
       </div>
     `;
@@ -1145,15 +1201,47 @@ function getTeammates() {
         const collabEl = document.querySelector(`input[name="collab-${pid}"]:checked`);
         const collab = collabEl ? collabEl.value : null;
 
+        const teamEl = document.querySelector(`input[name="team-${pid}"]:checked`);
+        const team =  teamEl ?  teamEl.value : null;
+
+        const competentEl = document.querySelector(`input[name="competent-${pid}"]:checked`);
+        const competent = competentEl ? competentEl.value : null;
+
+        const intentionthemEl = document.querySelector(`input[name="intentionthem-${pid}"]:checked`);
+        const intentionthem = intentionthemEl ? intentionthemEl.value : null;
+
+        const intentionmyEl = document.querySelector(`input[name="intentionmy-${pid}"]:checked`);
+        const intentionmy = intentionmyEl ? intentionmyEl.value : null;
+
+        const easyEl = document.querySelector(`input[name="easy-${pid}"]:checked`);
+        const easy = easyEl ? easyEl.value : null;
+
+        const funEl = document.querySelector(`input[name="fun-${pid}"]:checked`);
+        const fun = funEl ? funEl.value : null;
+
+        const similarEl = document.querySelector(`input[name="similar-${pid}"]:checked`);
+        const similar = similarEl ? similarEl.value : null;
+
+        const humanEl = document.querySelector(`input[name="human-${pid}"]:checked`);
+        const human = humanEl ? humanEl.value : null;
+
         const desc = document.getElementById(`desc-${pid}`).value.trim();
 
-        if (!collab || desc.length < 50) {
+        if (!collab || !human || !team || !competent || !intentionthem || !intentionmy || !easy || !fun || !similar || desc.length < 20) {
             incompleteTeammate = true;
         }
         
 
         teammateResponses[pid] = {
             collaborative: collab,
+            asATeam: team,
+            isCompetent: competent,
+            intentioThem: intentionthem,
+            intentionMy: intentionmy,
+            easyToWork: easy,
+            funToPlay: fun,
+            similatToMe:  similar,
+            humanlike: human,
             description: desc
         };
     });
