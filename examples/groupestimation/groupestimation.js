@@ -1237,21 +1237,21 @@ function showLevelCompleteMessage(levelNumber, callback) {
           Before moving on to Level ${levelNumber + 1}, please answer a few quick questions about your experience.<br><br>
         
           <div>
-            <label><strong>1. How satisfied are you with the gameplay in the last level?</strong></label><br>
+            <label><strong>1. How satisfied are you with the gameplay in the last level?<span style="color: red">*</span></strong></label><br>
             <span>Not at all</span>
             ${[1,2,3,4,5,6,7].map(v => `<label><input type="radio" name="satisfaction" value="${v}"></label>`).join('')}
             <span>Very satisfied</span>
           </div><br>
         
           <div>
-            <label><strong>2. How difficult was the task in the last level?</strong></label><br>
+            <label><strong>2. How difficult was the task in the last level?<span style="color: red">*</span></strong></label><br>
             <span>Not difficult at all</span>
             ${[1,2,3,4,5,6,7].map(v => `<label><input type="radio" name="difficulty" value="${v}"></label>`).join('')}
             <span>Extremely difficult</span>
           </div><br>
         
           <div>
-            <label><strong>3. Did you feel like you contributed to the outcome?</strong></label><br>
+            <label><strong>3. Did you feel like you contributed to the outcome?<span style="color: red">*</span></strong></label><br>
             <span>Not at all</span>
             ${[1,2,3,4,5,6,7].map(v => `<label><input type="radio" name="contribution" value="${v}"></label>`).join('')}
             <span>A lot</span>
