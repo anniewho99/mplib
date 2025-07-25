@@ -238,6 +238,12 @@ const instructionSteps = [
 
 let currentStep = 0;
 
+const params = new URLSearchParams(window.location.search);
+if (params.has("skipinstruction")) {
+    currentStep = 8;
+}
+
+
 function renderInstructionStep() {
     const step = instructionSteps[currentStep];
     document.getElementById('instructionText').innerText = step.text;
