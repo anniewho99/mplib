@@ -868,7 +868,7 @@ function getNumPlayersFromURL() {
 }
 
 let GameName = "groupestimation";
-let NumPlayers = 3;
+let NumPlayers = 1;
 let MinPlayers = NumPlayers;
 let MaxPlayers = NumPlayers;
 let MaxSessions = 0;
@@ -973,7 +973,7 @@ const levelPlacements = {
         },
         obstacles: {
             obs1: { x: 5, y: 2, id: 'obs1' },
-            obs2: { x: 10, y: 2, id: 'obs2' }
+            obs2: { x: 10, y: 2, id: 'obs2', immovable: true }
         }
     },
     2: {
@@ -987,9 +987,9 @@ const levelPlacements = {
             slot1: { x: 13, y: 5 }
         },
         obstacles: {
-            obs1: { x: 2, y: 2, id: 'obs1' },
+            obs1: { x: 2, y: 2, id: 'obs1', immovable: true },
             obs2: { x: 4, y: 4, id: 'obs2' },
-            obs3: { x: 14, y: 2, id: 'obs3' },
+            obs3: { x: 14, y: 2, id: 'obs3', immovable: true },
             obs4: { x: 12, y: 4, id: 'obs4' }
         }
     },
@@ -1006,10 +1006,10 @@ const levelPlacements = {
         obstacles: {
             obs1: { x: 2, y: 1, id: 'obs1' },
             obs2: { x: 5, y: 4, id: 'obs2' },
-            obs3: { x: 5, y: 8, id: 'obs3' },
-            obs4: { x: 14, y: 1, id: 'obs4' },
+            obs3: { x: 5, y: 8, id: 'obs3', immovable: true },
+            obs4: { x: 14, y: 1, id: 'obs4', immovable: true },
             obs5: { x: 11, y: 4, id: 'obs5' },
-            obs6: { x: 11, y: 8, id: 'obs6' }
+            obs6: { x: 11, y: 8, id: 'obs6', immovable: true }
         }
     },
 };
@@ -1358,7 +1358,7 @@ function showLevelCompleteMessage(levelNumber, callback) {
         screen.style.display = 'flex';
         
         // 30s timer
-        let countdown = 30;
+        let countdown = 15;
         const timerText = document.getElementById('feedbackTimer');
         timerText.innerText = `⏱ Time left: ${countdown}s`;
         
@@ -2129,6 +2129,8 @@ function drawBlock(block, isObstacle) {
     div.dataset.y = block.y;
     div.dataset.obstacle = isObstacle;
 
+    if (isObstacle && block.immovable) div.dataset.immovable = "true"; 
+
     // Align with top-left grid cell
     div.style.position = 'absolute';
     div.style.left = (block.x * CELL_WIDTH) + 'px';
@@ -2177,16 +2179,21 @@ function drawBlock(block, isObstacle) {
     }else{
         // div.style.backgroundColor = '#555'; // dark gray
         // div.style.borderRadius = '50%';
-        const minText = document.createElement('div');
-        minText.innerText = `1`;
-        minText.style.fontSize = '24px';
-        minText.style.fontWeight = 'bold';
-        minText.style.textShadow = '1px 1px 0 #000';
-        minText.style.color = 'white';
-        minText.style.marginBottom = '2px';
-        minText.style.imageRendering = 'pixelated';
-        minText.style.fontFamily = 'monospace'; 
-        div.appendChild(minText);
+
+        if (block.immovable) {
+            div.style.filter = 'grayscale(100%)'; // NEW (optional)
+          }else{
+            const minText = document.createElement('div');
+            minText.innerText = `1`;
+            minText.style.fontSize = '24px';
+            minText.style.fontWeight = 'bold';
+            minText.style.textShadow = '1px 1px 0 #000';
+            minText.style.color = 'white';
+            minText.style.marginBottom = '2px';
+            minText.style.imageRendering = 'pixelated';
+            minText.style.fontFamily = 'monospace'; 
+            div.appendChild(minText);
+          }
 
     }
 
@@ -2203,6 +2210,11 @@ function drawBlock(block, isObstacle) {
         left:  { top: '50%', left: '75%', transform: 'translate(-50%, -50%)' },
         right: { top: '50%', left: '25%', transform: 'translate(-50%, -50%)' }
     };
+
+    if (isObstacle && block.immovable) {           // NEW
+        container.appendChild(div);                  // NEW
+        return;                                      // NEW
+      }
     
     
     const directions = ['up', 'right', 'down', 'left'];
