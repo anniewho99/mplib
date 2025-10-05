@@ -238,6 +238,16 @@
             border-color: transparent transparent transparent #5E35B1;
         }
 
+        /* Perimeter wall strips */
+        .wall-strip {
+        position: absolute;
+        background-image: url('./images/wall.png'); /* your wall texture */
+        background-repeat: repeat;
+        background-size: 60px 60px; /* match CELL_WIDTH/HEIGHT */
+        pointer-events: none;       /* so clicks pass through */
+        z-index: 5;                 /* above grid, below blocks */
+        }
+
 
         .triangle.up {
             top: 0;
@@ -445,7 +455,7 @@
         <div id="game">
 
             <div class="row justify-content-center" style="margin-top: 20px; margin-bottom: 20px;">
-                <div id="image-container" style="position: relative; width: 812px; height: 542px;">
+                <div id="image-container" style="position: relative; width: 865px; height: 633px;">
                     <!-- Blocks and slots will be drawn here -->
                 </div>
             </div>

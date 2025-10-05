@@ -995,9 +995,9 @@ const levelPlacements = {
     },
     3: {
         blocks: {
-            blue: { x: 8, y: 3, color: 'blue', minVotes: 3 },
-            red: { x: 6, y: 0, color: 'red', minVotes: 2 },
-            yellow: { x: 10, y: 0, color: 'yellow', minVotes: 1 }
+            blue: { x: 8, y: 4, color: 'blue', minVotes: 3 },
+            red: { x: 6, y: 1, color: 'red', minVotes: 2 },
+            yellow: { x: 10, y: 1, color: 'yellow', minVotes: 1 }
         },
         slots: {
             slot0: { x: 2, y: 5 },
@@ -1035,6 +1035,8 @@ function loadLevel(levelNumber) {
     updateStateDirect('blocks', GameState.blocks, 'initalizeBlock');
     updateStateDirect('slots', GameState.slots, 'initalizeSlots');
     //updateStateDirect('obs', GameState.obstacles, 'initalizeObstacle');
+
+    drawPerimeterWalls();
 
     Object.values(GameState.slots).forEach(slot => {
         drawSlot(slot);
@@ -1401,6 +1403,31 @@ function getLevelTimeLimit(levelNumber) {
         return 5 * 60 * 1000; // default fallback
     }
 }
+
+function drawPerimeterWalls() {
+    const container = document.getElementById('image-container');
+    const W = container.clientWidth;
+    const H = container.clientHeight;
+    const WALL_THICKNESS = 15; // thin 15 px wall
+  
+    const strips = [
+      { top: 0, left: 0, width: W, height: WALL_THICKNESS },                 // top
+      { top: H - WALL_THICKNESS, left: 0, width: W, height: WALL_THICKNESS },// bottom
+      { top: 0, left: 0, width: WALL_THICKNESS, height: H },                 // left
+      { top: 0, left: W - WALL_THICKNESS, width: WALL_THICKNESS, height: H } // right
+    ];
+  
+    strips.forEach(cfg => {
+      const d = document.createElement('div');
+      d.className = 'wall-strip';
+      d.style.top = `${cfg.top}px`;
+      d.style.left = `${cfg.left}px`;
+      d.style.width = `${cfg.width}px`;
+      d.style.height = `${cfg.height}px`;
+      container.appendChild(d);
+    });
+  }
+  
 
 let currentLevelTimer = null;
 
@@ -1799,8 +1826,8 @@ function finalizeVotes() {
             if (plan.direction === 'left') x -= 1;
             if (plan.direction === 'right') x += 1;
         
-            x = Math.max(0, Math.min(17, x));
-            y = Math.max(0, Math.min(11, y));
+            x = Math.max(1, Math.min(18, x));
+            y = Math.max(1, Math.min(13, y));
         
 
             updateStateDirect(`moveBlock/${plan.block.dataset.color}`, {
@@ -2111,10 +2138,14 @@ function drawBlock(block, isObstacle) {
     div.classList.add('block');
     let width;
     let height;
-    if(isObstacle){
+    if(isObstacle && block.immovable){
+        width = CELL_WIDTH * 2;
+        height = CELL_HEIGHT * 2;
+    }else if(isObstacle && !block.immovable){
         width = CELL_WIDTH * 2.3;
         height = CELL_HEIGHT * 2.3;
-    }else{
+    }
+    else{
         width = CELL_WIDTH * 3;
         height = CELL_HEIGHT * 3;
     }
@@ -2147,9 +2178,15 @@ function drawBlock(block, isObstacle) {
     div.style.backgroundSize = 'cover';
     div.style.imageRendering = 'pixelated';
 
-    div.style.backgroundImage = isObstacle
-    ? "url('./images/obstacle.png')"
-    : "url('./images/block.png')";
+    if (isObstacle) {
+        const isImmovable = !!block.immovable; // true if obstacle can't move
+        div.style.backgroundImage = isImmovable
+          ? "url('./images/wall.png')"  // immovable obstacle → wall texture
+          : "url('./images/obstacle.png')";   
+          div.style.filter = 'none';                          // movable obstacle
+      } else {
+        div.style.backgroundImage = "url('./images/block.png')";         // normal block
+      }
 
 
     if(isObstacle == false){
@@ -2181,7 +2218,7 @@ function drawBlock(block, isObstacle) {
         // div.style.borderRadius = '50%';
 
         if (block.immovable) {
-            div.style.filter = 'grayscale(100%)'; // NEW (optional)
+            
           }else{
             const minText = document.createElement('div');
             minText.innerText = `1`;
