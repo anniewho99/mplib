@@ -1,0 +1,898 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<title>Block Puzzle Plan Animator</title>
+<style>
+  html,body { margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background:#0b0d10; color:#e7ebf0;}
+  .wrap { display:grid; grid-template-columns: 1fr 340px; gap:16px; padding:16px; }
+  canvas { background:#20252b; border-radius:12px; box-shadow: 0 8px 24px rgba(0,0,0,.35);}
+  .panel { background:#11151a; border:1px solid #243040; border-radius:12px; padding:14px; }
+  .panel h2 { margin: 0 0 10px 0; font-size:16px; color:#bcd; }
+  .row { display:flex; gap:8px; align-items:center; margin:8px 0; }
+  button { background:#1b2330; border:1px solid #2d3b50; color:#e7ebf0; padding:8px 10px; border-radius:8px; cursor:pointer; }
+  button:hover { background:#223044; }
+  input[type="range"] { width:160px; }
+  textarea { width:100%; height:200px; background:#0f141a; color:#dfe6ef; border:1px solid #2a394d; border-radius:8px; padding:8px; font-family:ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .small { font-size:12px; color:#9bb; }
+  .badge { display:inline-block; padding:2px 6px; border:1px solid #2d3b50; border-radius:6px; font-size:12px; color:#9bb; }
+  label.switch { display:flex; align-items:center; gap:8px; font-size:13px; color:#a9c; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <canvas id="cv" width="820" height="820"></canvas>
+
+  <div class="panel">
+    <h2>Plan Controls</h2>
+
+    <div class="row">
+      <button id="btnPlay">▶︎ Play</button>
+      <button id="btnPause">⏸ Pause</button>
+      <button id="btnPrev">⇦ Prev</button>
+      <button id="btnNext">Next ⇨</button>
+    </div>
+
+    <div class="row">
+      <span class="badge" id="lblRound">Round 0 / 0</span>
+      <span class="small" id="lblPhase" style="margin-left:auto;">idle</span>
+    </div>
+
+    <div class="row">
+      <span class="small">Speed</span>
+      <input type="range" id="rngSpeed" min="0.25" max="3" step="0.25" value="1">
+      <span class="small" id="lblSpeed">1.0×</span>
+    </div>
+
+    <div class="row">
+      <button id="btnReset">Reset to Start</button>
+      <button id="btnReload">Reload Plan</button>
+    </div>
+
+    <div class="row">
+      <label class="switch">
+        <input type="checkbox" id="chkDirs" checked />
+        Show move directions (arrows)
+      </label>
+    </div>
+
+    <h2>Plan Text (paste the solver output)</h2>
+    <textarea id="txtPlan"></textarea>
+    <div class="small" style="margin-top:6px;">
+      One move per line, like:
+      <pre>-  block yellow right -> (11,0)</pre>
+      <pre>-  obs obs5 down -> (11,6)</pre>
+    </div>
+
+    <h2>Legend</h2>
+    <div class="small">
+      Blocks (3×3): <b>1</b>=Yellow, <b>2</b>=Red, <b>3</b>=Blue.<br>
+      Obstacles (2×2): gray; immovable are darker with hatch.<br>
+      Slots: thick blue 3×3 outlines (reusable). During animation a big “Round N” overlays the board.
+    </div>
+  </div>
+</div>
+
+<script>
+// ======= CONSTANTS =======
+const GRID = 18;
+const BLOCK_SIZE = 3;
+const OBS_SIZE = 2;
+
+const CELL = 40;
+const PADDING = 20;
+const W = PADDING*2 + GRID*CELL;
+const H = W;
+
+const blockColors = { yellow:'#f5e85a', red:'#e74c3c', blue:'#4285f4' };
+// NEW: numeric labels for blocks: Yellow→1, Red→2, Blue→3
+const blockDigit = { yellow:'1', red:'2', blue:'3' };
+
+const dirGlyph = { up:'↑', down:'↓', left:'←', right:'→' };
+
+// ======= INITIAL STATE =======
+// //level 0
+// const INITIAL = {
+//   blocks: { blue:{x:13,y:9}, red:{x:7,y:0}, yellow:{x:0,y:9} },
+//   slots: { slot0:{x:2,y:5}, slot1:{x:15,y:5} },
+//   obstacles: {
+//     obs0:{x:8,y:4,id:'obs0', immovable:true},
+//     obs1:{x:8,y:6,id:'obs1', immovable:true},
+//     obs2:{x:5,y:4,id:'obs2'},
+//     obs3:{x:11,y:4,id:'obs3'},
+//   },
+//   locked:{blue:false, red:false, yellow:false},
+// };
+
+// //level 1
+// const INITIAL = {
+//   blocks: { blue:{x:8,y:2}, red:{x:4,y:0}, yellow:{x:12,y:0} },
+//   slots: { slot0:{x:3,y:7}, slot1:{x:14,y:7} },
+//   obstacles: {
+//     obs0:{x:7,y:5,id:'obs0', immovable:true},
+//     obs1:{x:11,y:5,id:'obs1', immovable:true},
+//     obs2:{x:2,y:9,id:'obs2'},
+//     obs3:{x:16,y:9,id:'obs3'},
+//   },
+//   locked:{blue:false, red:false, yellow:false},
+// };
+
+// //level 2
+// const INITIAL = {
+//   blocks: { blue:{x:9,y:3}, red:{x:5,y:0}, yellow:{x:12,y:0} },
+//   slots: { slot0:{x:3,y:5}, slot1:{x:14,y:5} },
+//   obstacles: {
+//     obs0:{x:1,y:2,id:'obs0', immovable:true},
+//     obs1:{x:17,y:2,id:'obs1', immovable:true},
+//     obs2:{x:5,y:6,id:'obs2'},
+//     obs3:{x:13,y:6,id:'obs3'},
+//   },
+//   locked:{blue:false, red:false, yellow:false},
+// };
+
+// //level 3 
+// const INITIAL = {
+//   blocks: {
+//     blue:   { x: 8,  y: 3 },
+//     red:    { x: 6,  y: 0 },
+//     yellow: { x: 10, y: 0 },
+//   },
+//   slots: {
+//     slot0: { x: 2,  y: 5 },
+//     slot1: { x: 13, y: 5 },
+//   },
+//   obstacles: {
+//     obs0: { x: 5, y: 4, id: 'obs0' },
+//     obs1: { x: 2, y: 1, id: 'obs1'},
+//     obs3: { x: 5, y: 8, id: 'obs3',  immovable: true},
+//     obs4: { x: 14, y: 1, id: 'obs4',  immovable: true},
+//     obs2: { x: 11, y: 4, id: 'obs2' },
+//     obs5: { x: 11, y: 8, id: 'obs5',  immovable: true}
+//   },
+//   locked: { blue: false, red: false, yellow: false },
+// };
+
+//level 3 flipped
+const INITIAL = {
+  blocks: {
+    blue:   { x: 8,  y: 3 },
+    red:    { x: 6,  y: 0 },
+    yellow: { x: 10, y: 0 },
+  },
+  slots: {
+    slot0: { x: 2,  y: 4 },
+    slot1: { x: 13, y: 4 },
+  },
+  obstacles: {
+    obs0: { x: 5, y: 3, id: 'obs0', immovable: true  },
+    obs1: { x: 2, y: 1, id: 'obs1', immovable: true},
+    obs3: { x: 5, y: 7, id: 'obs3'},
+    obs4: { x: 14, y: 0, id: 'obs4' },
+    obs2: { x: 11, y: 3, id: 'obs2', immovable: true  },
+    obs5: { x: 11, y: 7, id: 'obs5'}
+  },
+  locked: { blue: false, red: false, yellow: false },
+};
+
+//level 4
+// const INITIAL = {
+//   blocks: {
+//     blue:   { x: 13,  y: 9 },
+//     red:    { x: 8,  y: 0 },
+//     yellow: { x: 1, y: 9 },
+//   },
+//   slots: {
+//     slot0: { x: 2,  y: 3 },
+//     slot1: { x: 14, y: 3 },
+//   },
+//   obstacles: {
+//     obs0: { x: 5, y: 5, id: 'obs0', immovable: true  },
+//     obs1: { x: 7, y: 3, id: 'obs1', immovable: true},
+//     obs2: { x: 11, y: 4, id: 'obs2', immovable: true  },
+//     obs3: { x: 9, y: 6, id: 'obs3', immovable: true},
+//     obs4: { x: 13, y: 6, id: 'obs4', immovable: true },
+//     obs5: { x: 2, y: 0, id: 'obs5'},
+//     obs6: { x: 2, y: 6, id: 'obs6'},
+//     obs7: { x: 11, y: 9, id: 'obs7'}
+//   },
+//   locked: { blue: false, red: false, yellow: false },
+// };
+
+// ======= DEFAULT PLAN =======
+
+// // //level 0
+// const DEFAULT_PLAN_TEXT = `
+
+// Optimal rounds: 15
+// Round 1:
+//   - block blue up -> (13,8)
+// Round 2:
+//   - block blue up -> (13,7)
+// Round 3:
+//   - block blue up -> (13,6)
+// Round 4:
+//   - block blue up -> (13,5)
+// Round 5:
+//   - block blue right -> (14,5)
+// Round 6:
+//   - block red down -> (7,1)
+// Round 7:
+//   - block yellow up -> (0,8)
+//   - block red left -> (6,1)
+// Round 8:
+//   - block yellow up -> (0,7)
+//   - block red left -> (5,1)
+// Round 9:
+//   - block yellow up -> (0,6)
+//   - block red left -> (4,1)
+// Round 10:
+//   - block yellow up -> (0,5)
+//   - block red left -> (3,1)
+// Round 11:
+//   - block yellow right -> (1,5)
+//   - block red left -> (2,1)
+// Round 12:
+//   - block yellow right -> (2,5)
+//   - block red down -> (2,2)
+// Round 13:
+//   - block blue right -> (15,5)
+// Round 14:
+//   - block red down -> (2,3)
+// Round 15:
+//   - block red down -> (2,4)
+// Round 16:
+//   - block red down -> (2,5)`;
+
+// //level 1
+// const DEFAULT_PLAN_TEXT = `
+// Optimal rounds: 19
+// Round 1:
+//   - block blue left -> (7,2)
+// Round 2:
+//   - block yellow down -> (12,1)
+//   - obs obs2 down -> (2,10)
+//   - obs obs3 down -> (16,10)
+// Round 3:
+//   - block yellow down -> (12,2)
+//   - block red down -> (4,1)
+// Round 4:
+//   - block yellow right -> (13,2)
+//   - block red down -> (4,2)
+// Round 5:
+//   - block yellow down -> (13,3)
+//   - block red down -> (4,3)
+// Round 6:
+//   - block yellow down -> (13,4)
+//   - block red down -> (4,4)
+// Round 7:
+//   - block yellow down -> (13,5)
+//   - block red down -> (4,5)
+// Round 8:
+//   - block blue left -> (6,2)
+// Round 9:
+//   - block blue left -> (5,2)
+// Round 10:
+//   - block blue left -> (4,2)
+// Round 11:
+//   - block blue left -> (3,2)
+// Round 12:
+//   - block yellow down -> (13,6)
+//   - block red down -> (4,6)
+// Round 13:
+//   - block blue down -> (3,3)
+// Round 14:
+//   - block yellow down -> (13,7)
+//   - block red down -> (4,7)
+// Round 15:
+//   - block yellow right -> (14,7)
+//   - block red left -> (3,7)
+// Round 16:
+//   - block blue down -> (3,4)
+// Round 17:
+//   - block blue down -> (3,5)
+// Round 18:
+//   - block blue down -> (3,6)
+// Round 19:
+//   - block blue down -> (3,7)`;
+
+// // //level 2
+// const DEFAULT_PLAN_TEXT = `
+
+// Optimal rounds: 15
+// Round 1:
+//   - block blue down -> (9,4)
+// Round 2:
+//   - block blue down -> (9,5)
+// Round 3:
+//   - block blue right -> (10,5)
+// Round 4:
+//   - block yellow down -> (12,1)
+//   - block red down -> (5,1)
+// Round 5:
+//   - block yellow down -> (12,2)
+//   - block red down -> (5,2)
+// Round 6:
+//   - block yellow right -> (13,2)
+//   - block red down -> (5,3)
+// Round 7:
+//   - block yellow down -> (13,3)
+//   - block red left -> (4,3)
+// Round 8:
+//   - block yellow right -> (14,3)
+//   - block red left -> (3,3)
+// Round 9:
+//   - block yellow down -> (14,4)
+//   - obs obs2 right -> (6,6)
+//   - obs obs3 down -> (13,7)
+// Round 10:
+//   - block red down -> (3,4)
+//   - obs obs3 down -> (13,8)
+// Round 11:
+//   - block yellow down -> (14,5)
+//   - block red down -> (3,5)
+// Round 12:
+//   - block blue right -> (11,5)
+// Round 13:
+//   - block blue right -> (12,5)
+// Round 14:
+//   - block blue right -> (13,5)
+// Round 15:
+//   - block blue right -> (14,5)`;
+
+
+// //plan for level 3 before flip
+// const DEFAULT_PLAN_TEXT = `Optimal rounds: 17
+// Optimal plan:
+// Round 1:
+//   - block red left -> (5,0)
+//   - obs obs2 down -> (11,5)
+// Round 2:
+//   - block yellow right -> (11,0)
+//   - block red down -> (5,1)
+// Round 3:
+//   - block yellow down -> (11,1)
+//   - block red left -> (4,1)
+// Round 4:
+//   - obs obs0 down -> (5,5)
+//   - obs obs1 up -> (2,0)
+//   - obs obs2 down -> (11,6)
+// Round 5:
+//   - block yellow down -> (11,2)
+//   - block red down -> (4,2)
+// Round 6:
+//   - block yellow down -> (11,3)
+//   - block red left -> (3,2)
+// Round 7:
+//   - block yellow right -> (12,3)
+//   - block red left -> (2,2)
+// Round 8:
+//   - block blue right -> (9,3)
+// Round 9:
+//   - block yellow right -> (13,3)
+//   - block red down -> (2,3)
+// Round 10:
+//   - block blue right -> (10,3)
+// Round 11:
+//   - block yellow down -> (13,4)
+//   - block red down -> (2,4)
+// Round 12:
+//   - block yellow down -> (13,5)
+//   - block red down -> (2,5)
+// Round 13:
+//   - block blue right -> (11,3)
+// Round 14:
+//   - block blue right -> (12,3)
+// Round 15:
+//   - block blue right -> (13,3)
+// Round 16:
+//   - block blue down -> (13,4)
+// Round 17:
+//   - block blue down -> (13,5)`;
+
+//plan for level 3 after flip
+const DEFAULT_PLAN_TEXT = `Optimal rounds: 20
+Round 1:
+  - block blue down -> (8,4)
+Round 2:
+  - block blue down -> (8,5)
+Round 3:
+  - block red right -> (7,0)
+  - obs obs5 down -> (11,8)
+Round 4:
+  - block blue right -> (9,5)
+Round 5:
+  - block blue right -> (10,5)
+Round 6:
+  - block blue right -> (11,5)
+Round 7:
+  - block blue right -> (12,5)
+Round 8:
+  - block blue right -> (13,5)
+Round 9:
+  - block red down -> (7,1)
+  - obs obs4 right -> (15,0)
+Round 10:
+  - block yellow right -> (11,0)
+  - block red down -> (7,2)
+Round 11:
+  - block yellow right -> (12,0)
+  - block red down -> (7,3)
+Round 12:
+  - block blue up -> (13,4)
+Round 13:
+  - block red down -> (7,4)
+Round 14:
+  - block red down -> (7,5)
+  - obs obs4 right -> (16,0)
+Round 15:
+  - block red left -> (6,5)
+  - obs obs3 down -> (5,8)
+Round 16:
+  - block yellow right -> (13,0)
+  - block red left -> (5,5)
+Round 17:
+  - block yellow down -> (13,1)
+  - block red left -> (4,5)
+Round 18:
+  - block yellow down -> (13,2)
+  - block red left -> (3,5)
+Round 19:
+  - block yellow down -> (13,3)
+  - block red left -> (2,5)
+Round 20:
+  - block yellow down -> (13,4)
+  - block red up -> (2,4)`;
+//level 4
+// const DEFAULT_PLAN_TEXT = `
+
+// Optimal rounds: 18
+// Round 1:
+//   - block blue up -> (13,8)
+// Round 2:
+//   - block blue right -> (14,8)
+// Round 3:
+//   - block blue right -> (15,8)
+// Round 4:
+//   - block blue up -> (15,7)
+// Round 5:
+//   - block blue up -> (15,6)
+// Round 6:
+//   - block blue up -> (15,5)
+// Round 7:
+//   - block blue up -> (15,4)
+// Round 8:
+//   - block blue up -> (15,3)
+// Round 9:
+//   - block blue left -> (14,3)
+// Round 10:
+//   - block red right -> (9,0)
+//   - obs obs6 left -> (1,6)
+// Round 11:
+//   - block red down -> (9,1)
+//   - obs obs6 left -> (0,6)
+// Round 12:
+//   - block yellow up -> (1,8)
+//   - block red right -> (10,1)
+// Round 13:
+//   - block yellow right -> (2,8)
+//   - block red right -> (11,1)
+// Round 14:
+//   - block yellow up -> (2,7)
+//   - block red right -> (12,1)
+// Round 15:
+//   - block yellow up -> (2,6)
+//   - block red right -> (13,1)
+// Round 16:
+//   - block yellow up -> (2,5)
+//   - block red down -> (13,2)
+// Round 17:
+//   - block yellow up -> (2,4)
+//   - block red down -> (13,3)
+// Round 18:
+//   - block yellow up -> (2,3)
+//   - block red right -> (14,3)`;
+
+// ======= PLAN PARSER (captures direction) =======
+function parsePlanText(txt){
+  const lines = txt.split(/\r?\n/);
+  const rounds = [];
+  let cur = null;
+  const reMove = /^\s*-\s+(block|obs)\s+([a-zA-Z0-9_]+)\s+(up|down|left|right)\s*->\s*\((\d+)\s*,\s*(\d+)\)\s*$/i;
+
+  for (const raw of lines){
+    const line = raw.trimRight();
+    if (/^Round\s+\d+:/i.test(line)){
+      if (cur) rounds.push(cur);
+      cur = [];
+      continue;
+    }
+    const m = line.match(reMove);
+    if (m){
+      const [, kind, who, dir, xs, ys] = m;
+      cur?.push({
+        type: kind.toLowerCase(),
+        who,
+        dir: dir.toLowerCase(),
+        to: { x:+xs, y:+ys }
+      });
+    }
+  }
+  if (cur && cur.length) rounds.push(cur);
+  return rounds;
+}
+
+// ======= CANVAS SETUP =======
+const cv = document.getElementById('cv');
+cv.width = W; cv.height = H;
+const ctx = cv.getContext('2d');
+
+function drawGrid(){
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0,0,W,H);
+
+  ctx.strokeStyle = '#2d3642';
+  ctx.lineWidth = 1;
+  for (let i=0;i<=GRID;i++){
+    ctx.beginPath();
+    ctx.moveTo(PADDING+i*CELL, PADDING);
+    ctx.lineTo(PADDING+i*CELL, PADDING+GRID*CELL);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(PADDING, PADDING+i*CELL);
+    ctx.lineTo(PADDING+GRID*CELL, PADDING+i*CELL);
+    ctx.stroke();
+  }
+}
+
+function tlRect(x,y, sz){
+  return { x: PADDING + x*CELL, y: PADDING + y*CELL, w: sz*CELL, h: sz*CELL };
+}
+
+function drawSlot(s){
+  const r = tlRect(s.x, s.y, BLOCK_SIZE);
+  ctx.lineWidth = 6;
+  ctx.strokeStyle = '#4da3ff';
+  ctx.strokeRect(r.x+2, r.y+2, r.w-4, r.h-4);
+}
+
+function hatchRect(r){
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(r.x, r.y, r.w, r.h);
+  ctx.clip();
+  ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+  ctx.lineWidth = 2;
+  for (let x=r.x- r.h; x<r.x+r.w; x+=8){
+    ctx.beginPath();
+    ctx.moveTo(x, r.y);
+    ctx.lineTo(x+r.h, r.y+r.h);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawObstacle(ob){
+  const r = tlRect(ob.x, ob.y, OBS_SIZE);
+  ctx.fillStyle = ob.immovable ? '#3a4048' : '#86efac';
+  ctx.fillRect(r.x+2, r.y+2, r.w-4, r.h-4);
+  if (ob.immovable) hatchRect({x:r.x+2,y:r.y+2,w:r.w-4,h:r.h-4});
+  ctx.fillStyle = '#e8eef6';
+  // ctx.font = 'bold 14px ui-monospace';
+  // ctx.textAlign = 'center';
+  // ctx.textBaseline = 'middle';
+  // ctx.fillText(ob.id.replace(/^obs/,'').toUpperCase(), r.x+r.w/2, r.y+r.h/2);
+}
+
+function drawBlock(name, pos){
+  const r = tlRect(pos.x, pos.y, BLOCK_SIZE);
+  ctx.fillStyle = blockColors[name]||'#888';
+  ctx.fillRect(r.x+2, r.y+2, r.w-4, r.h-4);
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = '#1d2430';
+  ctx.strokeRect(r.x+1.5, r.y+1.5, r.w-3, r.h-3);
+
+  // NEW: number label (1/2/3) instead of Y/R/B
+  ctx.fillStyle = '#0d1320';
+  ctx.font = '700 18px ui-monospace';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  const digit = blockDigit[name] || '?';
+  ctx.fillText(digit, r.x+r.w/2, r.y+r.h/2);
+}
+
+// Arrow drawing for direction
+function drawArrowForEntity(kind, who, centerX, centerY, dir, color){
+  const L = Math.min(18, CELL*0.45);
+  const head = 6;
+
+  let dx=0, dy=0;
+  if (dir==='up') dy = -1;
+  else if (dir==='down') dy = 1;
+  else if (dir==='left') dx = -1;
+  else if (dir==='right') dx = 1;
+
+  const x2 = centerX + dx*L, y2 = centerY + dy*L;
+
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 3;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(centerX, centerY);
+  ctx.lineTo(x2, y2);
+  ctx.stroke();
+
+  // arrow head
+  ctx.beginPath();
+  if (dx !== 0 || dy !== 0){
+    const ang = Math.atan2(dy, dx);
+    const a1 = ang + Math.PI*0.75;
+    const a2 = ang - Math.PI*0.75;
+    ctx.moveTo(x2, y2);
+    ctx.lineTo(x2 + Math.cos(a1)*head, y2 + Math.sin(a1)*head);
+    ctx.moveTo(x2, y2);
+    ctx.lineTo(x2 + Math.cos(a2)*head, y2 + Math.sin(a2)*head);
+    ctx.stroke();
+  }
+
+  // glyph
+  ctx.fillStyle = 'rgba(0,0,0,0.55)';
+  const pad = 4;
+  const text = dirGlyph[dir] || dir;
+  ctx.font = 'bold 14px ui-monospace';
+  const tm = ctx.measureText(text);
+  const tw = tm.width + pad*2, th = 18;
+  ctx.fillRect(x2 - tw/2, y2 - th/2 - 1, tw, th);
+  ctx.fillStyle = '#fff';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(text, x2, y2-1);
+}
+
+// NEW: overlay “Round N” when animating
+function drawRoundOverlay(roundIdx, totalRounds){
+  const label = `Round ${roundIdx+1} / ${totalRounds}`;
+  const x = PADDING + 10;
+  const y = PADDING + 10;
+
+  // shadow box
+  ctx.fillStyle = 'rgba(0,0,0,0.55)';
+  ctx.fillRect(x, y, 210, 36);
+
+  // text
+  ctx.fillStyle = '#ffffff';
+  ctx.font = '700 18px ui-monospace';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(label, x + 10, y + 18);
+}
+
+function render(state, currentRoundMoves=null, tProgress=0, showDirs=true, animating=false, roundIdx=0, totalRounds=0){
+  drawGrid();
+
+  // slots
+  for (const s of Object.values(state.slots)) drawSlot(s);
+
+  // obstacles
+  for (const o of Object.values(state.obstacles)) drawObstacle(o);
+
+  // blocks
+  for (const [name,pos] of Object.entries(state.blocks)) drawBlock(name, pos);
+
+  // Overlay directions for the CURRENT round (during animation)
+  if (showDirs && currentRoundMoves && currentRoundMoves.length){
+    for (const m of currentRoundMoves){
+      const isBlock = m.type==='block';
+      let cx, cy, sz;
+      if (isBlock){
+        const p = state.blocks[m.who.toLowerCase()];
+        sz = BLOCK_SIZE;
+        const r = tlRect(p.x, p.y, sz);
+        cx = r.x + r.w/2;
+        cy = r.y + r.h/2;
+        drawArrowForEntity('block', m.who, cx, cy, m.dir, blockColors[m.who.toLowerCase()] || '#ddd');
+      } else {
+        const p = state.obstacles[m.who];
+        sz = OBS_SIZE;
+        const r = tlRect(p.x, p.y, sz);
+        cx = r.x + r.w/2;
+        cy = r.y + r.h/2;
+        drawArrowForEntity('obs', m.who, cx, cy, m.dir, '#cfd6df');
+      }
+    }
+  }
+
+  // NEW: draw round overlay when animating
+  if (animating) {
+    drawRoundOverlay(roundIdx, totalRounds);
+  }
+}
+
+// ======= SIM/ANIMATION =======
+function deepCopy(obj){ return JSON.parse(JSON.stringify(obj)); }
+
+const lblRound = document.getElementById('lblRound');
+const lblPhase = document.getElementById('lblPhase');
+const rngSpeed = document.getElementById('rngSpeed');
+const lblSpeed = document.getElementById('lblSpeed');
+const chkDirs  = document.getElementById('chkDirs');
+
+let PLAN_ROUNDS = parsePlanText(DEFAULT_PLAN_TEXT);
+document.getElementById('txtPlan').value = DEFAULT_PLAN_TEXT;
+
+let baseState = deepCopy(INITIAL);
+let liveState = deepCopy(INITIAL);
+let roundIdx = 0;
+let playing = false;
+let phase = 'idle';
+let animStart = 0;
+let animDur = 600;
+let rafId = null;
+let animCtx = null;
+
+function syncLabels(){
+  document.getElementById('lblRound').textContent = `Round ${Math.min(roundIdx, PLAN_ROUNDS.length)} / ${PLAN_ROUNDS.length}`;
+  lblPhase.textContent = phase;
+  lblSpeed.textContent = `${(+rngSpeed.value).toFixed(2)}×`;
+}
+
+function applyRoundOnce(state, moves){
+  const next = deepCopy(state);
+  for (const m of moves){
+    if (m.type === 'block'){
+      const who = m.who.toLowerCase();
+      next.blocks[who] = { x: m.to.x, y: m.to.y };
+    } else {
+      const id = m.who;
+      next.obstacles[id] = { ...next.obstacles[id], x: m.to.x, y: m.to.y };
+    }
+  }
+  // lock visual
+  for (const color of Object.keys(next.blocks)){
+    if (next.locked[color]) continue;
+    const p = next.blocks[color];
+    for (const s of Object.values(next.slots)){
+      if (s.x === p.x && s.y === p.y) next.locked[color] = true;
+    }
+  }
+  return next;
+}
+
+function startRoundAnimation(){
+  const moves = PLAN_ROUNDS[roundIdx];
+  if (!moves || !moves.length){
+    baseState = applyRoundOnce(baseState, []);
+    liveState = deepCopy(baseState);
+    roundIdx++;
+    phase = 'idle';
+    return false;
+  }
+  const starts = {};
+  const targets = {};
+  for (const m of moves){
+    const key = (m.type==='block' ? `b:${m.who.toLowerCase()}` : `o:${m.who}`);
+    if (m.type==='block') starts[key] = { ...baseState.blocks[m.who.toLowerCase()] };
+    else                  starts[key] = { ...baseState.obstacles[m.who] };
+    targets[key] = { x:m.to.x, y:m.to.y, type:m.type, who:m.who, dir:m.dir };
+  }
+  animCtx = { starts, targets, moves };
+  animStart = performance.now();
+  phase = 'animating';
+  return true;
+}
+
+function stepAnimation(now){
+  const speed = +rngSpeed.value;
+  const dur = animDur / speed;
+  const t = Math.min(1, (now - animStart) / dur);
+
+  liveState = deepCopy(baseState);
+
+  if (animCtx){
+    for (const [key, s] of Object.entries(animCtx.starts)){
+      const trg = animCtx.targets[key];
+      const ix = s.x + (trg.x - s.x) * t;
+      const iy = s.y + (trg.y - s.y) * t;
+
+      if (key.startsWith('b:')){
+        const who = key.slice(2);
+        liveState.blocks[who] = { x: ix, y: iy };
+      } else {
+        const who = key.slice(2);
+        liveState.obstacles[who] = { ...liveState.obstacles[who], x: ix, y: iy };
+      }
+    }
+  }
+
+  // Render with current round directions overlay + "Round N" label
+  render(
+    liveState,
+    animCtx?.moves || null,
+    t,
+    chkDirs.checked,
+    true,                 // animating overlay ON
+    roundIdx,             // current round index
+    PLAN_ROUNDS.length    // total rounds
+  );
+
+  if (t >= 1){
+    baseState = applyRoundOnce(baseState, animCtx?.moves || []);
+    liveState = deepCopy(baseState);
+    roundIdx++;
+    phase = 'idle';
+    animCtx = null;
+    syncLabels();
+  }
+}
+
+function tick(now){
+  if (phase === 'animating') stepAnimation(now);
+  else render(liveState, null, 0, chkDirs.checked, false, roundIdx, PLAN_ROUNDS.length);
+
+  if (playing){
+    if (phase === 'idle' && roundIdx < PLAN_ROUNDS.length){
+      startRoundAnimation();
+      syncLabels();
+    }
+    rafId = requestAnimationFrame(tick);
+  }
+}
+
+// ======= UI =======
+document.getElementById('btnPlay').onclick = ()=>{
+  if (playing) return;
+  playing = true;
+  if (phase==='idle' && roundIdx < PLAN_ROUNDS.length) startRoundAnimation();
+  syncLabels();
+  rafId = requestAnimationFrame(tick);
+};
+document.getElementById('btnPause').onclick = ()=>{
+  playing = false;
+  if (rafId) cancelAnimationFrame(rafId);
+  syncLabels();
+};
+document.getElementById('btnPrev').onclick = ()=>{
+  playing = false; if (rafId) cancelAnimationFrame(rafId);
+  roundIdx = Math.max(0, roundIdx-1);
+  baseState = deepCopy(INITIAL);
+  for (let r=0;r<roundIdx;r++) baseState = applyRoundOnce(baseState, PLAN_ROUNDS[r]);
+  liveState = deepCopy(baseState);
+  phase = 'idle'; animCtx=null;
+  syncLabels(); render(liveState, null, 0, chkDirs.checked, false, roundIdx, PLAN_ROUNDS.length);
+};
+document.getElementById('btnNext').onclick = ()=>{
+  playing = false; if (rafId) cancelAnimationFrame(rafId);
+  if (roundIdx >= PLAN_ROUNDS.length) return;
+  baseState = applyRoundOnce(baseState, PLAN_ROUNDS[roundIdx]);
+  roundIdx++;
+  liveState = deepCopy(baseState);
+  phase = 'idle'; animCtx=null;
+  syncLabels(); render(liveState, null, 0, chkDirs.checked, false, roundIdx, PLAN_ROUNDS.length);
+};
+document.getElementById('btnReset').onclick = ()=>{
+  playing = false; if (rafId) cancelAnimationFrame(rafId);
+  baseState = deepCopy(INITIAL);
+  liveState = deepCopy(INITIAL);
+  roundIdx = 0; phase='idle'; animCtx=null;
+  syncLabels(); render(liveState, null, 0, chkDirs.checked, false, roundIdx, PLAN_ROUNDS.length);
+};
+document.getElementById('btnReload').onclick = ()=>{
+  playing = false; if (rafId) cancelAnimationFrame(rafId);
+  const txt = document.getElementById('txtPlan').value;
+  PLAN_ROUNDS = parsePlanText(txt);
+  baseState = deepCopy(INITIAL);
+  liveState = deepCopy(INITIAL);
+  roundIdx = 0; phase='idle'; animCtx=null;
+  syncLabels(); render(liveState, null, 0, chkDirs.checked, false, roundIdx, PLAN_ROUNDS.length);
+};
+rngSpeed.oninput = ()=>{ lblSpeed.textContent = `${(+rngSpeed.value).toFixed(2)}×`; };
+
+// Startup
+document.getElementById('txtPlan').value = DEFAULT_PLAN_TEXT;
+PLAN_ROUNDS = parsePlanText(DEFAULT_PLAN_TEXT);
+const lblRoundEl = document.getElementById('lblRound');
+lblRoundEl.textContent = `Round 0 / ${PLAN_ROUNDS.length}`;
+render(liveState, null, 0, true, false, 0, PLAN_ROUNDS.length);
+</script>
+</body>
+</html>

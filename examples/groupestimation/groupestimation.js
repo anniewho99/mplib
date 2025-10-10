@@ -236,7 +236,7 @@ const instructionSteps = [
     }
 ];
 
-let currentStep = 0;
+let currentStep = 8;
 
 const params = new URLSearchParams(window.location.search);
 if (params.has("skipinstruction")) {
@@ -868,7 +868,7 @@ function getNumPlayersFromURL() {
 }
 
 let GameName = "groupestimation";
-let NumPlayers = 3;
+let NumPlayers = 1;
 let MinPlayers = NumPlayers;
 let MaxPlayers = NumPlayers;
 let MaxSessions = 0;
@@ -949,67 +949,76 @@ let completedLevel = false;
 const levelPlacements = {
     0: {
         blocks: {
-            blue: { x: 7, y: 1, color: 'blue', minVotes: 3 },
-            red: { x: 7, y: 5, color: 'red', minVotes: 2},
-            yellow: { x: 7, y: 9, color: 'yellow', minVotes: 1 }
+            blue: { x: 13, y: 9, color: 'blue', minVotes: 3 },
+            red: { x: 7, y: 0, color: 'red', minVotes: 2},
+            yellow: { x: 0, y: 9, color: 'yellow', minVotes: 1 }
         },
         slots: {
             slot0: { x: 2, y: 5 },
-            slot1: { x: 13, y: 5 }
+            slot1: { x: 15, y: 5 }
         },
         obstacles: {
-            obs1: { x: 2, y: 2, id: 'obs1' }
+            obs0:{x:8,y:4,id:'obs0', immovable:true},
+            obs1:{x:8,y:6,id:'obs1', immovable:true},
+            obs2:{x:5,y:4,id:'obs2'},
+            obs3:{x:11,y:4,id:'obs3'},
         }
     },
     1: {
         blocks: {
-            blue: { x: 7, y: 1, color: 'blue', minVotes: 3 },
-            red: { x: 7, y: 5, color: 'red', minVotes: 2},
-            yellow: { x: 7, y: 9, color: 'yellow', minVotes: 1 }
+            blue: { x: 8, y: 2, color: 'blue', minVotes: 3 },
+            red: { x: 4, y: 0, color: 'red', minVotes: 2},
+            yellow: { x: 12, y: 0, color: 'yellow', minVotes: 1 }
         },
         slots: {
-            slot0: { x: 2, y: 5 },
-            slot1: { x: 13, y: 5 }
+            slot0: { x: 3, y: 7 },
+            slot1: { x: 14, y: 7 }
         },
         obstacles: {
-            obs1: { x: 5, y: 2, id: 'obs1' },
-            obs2: { x: 10, y: 2, id: 'obs2', immovable: true }
+            obs0:{x:7,y:5,id:'obs0', immovable:true},
+            obs1:{x:11,y:5,id:'obs1', immovable:true},
+            obs2:{x:2,y:9,id:'obs2'},
+            obs3:{x:16,y:9,id:'obs3'},
         }
     },
     2: {
         blocks: {
-            blue: { x: 7, y: 1, color: 'blue', minVotes: 3 },
-            red: { x: 7, y: 5, color: 'red', minVotes: 2},
-            yellow: { x: 7, y: 9, color: 'yellow', minVotes: 1 }
+            blue: { x: 8, y: 3, color: 'blue', minVotes: 3 },
+            red: { x: 6, y: 0, color: 'red', minVotes: 2},
+            yellow: { x: 10, y: 0, color: 'yellow', minVotes: 1 }
         },
         slots: {
             slot0: { x: 2, y: 5 },
             slot1: { x: 13, y: 5 }
         },
         obstacles: {
-            obs1: { x: 2, y: 2, id: 'obs1', immovable: true },
-            obs2: { x: 4, y: 4, id: 'obs2' },
-            obs3: { x: 14, y: 2, id: 'obs3', immovable: true },
-            obs4: { x: 12, y: 4, id: 'obs4' }
+            obs0: { x: 5, y: 4, id: 'obs0', immovable: true  },
+            obs1: { x: 2, y: 1, id: 'obs1', immovable: true},
+            obs3: { x: 5, y: 8, id: 'obs3'},
+            obs4: { x: 14, y: 1, id: 'obs4' },
+            obs2: { x: 11, y: 4, id: 'obs2', immovable: true  },
+            obs5: { x: 11, y: 8, id: 'obs5'}
         }
     },
     3: {
         blocks: {
-            blue: { x: 8, y: 4, color: 'blue', minVotes: 3 },
-            red: { x: 6, y: 1, color: 'red', minVotes: 2 },
-            yellow: { x: 10, y: 1, color: 'yellow', minVotes: 1 }
+            blue: { x: 13, y: 9, color: 'blue', minVotes: 3 },
+            red: { x: 8, y: 0, color: 'red', minVotes: 2 },
+            yellow: { x: 1, y: 9, color: 'yellow', minVotes: 1 }
         },
         slots: {
-            slot0: { x: 2, y: 5 },
-            slot1: { x: 13, y: 5 }
+            slot0: { x: 2, y: 3 },
+            slot1: { x: 14, y: 3 }
         },
         obstacles: {
-            obs1: { x: 2, y: 1, id: 'obs1' },
-            obs2: { x: 5, y: 4, id: 'obs2' },
-            obs3: { x: 5, y: 8, id: 'obs3', immovable: true },
-            obs4: { x: 14, y: 1, id: 'obs4', immovable: true },
-            obs5: { x: 11, y: 4, id: 'obs5' },
-            obs6: { x: 11, y: 8, id: 'obs6', immovable: true }
+            obs0: { x: 5, y: 5, id: 'obs0', immovable: true  },
+            obs1: { x: 7, y: 3, id: 'obs1', immovable: true},
+            obs2: { x: 11, y: 4, id: 'obs2', immovable: true  },
+            obs3: { x: 9, y: 6, id: 'obs3', immovable: true},
+            obs4: { x: 13, y: 6, id: 'obs4', immovable: true },
+            obs5: { x: 2, y: 0, id: 'obs5'},
+            obs6: { x: 2, y: 6, id: 'obs6'},
+            obs7: { x: 11, y: 9, id: 'obs7'}
         }
     },
 };
@@ -1360,7 +1369,7 @@ function showLevelCompleteMessage(levelNumber, callback) {
         screen.style.display = 'flex';
         
         // 30s timer
-        let countdown = 15;
+        let countdown = 5;
         const timerText = document.getElementById('feedbackTimer');
         timerText.innerText = `⏱ Time left: ${countdown}s`;
         
@@ -1396,11 +1405,11 @@ function showLevelCompleteMessage(levelNumber, callback) {
 
 function getLevelTimeLimit(levelNumber) {
     if (levelNumber === 0 || levelNumber === 1) {
-        return 5 * 60 * 1000; // 5 minutes
+        return 15 * 1000; // 5 minutes
     } else if (levelNumber === 2 || levelNumber === 3) {
-        return 5 * 60 * 1000; // 5 minutes
+        return 15 * 1000; // 5 minutes
     } else {
-        return 5 * 60 * 1000; // default fallback
+        return 15 * 1000; // default fallback
     }
 }
 
