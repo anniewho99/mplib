@@ -682,7 +682,11 @@ function render(state, currentRoundMoves=null, tProgress=0, showDirs=true, anima
   for (const o of Object.values(state.obstacles)) drawObstacle(o);
 
   // blocks
-  for (const [name,pos] of Object.entries(state.blocks)) drawBlock(name, pos);
+  for (const [name, pos] of Object.entries(state.blocks)) {
+    if (state.locked[name]) continue;   // 🔴 hide locked blocks
+    drawBlock(name, pos);
+  }
+
 
   // Overlay directions for the CURRENT round (during animation)
   if (showDirs && currentRoundMoves && currentRoundMoves.length){
