@@ -103,11 +103,11 @@ const instructionSteps = [
                 background-image: 
                     linear-gradient(to right, darkgray 1px, transparent 1px),
                     linear-gradient(to bottom, darkgray 1px, transparent 1px);
-                background-size: 45px 45px;
+                background-size: 40px 40px;
                 position: relative;
                 display: grid;
-                grid-template-columns: repeat(8, 45px);
-                grid-template-rows: repeat(8, 45px);
+                grid-template-columns: repeat(8, 40px);
+                grid-template-rows: repeat(8, 40px);
                 margin: auto;">
             </div>
         `
@@ -122,11 +122,11 @@ const instructionSteps = [
                 background-image: 
                     linear-gradient(to right, darkgray 1px, transparent 1px),
                     linear-gradient(to bottom, darkgray 1px, transparent 1px);
-                background-size: 45px 45px;
+                background-size: 40px 40px;
                 position: relative;
                 display: grid;
-                grid-template-columns: repeat(8, 45px);
-                grid-template-rows: repeat(8, 45px);
+                grid-template-columns: repeat(8, 40px);
+                grid-template-rows: repeat(8, 40px);
                 margin: auto;">
             </div>
         `
@@ -141,17 +141,17 @@ const instructionSteps = [
                 background-image: 
                     linear-gradient(to right, darkgray 1px, transparent 1px),
                     linear-gradient(to bottom, darkgray 1px, transparent 1px);
-                background-size: 45px 45px;
+                background-size: 40px 40px;
                 position: relative;
                 display: grid;
-                grid-template-columns: repeat(8, 45px);
-                grid-template-rows: repeat(8, 45px);
+                grid-template-columns: repeat(8, 40px);
+                grid-template-rows: repeat(8, 40px);
                 margin: auto;">
             </div>
                <div id="practiceTimer" style="text-align:center; font-size:18px; margin-top:10px;"></div>`
       },      
       {
-        text: `In addition to blocks and slots, there are also obstacles — the black object on the left is an obstacle. Obstacles always require just one person to move. Let's start by pushing the obstacle out of the way, then push the block into the slot.`,
+        text: `In addition to blocks and slots, there are also walls — the brown areas on the board. You can’t move them, but you can move around them. Let’s try to get the block into a slot while avoiding the wall! `,
         demo: `<div id="practiceBoard" style="
                 width: 360px;
                 height: 360px;
@@ -159,11 +159,29 @@ const instructionSteps = [
                 background-image: 
                     linear-gradient(to right, darkgray 1px, transparent 1px),
                     linear-gradient(to bottom, darkgray 1px, transparent 1px);
-                background-size: 45px 45px;
+                background-size: 40px 40px;
                 position: relative;
                 display: grid;
-                grid-template-columns: repeat(8, 45px);
-                grid-template-rows: repeat(8, 45px);
+                grid-template-columns: repeat(8, 40px);
+                grid-template-rows: repeat(8, 40px);
+                margin: auto;">
+            </div>
+               <div id="practiceTimer" style="text-align:center; font-size:18px; margin-top:10px;"></div>`
+      },  
+      {
+        text: `There are also obstacles that are movable — the black object on the left is an obstacle. Obstacles always require only one person to move. Let’s start by pushing the obstacle out of the way, and then push the block into the slot.`,
+        demo: `<div id="practiceBoard" style="
+                width: 360px;
+                height: 360px;
+                background-color: #bcbcbc;
+                background-image: 
+                    linear-gradient(to right, darkgray 1px, transparent 1px),
+                    linear-gradient(to bottom, darkgray 1px, transparent 1px);
+                background-size: 40px 40px;
+                position: relative;
+                display: grid;
+                grid-template-columns: repeat(8, 40px);
+                grid-template-rows: repeat(8, 40px);
                 margin: auto;">
             </div>
                <div id="practiceTimer" style="text-align:center; font-size:18px; margin-top:10px;"></div>`
@@ -177,11 +195,11 @@ const instructionSteps = [
                 background-image: 
                     linear-gradient(to right, darkgray 1px, transparent 1px),
                     linear-gradient(to bottom, darkgray 1px, transparent 1px);
-                background-size: 45px 45px;
+                background-size: 40px 40px;
                 position: relative;
                 display: grid;
-                grid-template-columns: repeat(8, 45px);
-                grid-template-rows: repeat(8, 45px);
+                grid-template-columns: repeat(8, 40px);
+                grid-template-rows: repeat(8, 40px);
                 margin: auto;">
             </div>
                <div id="practiceTimer" style="text-align:center; font-size:18px; margin-top:10px;"></div>`
@@ -195,11 +213,11 @@ const instructionSteps = [
                 background-image: 
                     linear-gradient(to right, darkgray 1px, transparent 1px),
                     linear-gradient(to bottom, darkgray 1px, transparent 1px);
-                background-size: 45px 45px;
+                background-size: 40px 40px;
                 position: relative;
                 display: grid;
-                grid-template-columns: repeat(8, 45px);
-                grid-template-rows: repeat(8, 45px);
+                grid-template-columns: repeat(8, 40px);
+                grid-template-rows: repeat(8, 40px);
                 margin: auto;">
             </div>
                <div id="practiceTimer" style="text-align:center; font-size:18px; margin-top:10px;"></div>`
@@ -236,7 +254,7 @@ const instructionSteps = [
     }
 ];
 
-let currentStep = 8;
+let currentStep = 9;
 
 const params = new URLSearchParams(window.location.search);
 if (params.has("skipinstruction")) {
@@ -288,8 +306,29 @@ document.getElementById('nextInstruction').onclick = () => {
           startPracticePhaseCycle();
         }, 50); 
       }
-      
+
       if (currentStep === 5) {
+        // Stop countdown updates
+        clearInterval(practiceTimerInterval);
+        practiceTimerInterval = null;
+
+        // Clear the visible timer
+        const timerEl = document.getElementById('practiceTimer');
+        if (timerEl) timerEl.innerText = '';
+
+        let practiceBlock = { x: 6, y: 2, color: 'yellow', minVotes: 1 };
+        let practiceObstacle = { x: 4, y: 2, id: 'obs1' };
+        cleanupPracticeBoard();
+        setTimeout(() => {
+        hideNextButton();
+          createPracticeSlot(1, 3);
+          drawPracticeBlock(practiceBlock, false);
+          drawPracticeBlock(practiceObstacle, true, true);
+          startPracticePhaseCycle();
+        }, 50); 
+      }
+
+      if (currentStep === 6) {
         // Stop countdown updates
         clearInterval(practiceTimerInterval);
         practiceTimerInterval = null;
@@ -310,7 +349,7 @@ document.getElementById('nextInstruction').onclick = () => {
         }, 50); 
       }
 
-      if (currentStep === 6) {
+      if (currentStep === 7) {
         // Stop countdown updates
         clearInterval(practiceTimerInterval);
         practiceTimerInterval = null;
@@ -321,17 +360,19 @@ document.getElementById('nextInstruction').onclick = () => {
 
         let practiceBlock = { x: 2, y: 3, color: 'red', minVotes: 2 };
         let practiceObstacle = { x: 0, y: 2, id: 'obs1' };
+        let practiceObstacleTwo = { x: 6, y: 6, id: 'obs2' };
         cleanupPracticeBoard();
         setTimeout(() => {
         hideNextButton();
           createPracticeSlot(1, 3);
           drawPracticeBlock(practiceBlock, false);
           drawPracticeBlock(practiceObstacle, true);
+          drawPracticeBlock(practiceObstacleTwo, true, true);
           startPracticePhaseCycle();
         }, 50); 
       }
 
-      if (currentStep === 7) {
+      if (currentStep === 8) {
         // Stop countdown updates
         clearInterval(practiceTimerInterval);
         practiceTimerInterval = null;
@@ -342,12 +383,14 @@ document.getElementById('nextInstruction').onclick = () => {
 
         let practiceBlock = { x: 2, y: 3, color: 'blue', minVotes: 3 };
         let practiceObstacle = { x: 0, y: 1, id: 'obs1' };
+        let practiceObstacleTwo = { x: 5, y: 0, id: 'obs1' };
         cleanupPracticeBoard();
         setTimeout(() => {
         hideNextButton();
           createPracticeSlot(1, 3);
           drawPracticeBlock(practiceBlock, false);
           drawPracticeBlock(practiceObstacle, true);
+          drawPracticeBlock(practiceObstacleTwo, true, true);
           startPracticePhaseCycle();
         }, 50); 
       }
@@ -403,11 +446,11 @@ function startPracticePhaseCycle() {
     practiceTimerInterval = setInterval(() => {
       countdown--;
       if (countdown > 0) {
-        if(currentStep == 6){
+        if(currentStep == 7){
             const blockEl = document.querySelector('.block:not([data-obstacle="true"])');
             addPracticeArrowToBlock(blockEl, "left", 2);
         }
-        if(currentStep == 7){
+        if(currentStep == 8){
             const blockEl = document.querySelector('.block:not([data-obstacle="true"])');
             addPracticeArrowToBlock(blockEl, "left", 2);
             if(countdown > 3){
@@ -445,16 +488,22 @@ function createPracticeSlot(x, y) {
     board.appendChild(div);
 }
   
-function drawPracticeBlock(block, isObstacle) {
-    const CELL_SIZE = 45;
+function drawPracticeBlock(block, isObstacle, immovable) {
+    const CELL_SIZE = 40;
     const container = document.getElementById('practiceBoard'); 
     const div = document.createElement('div');
     div.classList.add('block');
     let width;
     let height;
     if(isObstacle){
-        width = CELL_SIZE * 2.3;
-        height = CELL_SIZE * 2.3;
+        if(immovable){
+            width = CELL_SIZE * 2;
+            height = CELL_SIZE * 2;
+        }else{
+            width = CELL_SIZE * 2.3;
+            height = CELL_SIZE * 2.3;
+        }
+
     }else{
         width = CELL_SIZE * 3;
         height = CELL_SIZE * 3;
@@ -486,9 +535,19 @@ function drawPracticeBlock(block, isObstacle) {
     div.style.backgroundSize = 'cover';
     div.style.imageRendering = 'pixelated';
 
-    div.style.backgroundImage = isObstacle
-    ? "url('./images/obstacle.png')"
-    : "url('./images/block.png')";
+    // div.style.backgroundImage = isObstacle
+    // ? "url('./images/obstacle.png')"
+    // : "url('./images/block.png')";
+
+
+    if (isObstacle) {
+        div.style.backgroundImage = immovable
+          ? "url('./images/wall.png')"  // immovable obstacle → wall texture
+          : "url('./images/obstacle.png')";   
+          div.style.filter = 'none';                          // movable obstacle
+      } else {
+        div.style.backgroundImage = "url('./images/block.png')";         // normal block
+      }
 
 
     if(isObstacle == false){
@@ -516,18 +575,22 @@ function drawPracticeBlock(block, isObstacle) {
         div.appendChild(minText);
 
     }else{
-        // div.style.backgroundColor = '#555'; // dark gray
-        // div.style.borderRadius = '50%';
-        const minText = document.createElement('div');
-        minText.innerText = `1`;
-        minText.style.fontSize = '24px';
-        minText.style.fontWeight = 'bold';
-        minText.style.textShadow = '1px 1px 0 #000';
-        minText.style.color = 'white';
-        minText.style.marginBottom = '2px';
-        minText.style.imageRendering = 'pixelated';
-        minText.style.fontFamily = 'monospace'; 
-        div.appendChild(minText);
+        if(!immovable){
+            // div.style.backgroundColor = '#555'; // dark gray
+            // div.style.borderRadius = '50%';
+            const minText = document.createElement('div');
+            minText.innerText = `1`;
+            minText.style.fontSize = '24px';
+            minText.style.fontWeight = 'bold';
+            minText.style.textShadow = '1px 1px 0 #000';
+            minText.style.color = 'white';
+            minText.style.marginBottom = '2px';
+            minText.style.imageRendering = 'pixelated';
+            minText.style.fontFamily = 'monospace'; 
+            div.appendChild(minText);
+
+        }
+
 
     }
 
@@ -545,6 +608,10 @@ function drawPracticeBlock(block, isObstacle) {
         right: { top: '50%', left: '25%', transform: 'translate(-50%, -50%)' }
     };
     
+    if (isObstacle && immovable) {           // NEW
+        container.appendChild(div);                  // NEW
+        return;                                      // NEW
+      }
     
     const directions = ['up', 'right', 'down', 'left'];
     directions.forEach(dir => {
@@ -559,20 +626,23 @@ function drawPracticeBlock(block, isObstacle) {
         arrow.dataset.targetId = id;
         arrow.dataset.isObstacle = isObstacle;
         if (isObstacle) {
-            switch (dir) {
-                case 'up':
-                    arrow.style.borderWidth = '12px 15px 16px 15px';
-                    break;
-                case 'down':
-                    arrow.style.borderWidth = '16px 15px 12px 15px';
-                    break;
-                case 'left':
-                    arrow.style.borderWidth = '15px 15px 15px 12px';
-                    break;
-                case 'right':
-                    arrow.style.borderWidth = '15px 12px 15px 15px';
-                    break;
-            }
+
+                switch (dir) {
+                    case 'up':
+                        arrow.style.borderWidth = '12px 15px 16px 15px';
+                        break;
+                    case 'down':
+                        arrow.style.borderWidth = '16px 15px 12px 15px';
+                        break;
+                    case 'left':
+                        arrow.style.borderWidth = '15px 15px 15px 12px';
+                        break;
+                    case 'right':
+                        arrow.style.borderWidth = '15px 12px 15px 15px';
+                        break;
+                }
+
+            
         }
         
 
@@ -723,7 +793,7 @@ function finalizePracticeVotes() {
 }
 
 function movePracticeBlock(block, direction) {
-    const CELL_SIZE = 45;
+    const CELL_SIZE = 40;
     const container = document.getElementById('practiceBoard');
 
     // Disable all direction buttons
@@ -882,8 +952,8 @@ let playerId;
 
 let arrivalIndex;
 
-const CELL_WIDTH = 45;
-const CELL_HEIGHT = 45;
+const CELL_WIDTH = 40;
+const CELL_HEIGHT = 40;
 
 //  Configuration Settings for the Session
 const studyId = GameName; 
@@ -949,76 +1019,77 @@ let completedLevel = false;
 const levelPlacements = {
     0: {
         blocks: {
-            blue: { x: 13, y: 9, color: 'blue', minVotes: 3 },
-            red: { x: 7, y: 0, color: 'red', minVotes: 2},
-            yellow: { x: 0, y: 9, color: 'yellow', minVotes: 1 }
+            blue: { x: 10, y: 10, color: 'blue', minVotes: 3 },
+            red: { x: 8, y: 1, color: 'red', minVotes: 2},
+            yellow: { x: 1, y: 10, color: 'yellow', minVotes: 1 }
         },
         slots: {
-            slot0: { x: 2, y: 5 },
-            slot1: { x: 15, y: 5 }
+            slot0: { x: 3, y: 6 },
+            slot1: { x: 16, y: 6 }
         },
         obstacles: {
-            obs0:{x:8,y:4,id:'obs0', immovable:true},
-            obs1:{x:8,y:6,id:'obs1', immovable:true},
-            obs2:{x:5,y:4,id:'obs2'},
-            obs3:{x:11,y:4,id:'obs3'},
+            obs0:{x:9,y:5,id:'obs0', immovable:true},
+            obs1:{x:9,y:7,id:'obs1', immovable:true},
+            obs2:{x:6,y:5,id:'obs2'},
+            obs3:{x:12,y:5,id:'obs3'},
         }
     },
     1: {
         blocks: {
-            blue: { x: 8, y: 2, color: 'blue', minVotes: 3 },
-            red: { x: 4, y: 0, color: 'red', minVotes: 2},
-            yellow: { x: 12, y: 0, color: 'yellow', minVotes: 1 }
+            blue: { x: 12, y: 10, color: 'blue', minVotes: 3 },
+            red: { x: 9, y: 1, color: 'red', minVotes: 2},
+            yellow: { x: 2, y: 10, color: 'yellow', minVotes: 1 }
         },
         slots: {
-            slot0: { x: 3, y: 7 },
-            slot1: { x: 14, y: 7 }
+            slot0: { x: 3, y: 4 },
+            slot1: { x: 15, y: 4 }
         },
         obstacles: {
-            obs0:{x:7,y:5,id:'obs0', immovable:true},
-            obs1:{x:11,y:5,id:'obs1', immovable:true},
-            obs2:{x:2,y:9,id:'obs2'},
-            obs3:{x:16,y:9,id:'obs3'},
+            obs0: { x: 6, y: 6, id: 'obs0', immovable: true  },
+            obs1: { x: 8, y: 4, id: 'obs1', immovable: true},
+            obs2: { x: 12, y: 5, id: 'obs2', immovable: true  },
+            obs3: { x: 10, y: 7, id: 'obs3', immovable: true},
+            obs4: { x: 14, y: 7, id: 'obs4', immovable: true },
+            obs5: { x: 3, y: 1, id: 'obs5'},
+            obs6: { x: 3, y: 7, id: 'obs6'},
+            obs7: { x: 10, y: 10, id: 'obs7'}
         }
     },
     2: {
         blocks: {
-            blue: { x: 8, y: 3, color: 'blue', minVotes: 3 },
-            red: { x: 6, y: 0, color: 'red', minVotes: 2},
-            yellow: { x: 10, y: 0, color: 'yellow', minVotes: 1 }
+            blue: { x: 16, y: 9, color: 'blue', minVotes: 3 },
+            red: { x: 6, y: 1, color: 'red', minVotes: 2},
+            yellow: { x: 6, y: 9, color: 'yellow', minVotes: 1 }
         },
         slots: {
-            slot0: { x: 2, y: 5 },
-            slot1: { x: 13, y: 5 }
+            slot0: { x: 1, y: 6 },
+            slot1: { x: 9, y: 5 }
         },
         obstacles: {
-            obs0: { x: 5, y: 4, id: 'obs0', immovable: true  },
-            obs1: { x: 2, y: 1, id: 'obs1', immovable: true},
-            obs3: { x: 5, y: 8, id: 'obs3'},
-            obs4: { x: 14, y: 1, id: 'obs4' },
-            obs2: { x: 11, y: 4, id: 'obs2', immovable: true  },
-            obs5: { x: 11, y: 8, id: 'obs5'}
+            obs0: { x: 3, y: 10, id: 'obs0', immovable: true  },
+            obs1: { x: 13, y: 6, id: 'obs1', immovable: true},
+            obs2: { x: 2, y: 3, id: 'obs2'},
+            obs3: { x: 6, y: 6, id: 'obs3'},
+            obs4: { x: 10, y: 9, id: 'obs4'}
         }
     },
     3: {
         blocks: {
-            blue: { x: 13, y: 9, color: 'blue', minVotes: 3 },
-            red: { x: 8, y: 0, color: 'red', minVotes: 2 },
-            yellow: { x: 1, y: 9, color: 'yellow', minVotes: 1 }
+            blue: { x: 9, y: 4, color: 'blue', minVotes: 3 },
+            red: { x: 7, y: 1, color: 'red', minVotes: 2 },
+            yellow: { x: 11, y: 1, color: 'yellow', minVotes: 1 }
         },
         slots: {
-            slot0: { x: 2, y: 3 },
-            slot1: { x: 14, y: 3 }
+            slot0: { x: 3, y: 5 },
+            slot1: { x: 14, y: 5 }
         },
         obstacles: {
-            obs0: { x: 5, y: 5, id: 'obs0', immovable: true  },
-            obs1: { x: 7, y: 3, id: 'obs1', immovable: true},
-            obs2: { x: 11, y: 4, id: 'obs2', immovable: true  },
-            obs3: { x: 9, y: 6, id: 'obs3', immovable: true},
-            obs4: { x: 13, y: 6, id: 'obs4', immovable: true },
-            obs5: { x: 2, y: 0, id: 'obs5'},
-            obs6: { x: 2, y: 6, id: 'obs6'},
-            obs7: { x: 11, y: 9, id: 'obs7'}
+            obs0: { x: 6, y: 4, id: 'obs0', immovable: true  },
+            obs1: { x: 3, y: 2, id: 'obs1', immovable: true},
+            obs3: { x: 6, y: 8, id: 'obs3'},
+            obs4: { x: 15, y: 1, id: 'obs4' },
+            obs2: { x: 12, y: 4, id: 'obs2', immovable: true  },
+            obs5: { x: 12, y: 8, id: 'obs5'}
         }
     },
 };
@@ -1835,8 +1906,8 @@ function finalizeVotes() {
             if (plan.direction === 'left') x -= 1;
             if (plan.direction === 'right') x += 1;
         
-            x = Math.max(1, Math.min(18, x));
-            y = Math.max(1, Math.min(13, y));
+            x = Math.max(1, Math.min(17, x));
+            y = Math.max(1, Math.min(12, y));
         
 
             updateStateDirect(`moveBlock/${plan.block.dataset.color}`, {
@@ -2434,7 +2505,7 @@ function layoutDirectionalArrows(block, direction, isObstacle) {
 }
 
 
-function animateSpriteOnce(arrowDiv, frameCount = 6, frameWidth = 45, frameHeight = 45, fps = 6) {
+function animateSpriteOnce(arrowDiv, frameCount = 6, frameWidth = 40, frameHeight = 40, fps = 6) {
     let currentFrame = 0;
 
     function step() {
