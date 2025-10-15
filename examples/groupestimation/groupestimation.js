@@ -254,11 +254,11 @@ const instructionSteps = [
     }
 ];
 
-let currentStep = 9;
+let currentStep = 0;
 
 const params = new URLSearchParams(window.location.search);
 if (params.has("skipinstruction")) {
-    currentStep = 8;
+    currentStep = 9;
 }
 
 
