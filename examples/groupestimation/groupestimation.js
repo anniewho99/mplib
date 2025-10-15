@@ -938,7 +938,7 @@ function getNumPlayersFromURL() {
 }
 
 let GameName = "groupestimation";
-let NumPlayers = 1;
+let NumPlayers = 3;
 let MinPlayers = NumPlayers;
 let MaxPlayers = NumPlayers;
 let MaxSessions = 0;
@@ -1401,8 +1401,8 @@ function showLevelCompleteMessage(levelNumber, callback) {
         // Header based on completion status
         let fnished = completedLevel;
         let headerText = completedLevel
-          ? `🎉 You've completed Level ${levelNumber}!`
-          : `Time is up on Level ${levelNumber}.`;
+          ? `🎉 You've completed Level ${levelNumber + 1}!`
+          : `Time is up on Level ${levelNumber + 1}.`;
         
         // Reset the flag for the next round
         completedLevel = false;
@@ -1410,7 +1410,7 @@ function showLevelCompleteMessage(levelNumber, callback) {
         // Full message with header and questionnaire
         message.innerHTML = `
           ${headerText}<br>
-          Before moving on to Level ${levelNumber + 1}, please answer a few quick questions about your experience.<br><br>
+          Before moving on to Level ${levelNumber + 2}, please answer a few quick questions about your experience.<br><br>
         
           <div>
             <label><strong>1. How satisfied are you with the gameplay in the last level?<span style="color: red">*</span></strong></label><br>
@@ -1476,11 +1476,11 @@ function showLevelCompleteMessage(levelNumber, callback) {
 
 function getLevelTimeLimit(levelNumber) {
     if (levelNumber === 0 || levelNumber === 1) {
-        return 15 * 1000; // 5 minutes
+        return 5 * 60 * 1000; // 5 minutes
     } else if (levelNumber === 2 || levelNumber === 3) {
-        return 15 * 1000; // 5 minutes
+        return 5 * 60  * 1000; // 5 minutes
     } else {
-        return 15 * 1000; // default fallback
+        return 5 * 60 * 1000; // default fallback
     }
 }
 
@@ -1827,6 +1827,13 @@ function hideDirectionButtons() {
 //     // }, countdown * 1000);
 // }
 
+function isInsidePlayable(x, y) {
+    const min = 1; // leave 1-tile wall ring
+    const maxX = 17;
+    const maxY = 12;
+    return x >= min && x <= maxX && y >= min && y <= maxY;
+  }
+  
 function finalizeVotes() {
     getCurrentPlayerIds().forEach(pid => {
         updateStateDirect(`players/${pid}`, { block: null, direction: null, obstacle: null }, 'start new event');
@@ -1865,12 +1872,13 @@ function finalizeVotes() {
         if (majorityDirection === 'right') targetX += 1;
 
         const size = block.dataset.obstacle === 'true' ? 2 : 3;
+        const willMove = !!majorityDirection && isInsidePlayable(targetX, targetY);
 
         futurePlans.push({
             id,
             block,
             direction: majorityDirection,
-            willMove: !!majorityDirection,
+            willMove,
             size,
             futureCoords: getOccupiedCells(targetX, targetY, size)
         });
@@ -2474,7 +2482,7 @@ function layoutDirectionalArrows(block, direction, isObstacle) {
                 break;
 
             case 'down':
-                topPx = isObstacle ? 90 : 135; 
+                topPx = (isObstacle ? 90 : 135) - 10; 
                 leftPx = i * OFFSET_STEP;
                 transform += ' translate(5%, -10%)';
                 break;
@@ -2487,7 +2495,7 @@ function layoutDirectionalArrows(block, direction, isObstacle) {
 
             case 'right':
                 topPx = i * OFFSET_STEP;
-                leftPx = isObstacle ? 80 : 125; 
+                leftPx = (isObstacle ? 80 : 125) - 10; 
                 transform += ' translate(-5%, -10%) scaleY(-1)';
                 break;
         }
