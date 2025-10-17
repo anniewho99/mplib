@@ -148,7 +148,7 @@ const instructionSteps = [
                 grid-template-rows: repeat(8, 40px);
                 margin: auto;">
             </div>
-               <div id="practiceTimer" style="text-align:center; font-size:18px; margin-top:10px;"></div>`
+               <div id="practiceTimer" style="text-align:center; font-size:18px; margin-top:10px; color:black;"></div>`
       },      
       {
         text: `In addition to blocks and slots, there are also walls — the brown areas on the board. You can’t move them, but you can move around them. Let’s try to get the block into a slot while avoiding the wall! `,
@@ -166,7 +166,7 @@ const instructionSteps = [
                 grid-template-rows: repeat(8, 40px);
                 margin: auto;">
             </div>
-               <div id="practiceTimer" style="text-align:center; font-size:18px; margin-top:10px;"></div>`
+               <div id="practiceTimer" style="text-align:center; font-size:18px; margin-top:10px; color:black;"></div>`
       },  
       {
         text: `There are also obstacles that are movable — the black object on the left is an obstacle. Obstacles always require only one person to move. Let’s start by pushing the obstacle out of the way, and then push the block into the slot.`,
@@ -184,7 +184,7 @@ const instructionSteps = [
                 grid-template-rows: repeat(8, 40px);
                 margin: auto;">
             </div>
-               <div id="practiceTimer" style="text-align:center; font-size:18px; margin-top:10px;"></div>`
+               <div id="practiceTimer" style="text-align:center; font-size:18px; margin-top:10px; color:black;"></div>`
       },   
       {
         text: `Some blocks require two players to move — like this one. You'll see another player's choice as soon as they click a direction. In this case, another player has already chosen to move the block to the left. Try coordinating with them to move this 2 block into the slot.`,
@@ -202,7 +202,7 @@ const instructionSteps = [
                 grid-template-rows: repeat(8, 40px);
                 margin: auto;">
             </div>
-               <div id="practiceTimer" style="text-align:center; font-size:18px; margin-top:10px;"></div>`
+               <div id="practiceTimer" style="text-align:center; font-size:18px; margin-top:10px; color:black;"></div>`
       },     
       {
         text: `Finally, there is also a block that requires three players to coordinate in order to move it. One player has already decided to push the block to the left. Another is still deciding — they initially chose to push it down but are now switching to the left as well. Remember, you can change your choice between different blocks and directions in the five seconds countdown. Try coordinating with them to move this 3 block into the slot.`,
@@ -220,7 +220,7 @@ const instructionSteps = [
                 grid-template-rows: repeat(8, 40px);
                 margin: auto;">
             </div>
-               <div id="practiceTimer" style="text-align:center; font-size:18px; margin-top:10px;"></div>`
+               <div id="practiceTimer" style="text-align:center; font-size:18px; margin-top:10px; color:black;"></div>`
       },   
     {
             text: `
@@ -267,7 +267,7 @@ function renderInstructionStep() {
     document.getElementById('instructionText').innerText = step.text;
     document.getElementById('instructionDemo').innerHTML = step.demo || '';
 
-    document.getElementById('prevInstruction').style.display = currentStep > 0 ? 'inline-block' : 'none';
+    // document.getElementById('prevInstruction').style.display = currentStep > 0 ? 'inline-block' : 'none';
     // document.getElementById('nextInstruction').style.display = currentStep < instructionSteps.length - 1 ? 'inline-block' : 'none';
     const nextBtn = document.getElementById('nextInstruction');
     if (!practiceSessionActive && currentStep < instructionSteps.length - 1) {
@@ -278,10 +278,10 @@ function renderInstructionStep() {
     document.getElementById('name-entry').style.display = step.showNameEntry ? 'block' : 'none';
 }
 
-document.getElementById('prevInstruction').onclick = () => {
-    if (currentStep > 0) currentStep--;
-    renderInstructionStep();
-};
+// document.getElementById('prevInstruction').onclick = () => {
+//     if (currentStep > 0) currentStep--;
+//     renderInstructionStep();
+// };
 
 document.getElementById('nextInstruction').onclick = () => {
     if (currentStep < instructionSteps.length - 1) currentStep++;
@@ -316,8 +316,8 @@ document.getElementById('nextInstruction').onclick = () => {
         const timerEl = document.getElementById('practiceTimer');
         if (timerEl) timerEl.innerText = '';
 
-        let practiceBlock = { x: 6, y: 2, color: 'yellow', minVotes: 1 };
-        let practiceObstacle = { x: 4, y: 2, id: 'obs1' };
+        let practiceBlock = { x: 4, y: 2, color: 'yellow', minVotes: 1 };
+        let practiceObstacle = { x: 2, y: 1, id: 'obs1' };
         cleanupPracticeBoard();
         setTimeout(() => {
         hideNextButton();
@@ -414,14 +414,14 @@ document.getElementById('consentProceed').addEventListener('click', function () 
 
 function generateRandomName() {
     const firstWords = [
-      'Swift', 'Clever', 'Brave', 'Silent', 'Happy', 'Curious', 'Witty', 'Lucky',
-      'Bright', 'Bold', 'Zany', 'Quirky', 'Gentle', 'Snappy', 'Jolly'
-    ];
-  
+        'Ace', 'Zen', 'Max', 'Sky', 'Lux', 'Jay', 'Sam', 'Rio',
+        'Ash', 'Kit', 'Tao', 'Bea', 'Neo', 'Sol', 'Kai'
+      ];
+      
     const secondWords = [
-      'Fox', 'Tiger', 'Owl', 'Penguin', 'Panda', 'Hawk', 'Koala', 'Wolf',
-      'Frog', 'Eagle', 'Bear', 'Otter', 'Lynx', 'Turtle', 'Leopard'
-    ];
+        'Fox', 'Cat', 'Owl', 'Bee', 'Bat', 'Dog', 'Ant', 'Yak',
+        'Frog', 'Lynx', 'Cub', 'Rat', 'Pup', 'Hog', 'Bug'
+      ];
   
     const first = firstWords[Math.floor(Math.random() * firstWords.length)];
     const second = secondWords[Math.floor(Math.random() * secondWords.length)];
@@ -899,6 +899,7 @@ function movePracticeBlock(block, direction) {
                 //     practiceSessionActive = false;
                 //     practiceCompleted = true;  
                 // }
+                document.getElementById("practiceTimer").style.color = "transparent";
                 showNextButton();
             }, 2000);
         }
@@ -1401,8 +1402,8 @@ function showLevelCompleteMessage(levelNumber, callback) {
         // Header based on completion status
         let fnished = completedLevel;
         let headerText = completedLevel
-          ? `🎉 You've completed Level ${levelNumber + 1}!`
-          : `Time is up on Level ${levelNumber + 1}.`;
+          ? `🎉 You've completed Level ${levelNumber}!`
+          : `Time is up on Level ${levelNumber}.`;
         
         // Reset the flag for the next round
         completedLevel = false;
@@ -1410,7 +1411,7 @@ function showLevelCompleteMessage(levelNumber, callback) {
         // Full message with header and questionnaire
         message.innerHTML = `
           ${headerText}<br>
-          Before moving on to Level ${levelNumber + 2}, please answer a few quick questions about your experience.<br><br>
+          Before moving on to Level ${levelNumber + 1}, please answer a few quick questions about your experience.<br><br>
         
           <div>
             <label><strong>1. How satisfied are you with the gameplay in the last level?<span style="color: red">*</span></strong></label><br>
@@ -1438,9 +1439,11 @@ function showLevelCompleteMessage(levelNumber, callback) {
         
         screen.appendChild(message);
         screen.style.display = 'flex';
+
+        document.getElementById("levelIndicator").textContent = `Level ${currentLevel + 1} of 4`;
         
         // 30s timer
-        let countdown = 5;
+        let countdown = 15;
         const timerText = document.getElementById('feedbackTimer');
         timerText.innerText = `⏱ Time left: ${countdown}s`;
         
