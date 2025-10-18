@@ -1440,7 +1440,7 @@ function showLevelCompleteMessage(levelNumber, callback) {
         screen.appendChild(message);
         screen.style.display = 'flex';
 
-        document.getElementById("levelIndicator").textContent = `Level ${currentLevel + 1} of 4`;
+        document.getElementById("levelIndicator").textContent = `Level ${levelNumber +1} of 4`;
         
         // 30s timer
         let countdown = 15;
