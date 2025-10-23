@@ -535,11 +535,6 @@ function drawPracticeBlock(block, isObstacle, immovable) {
     div.style.backgroundSize = 'cover';
     div.style.imageRendering = 'pixelated';
 
-    // div.style.backgroundImage = isObstacle
-    // ? "url('./images/obstacle.png')"
-    // : "url('./images/block.png')";
-
-
     if (isObstacle) {
         div.style.backgroundImage = immovable
           ? "url('./images/wall.png')"  // immovable obstacle → wall texture
@@ -893,12 +888,7 @@ function movePracticeBlock(block, direction) {
             block.style.opacity = '0';
             setTimeout(() => {
                 block.remove();
-                // if (practiceSessionActive) {
-                //     showNextButton();
-                //     cleanupPracticeBoard();
-                //     practiceSessionActive = false;
-                //     practiceCompleted = true;  
-                // }
+
                 document.getElementById("practiceTimer").style.color = "transparent";
                 showNextButton();
             }, 2000);
@@ -950,6 +940,24 @@ let MaxSessionTime = 0;
 let SaveData = true;
 
 let playerId;
+
+// ---- Phase Controller Lease ----
+const PHASE_LEASE_MS  = 4000;  // lease lasts ~4s
+const PHASE_TICK_MS   = 1500;  // renew/advance check cadence
+const PHASE_DRIFT_MS  = 1200;  // drift tolerance
+
+let iAmController     = false;
+let leaseTimer        = null;
+// ---- Controller/Tx hardening ----
+let txBackoffMs = 0;                 // grows on failures, resets on success
+
+// (optional but highly recommended) surface silent crashes
+window.onerror = (m, s, l, c, e) => console.error('[GLOBAL ERROR]', m, s, l, c, e);
+window.onunhandledrejection = (ev) => console.error('[UNHANDLED REJECTION]', ev?.reason || ev);
+
+let currentPhaseSnap  = null;  // last phase object we saw
+const lastMoveVersion = {};    // per-color applied move version
+
 
 let arrivalIndex;
 
@@ -1106,13 +1114,6 @@ function loadLevel(levelNumber) {
     GameState.slots = config.slots;
     GameState.obstacles = config.obstacles;
 
-    // let allPlayerIDs = getCurrentPlayerIds();
-    // allPlayerIDs.forEach(player => {
-    //     newGameState.players[player] = {
-    //         selectedBlock: null,
-    //         selectedPosition: null
-    //     };
-    // });
     updateStateDirect('blocks', GameState.blocks, 'initalizeBlock');
     updateStateDirect('slots', GameState.slots, 'initalizeSlots');
     //updateStateDirect('obs', GameState.obstacles, 'initalizeObstacle');
@@ -1491,7 +1492,7 @@ function drawPerimeterWalls() {
     const container = document.getElementById('image-container');
     const W = container.clientWidth;
     const H = container.clientHeight;
-    const WALL_THICKNESS = 15; // thin 15 px wall
+    const WALL_THICKNESS = 18; // thin 15 px wall
   
     const strips = [
       { top: 0, left: 0, width: W, height: WALL_THICKNESS },                 // top
@@ -1539,6 +1540,13 @@ function startLevelTimer(levelNumber) {
                 clearImageContainer();
                 showLevelCompleteMessage(currentLevel - 1, () => {
                     loadLevel(currentLevel);
+                    // Kill any leftover countdown from previous level/round
+                    if (countdownInterval) { clearInterval(countdownInterval); countdownInterval = null; }
+                    lastRenderKey = '';
+
+                    // Immediately re-render from whatever the server says now
+                    if (window.currentPhaseSnap) renderPhase(window.currentPhaseSnap);
+
                 });
             }
         } else {
@@ -1565,11 +1573,6 @@ function stopLevelTimer() {
 
 console.log("Game Starting...", thisPlayerID);
 
-// let gameState = {
-//     images: {},
-//     players: {
-//     }
-// };
 let GameState = {
     blocks: {},
     slots: {},
@@ -1593,22 +1596,10 @@ let messageWaitingRoom = document.getElementById('messageWaitingRoom');
 
 //      Game Interface
 let gameScreen = document.getElementById('gameScreen');
-let messageGame = document.getElementById('messageGame');
-let submitGuess; // = document.getElementById('estimation-button');
-let submitSelection;
-let playerID = document.getElementById('playerID');
-//let messageToPlayer = document.getElementById('messageToPlayer');
-let imageContainer = document.getElementById('image-to-estimate');
-//let leaveButton = document.getElementById('leaveBtn');
 
 //      Complete Screen
 let messageFinish = document.getElementById('messageFinish');
 
-
-//let turnText = document.getElementById('turnMessage');
-
-
-//imageContainer.src = images[selectedImages[trialNumber]].path;
 
 // Set up correct instructions
 instructionsText.innerHTML = `Welcome! In this game, your goal is to work with two other players to move all the blocks into the slots as quickly as possible across four levels.\n\nBelow is a video showing what the game looks like.\nWe'll explain everything step by step!`;
@@ -1619,11 +1610,6 @@ instructionsText.innerHTML = `Welcome! In this game, your goal is to work with t
 //      Join Button
 joinButton.addEventListener('click', function () {
 
-    // playerName = document.getElementById('playerName').value.trim();
-    // if (!playerName) {
-    //     alert("Please enter your name before proceeding.");
-    //     return;
-    // }
     /*
     Call the library function to attempt to join a session.
     
@@ -1634,15 +1620,6 @@ joinButton.addEventListener('click', function () {
     joinSession();
 });
 
-// //      Leave Button (End Session Button)
-// leaveButton.addEventListener('click', function () {
-//     /*
-//     Call the library function to leave a session.
-    
-//     This then triggers the local function endSession.
-//     */
-//     leaveSession();
-// });
 
 /*
     Game Logic and UI
@@ -1659,7 +1636,55 @@ let roundTimer;
 let votingDuration = 5; 
 let breakDuration = 2; 
 
-let countdownInterval;
+let countdownInterval = null;
+
+let lastRenderKey = '';  // helps avoid duplicate setIntervals
+
+function renderPhase(p) {
+  const msg = document.getElementById('turnMessage');
+  if (!msg) return; // DOM may have been rebuilt
+
+  const phase   = p?.current;
+  const endTime = p?.endTime || 0;
+
+  // Toggle inputs strictly from phase
+  if (phase === 'voting') { showDirectionButtons(); } else { hideDirectionButtons(); }
+
+  // Avoid stacking intervals: derive a render key from authoritative state
+  const key = `${phase}|${endTime}`;
+  if (lastRenderKey === key && countdownInterval) return;  // already rendering this state
+  lastRenderKey = key;
+
+  if (countdownInterval) { clearInterval(countdownInterval); countdownInterval = null; }
+
+  const tick = () => {
+    const timeLeft = Math.max(0, Math.ceil((endTime - Date.now()) / 1000));
+    msg.innerText = (phase === 'voting')
+      ? `Choose which block/obstacle you want to move in ${timeLeft}s. You can change your choice at any time.`
+      : `Moving the objects now...`;
+    msg.style.textShadow = '1px 1px 0 #000';
+    msg.style.imageRendering = 'pixelated';
+    msg.style.fontFamily = 'monospace';
+
+    // Local watchdog: if we ever show "moving" with 0s for >1.5s,
+    // force a full re-render from the current snapshot to break stale UI.
+    if (phase === 'moving' && timeLeft <= 0) {
+      // debounce so we don't thrash
+      if (!renderPhase.__watchdogArmed) {
+        renderPhase.__watchdogArmed = true;
+        setTimeout(() => {
+          renderPhase.__watchdogArmed = false;
+          // Re-render from the snapshot (authoritative)
+          if (window.currentPhaseSnap) renderPhase(window.currentPhaseSnap);
+        }, 1500);
+      }
+    }
+  };
+
+  tick(); // immediate draw
+  countdownInterval = setInterval(tick, 500);
+}
+
 
 let playerColorMap = {}; 
 
@@ -1689,105 +1714,6 @@ function assignAvatarColors() {
     _createThisPlayerAvatar(); 
 }
 
-
-// function tickPhaseOwner() {
-//     if (getCurrentPlayerArrivalIndex() !== 1) return;
-
-//     localCountdown--;
-
-//     if (localCountdown >= 0) {
-//         updateStateDirect("phase", {
-//             current: currentPhase,
-//             timeRemaining: localCountdown
-//         });
-//     }
-
-//     if (localCountdown === 0) {
-//         if (currentPhase === "voting") {
-//             //finalizeVotes();
-//             startPhase("moving", breakDuration);
-//         } else {
-//             startPhase("voting", votingDuration);
-//         }
-//     }
-// }
-
-// function startPhase(phaseName, duration) {
-//     // currentPhase = { current: phaseName, timeRemaining: duration };
-//     currentPhase = phaseName;
-//     localCountdown = duration;
-
-//     if (getCurrentPlayerArrivalIndex() === 1) {
-//         updateStateDirect("phase", {
-//             current: phaseName,
-//             timeRemaining: duration
-//     });
-//     }
-// }
-function startPhase(phaseName, durationInSeconds) {
-    const now = Date.now();
-    const endTime = now + durationInSeconds * 1000;
-
-    currentPhase = phaseName;
-    localCountdown = durationInSeconds;
-
-    updateStateDirect("phase", {
-        current: phaseName,
-        endTime: endTime,
-        controllerId: getCurrentPlayerId()
-    }, 'start phase');
-}
-
-
-
-// let playerColorMap = {}; 
-
-
-// function assignAvatarColors() {
-//     const PLAYER_COLORS = [
-//         '#E69F00', // Orange
-//         '#009E73', // Green
-//         '#F0E442', // Yellow
-//         '#CC79A7', // Pink/Magenta
-//         '#0072B2'  // Blue
-//     ];
-
-//     const arrivalIndex = getCurrentPlayerArrivalIndex(); // 1-based
-//     const numPlayers = getNumberCurrentPlayers();
-
-//     const root = document.documentElement;
-
-//     // 1. Set color for local player (#player1)
-//     const myColor = PLAYER_COLORS[arrivalIndex - 1];
-//     root.style.setProperty('--player1avatar-backgroundcolor', myColor);
-
-//     updateStateDirect(`players/${getCurrentPlayerId()}`, {
-//         color: myColor
-//     });
-
-//     playerColorMap[getCurrentPlayerId()] = myColor;
-
-//     // 2. Assign the remaining N-1 colors to player2–playerN
-//     let colorIndex = 0;
-//     for (let i = 2; i <= numPlayers; i++) {
-//         if (colorIndex === arrivalIndex - 1) colorIndex++; // Skip local player's color
-//         root.style.setProperty(`--player${i}avatar-backgroundcolor`, PLAYER_COLORS[colorIndex]);
-//         colorIndex++;
-//     }
-// }
-
-// function disableSubmitButton() {
-//     if (submitSelection) {
-//         submitSelection.disabled = true;
-//     }
-// }
-
-// function enableSubmitButton() {
-//     if (submitSelection) {
-//         submitSelection.disabled = false;
-//     }
-// }
-
 function showDirectionButtons() {
     const buttons = document.querySelectorAll('.direction-button');
     buttons.forEach(btn => {
@@ -1805,31 +1731,6 @@ function hideDirectionButtons() {
     });
 }
 
-
-// function startVotingPhase() {
-//     clearTimeout(roundTimer);
-//     clearInterval(countdownInterval);
-
-//     let countdown = votingDuration;
-//     const turnMessage = document.getElementById('turnMessage');
-//     turnMessage.innerText = `Choose which block you want to move in ${countdown} seconds. You can change your vote at any time.`;
-
-//     // Update the countdown every second
-//     countdownInterval = setInterval(() => {
-//         countdown--;
-//         if (countdown > 0) {
-//             turnMessage.innerText = `Decide which block you want to move in ${countdown} seconds. You can change your vote at any time.`;
-//         }
-//     }, 1000);
-
-
-//     // // Start 15 second timer
-//     // roundTimer = setTimeout(() => {
-//     //     clearInterval(countdownInterval);
-//     //     finalizeVotes();
-//     // }, countdown * 1000);
-// }
-
 function isInsidePlayable(x, y) {
     const min = 1; // leave 1-tile wall ring
     const maxX = 17;
@@ -1842,9 +1743,6 @@ function finalizeVotes() {
         updateStateDirect(`players/${pid}`, { block: null, direction: null, obstacle: null }, 'start new event');
     });
     updateStateDirect('players/events', eventNumber + 1, 'update event number');
-    //hideDirectionButtons();
-    //const turnMessage = document.getElementById('turnMessage');
-    // turnMessage.innerText = `Moving the blocks now...`;
 
     const container = document.getElementById('image-container');
     const blocks = container.querySelectorAll('.block');
@@ -1924,7 +1822,8 @@ function finalizeVotes() {
             updateStateDirect(`moveBlock/${plan.block.dataset.color}`, {
                 location: {x, y},
                 direction: plan.direction,
-                move: true
+                move: true,
+                version: Date.now()
             }, 'movable block');
 
             console.log(`Pushing moveBlock for ${plan.block.dataset.color}: ${x, y}`);
@@ -1940,10 +1839,6 @@ function finalizeVotes() {
         }
     });
 
-    // setTimeout(() => {
-    //     showDirectionButtons();
-    //     startVotingPhase();
-    // }, breakDuration * 1000);
 }
 
 
@@ -2010,15 +1905,6 @@ function getMinRequiredVotes(color) {
     return minVotesMap[color] || 1; // default to 1 if undefined
 }
 
-// function getMinRequiredVotes(color) {
-//     const minVotesMap = {
-//         blue: 1,
-//         red: 1,
-//         yellow: 1,
-//     };
-//     return minVotesMap[color] || 1; // default to 1 if undefined
-// }
-
 
 function moveBlock(block, x, y, direction) {
     console.log(`moveBlock called for ${block.dataset.color}, direction: ${x, y}`);
@@ -2030,17 +1916,6 @@ function moveBlock(block, x, y, direction) {
 
     // Don't move if already locked (only applies to non-obstacles)
     if (!isObstacle && lockedBlocks[color]) return;
-
-    // let x = parseInt(block.dataset.x);
-    // let y = parseInt(block.dataset.y);
-
-    // if (direction === 'up') y -= 1;
-    // if (direction === 'down') y += 1;
-    // if (direction === 'left') x -= 1;
-    // if (direction === 'right') x += 1;
-
-    // x = Math.max(0, Math.min(17, x));
-    // y = Math.max(0, Math.min(11, y));
 
     block.dataset.x = x;
     block.dataset.y = y;
@@ -2107,13 +1982,6 @@ function moveBlock(block, x, y, direction) {
     block.style.transition = `top ${ANIMATION_DURATION}ms ease, left ${ANIMATION_DURATION}ms ease, transform 0.2s`;
     block.style.left = (x * CELL_WIDTH) + 'px';
     block.style.top = (y * CELL_HEIGHT) + 'px';
-    
-//         // Trigger slight scale effect after moving
-//     setTimeout(() => {
-//             block.style.transform = 'scale(1)';
-//         }, 200);
-// ;
-
 
     // Only check slot match if it's not an obstacle
     if (!isObstacle) {
@@ -2124,10 +1992,6 @@ function moveBlock(block, x, y, direction) {
                     console.log(`Block ${color} reached slot at (${x}, ${y}). Locking.`);
 
                     lockedBlocks[color] = true;
-
-                    // // Visually indicate it's locked
-                    // block.style.border = '4px solid gold';
-                    // block.style.backgroundColor = 'lightgray';
 
                     const arrows = block.querySelectorAll('.direction-button');
                     arrows.forEach(btn => btn.remove());
@@ -2156,16 +2020,15 @@ function moveBlock(block, x, y, direction) {
                                 
                                 if (currentLevel != 4){
                                     loadLevel(currentLevel);
-                                    startPhase("voting", votingDuration);
+                                    // Kill any leftover countdown from previous level/round
+                                    if (countdownInterval) { clearInterval(countdownInterval); countdownInterval = null; }
+                                    lastRenderKey = '';
+
+                                    // Immediately re-render from whatever the server says now
+                                    if (window.currentPhaseSnap) renderPhase(window.currentPhaseSnap);
+
                                 }
                             });
-
-                            // setTimeout(() => {
-                            //     clearImageContainer();
-                            //     loadLevel(currentLevel);
-
-                            //     startPhase("voting", votingDuration);
-                            // }, 2000);  // Give time for animations
                         }
                     }, 2000);
                     // delete GameState.slots[slotColor];
@@ -2532,17 +2395,6 @@ function animateSpriteOnce(arrowDiv, frameCount = 6, frameWidth = 40, frameHeigh
     step();
 }
 
-
-function directionToArrowSymbol(direction) {
-    switch (direction) {
-        case 'up': return '↑';
-        case 'down': return '↓';
-        case 'left': return '←';
-        case 'right': return '→';
-        default: return '?';
-    }
-}
-
 function removeArrowFromPlayer(playerId) {
     console.log(`[removeArrowFromPlayer] Removing arrows for player ${playerId}`);
 
@@ -2550,75 +2402,6 @@ function removeArrowFromPlayer(playerId) {
     arrows.forEach(arrow => arrow.remove());
 }
 
-
-
-function _randomizeGamePlacement() {
-    let newGameState = {
-        blocks: {},
-        slots: {},
-        players: {},
-        obstacles: {}
-    };
-
-    // Block setup — all in the middle
-    const blockSettings = [
-        { color: 'blue', minVotes: 3 },
-        { color: 'red', minVotes: 2 },
-        { color: 'yellow', minVotes: 1 }
-    ];
-
-    const possibleStartY = [1, 5, 9];
-    shuffleArray(possibleStartY);
-
-    blockSettings.forEach((block, index) => {
-        newGameState.blocks[block.color] = {
-            x: 8, // middle of the board
-            y: possibleStartY[index],
-            color: block.color,
-            minVotes: block.minVotes
-        };
-    });
-
-    // Slots on both sides (3 left + 3 right)
-    const possibleSlotPositions = [
-        { x: 0, y: 3 },
-        { x: 0, y: 9 },
-        { x: 14, y: 2 },
-        { x: 15, y: 9 }
-    ];
-    shuffleArray(possibleSlotPositions);
-
-    // Use all 6 slots
-    for (let i = 0; i < 4; i++) {
-        newGameState.slots[`slot${i}`] = {
-            x: possibleSlotPositions[i].x,
-            y: possibleSlotPositions[i].y
-        };
-    }
-
-    newGameState.obstacles = {
-        obs1: { x: 2, y: 6, id: 'obs1'},
-        obs2: { x: 5, y: 6, id: 'obs2' },
-        obs3: { x: 12, y: 1, id: 'obs3' },
-        obs4: { x: 13, y: 9, id: 'obs4'}
-    };
-
-    // // Initialize player choices
-    // let allPlayerIDs = getCurrentPlayerIds();
-    // allPlayerIDs.forEach(player => {
-    //     newGameState.players[player] = {
-    //         selectedBlock: null,
-    //         selectedPosition: null
-    //     };
-    // });
-
-    return newGameState;
-}
-
-// helper to shuffle
-function shuffleArray(array) {
-    return array.sort(() => Math.random() - 0.5);
-}
 
 function _setPlayerAvatarCSS() {
     /*
@@ -2646,24 +2429,6 @@ function clearImageContainer() {
     const container = document.getElementById('image-container');
     container.innerHTML = '';
 }
-
-
-// function _createThisPlayerAvatar() {
-//     let thisPlayerContainer = document.getElementById('player1-container');
-//     thisPlayerContainer.innerHTML = `
-//         <div class="row" id="${thisPlayerID}-container">
-//             <div class="col-12" id="${thisPlayerID}-content">
-//                 <h3 id="${thisPlayerID}-name">You</h3>
-//             </div>
-//         </div>
-//         <div class="row" id="${thisPlayerID}-avatar-container">
-//             <div class="col-12" id="${thisPlayerID}-avatar-content">
-//                 <div class="person" id="player1"></div>
-//             </div>
-//         </div>
-//     `;
-
-// }
 
 function _createThisPlayerAvatar() {
     const container = document.getElementById('player1-container');
@@ -2725,72 +2490,46 @@ function _createOtherPlayerAvatar() {
     });
 }
 
-
-function _updatePlayerAvatar(n, color) {
-    /*
-        Update Player N's avatar if they have made an estimate
-    */
-
-    // Get element responsible for player avatar colors
-    let root = document.querySelector(":root");
-
-    // Update the color
-    root.style.setProperty("--player" + n + "avatar-backgroundcolor", color);
-
-
-};
-
-function _updatePlayerAvatarV2(player) {
-    /*
-        Update Player N's avatar if they have made an estimate
-    */
-
-    // Get element responsible for player avatar colors
-    let root = document.querySelector(":root");
-
-    // Update the color
-    root.style.setProperty("--" + player + "-avatar-backgroundcolor", 'green');
-
-
-};
-
-
 function newGame() {
     // Initialize a game
     //let whoStarts;
+    practiceTimerInterval = null;
     assignAvatarColors();
     _setPlayerAvatarCSS();
     _createThisPlayerAvatar();
 
 
-    GameState = _randomizeGamePlacement();
-
-    let arrivalIndex = getCurrentPlayerArrivalIndex();
-
-    if (arrivalIndex == 1){
-        // updateStateDirect('blocks', GameState.blocks, 'initalizeBlock');
-        // updateStateDirect('slots', GameState.slots, 'initalizeSlots');
-        // updateStateDirect('obs', GameState.obstacles, 'initalizeObstacle');
-
-        // Object.values(GameState.slots).forEach(slot => {
-        //     drawSlot(slot);
-        // });
-        
-        // Object.values(GameState.blocks).forEach(block => {
-        //     drawBlock(block, false);
-        // });
-
-        // Object.values(GameState.obstacles).forEach(obstacles => {
-        //     drawBlock(obstacles, true);
-        // });
-
-        //setInterval(tickPhaseOwner, 1000); // centralized tick
-        startPhase("voting", votingDuration);
-        
-    }
     loadLevel(currentLevel);
 
+    (async () => {
+        try {
+          // Claim or create the controller lease atomically.
+          await updateStateTransaction('phase', 'lease', {});
+      
+          // OPTIONAL: If the phase node was just created (version 0, no current),
+          // advance transactionally into the first voting round.
+          // Rely on your phase snapshot; if you don't have one yet, a small delay lets
+          // your receiveStateChange populate currentPhaseSnap.
+          setTimeout(async () => {
+            const v = (currentPhaseSnap && typeof currentPhaseSnap.version === 'number') ? currentPhaseSnap.version : 0;
+            const hasCurrent = !!(currentPhaseSnap && currentPhaseSnap.current);
+            if (!hasCurrent) {
+              await updateStateTransaction('phase', 'advance', {
+                expectVersion: v,
+                nextPhase: 'voting',
+                durationMs: votingDuration * 1000
+              });
+            }
+          }, 200);
+        } catch (e) {
+          console.error('[phase bootstrap failed]', e);
+        }
+      })();
+      
+      
+
     console.log("Initialized GameState:", GameState);
+    startLeaseHeartbeat();
     //_createOtherPlayerAvatar();
 }
 
@@ -2802,15 +2541,6 @@ function newGame() {
 // --------------------------------------------------------------------------------------
 // Function to receive state changes from Firebase
 function receiveStateChange(pathNow, nodeName, newState, typeChange ) {
-    // console.log("State change received");
-    // console.log("pathNow", pathNow);
-    // console.log("nodeName", nodeName);
-    // console.log("New state", newState);
-    // console.log("type change", typeChange);
-    // console.log("Current Game State");
-    // console.log(GameState);
-
-    
 
     if (pathNow == "players" && (typeChange == 'onChildAdded' ||typeChange == 'onChildChanged')) {
         const playerId = nodeName; // nodeName is the player ID
@@ -2852,145 +2582,242 @@ function receiveStateChange(pathNow, nodeName, newState, typeChange ) {
     } else if(pathNow == "blocks" && (typeChange == 'onChildAdded' ||typeChange == 'onChildChanged')){
         console.log("Block update received:", nodeName, newState);
         // let arrivalIndex = getCurrentPlayerArrivalIndex();
-        // if(arrivalIndex != 1){
-        //     GameState.blocks[nodeName] = newState;  // update your local GameState
-        //     drawBlock(newState, false)
-        // }
+
 
     }else if(pathNow == "slots" && (typeChange == 'onChildAdded' ||typeChange == 'onChildChanged')){
         // console.log("Slots update received:", nodeName, newState);
-        // let arrivalIndex = getCurrentPlayerArrivalIndex();
-        // if(arrivalIndex != 1){
-        //     GameState.slots[nodeName] = newState; // update your local GameState
-        //     drawSlot(newState);
-        // }
+
     }else if(pathNow == "obs" && (typeChange == 'onChildAdded' ||typeChange == 'onChildChanged')){
         // console.log("received obstacle update");
-        // let arrivalIndex = getCurrentPlayerArrivalIndex();
-        // if(arrivalIndex != 1){
-        //     GameState.obstacles[newState.id] = newState; 
-        //     drawBlock(newState, true);
-        // }
+
     } else if (pathNow === 'phase') {
-        if (nodeName === 'current') {
-            currentPhase = newState;
-            if (currentPhase === 'voting') {
-                showDirectionButtons();
-            } else if (currentPhase === 'moving') {
-                hideDirectionButtons();
-                const msg = document.getElementById('turnMessage');
-                msg.innerText = `Moving the objects now...`;
-                msg.style.textShadow = '1px 1px 0 #000';
-                msg.style.imageRendering = 'pixelated';
-                msg.style.fontFamily = 'monospace';
-            }
-        } else if (nodeName === 'endTime') {
-            const endTime = newState;
-    
-            clearInterval(countdownInterval);
-    
-            countdownInterval = setInterval(() => {
-                const timeLeft = Math.max(0, Math.ceil((endTime - Date.now()) / 1000));
-                localCountdown = timeLeft;
-    
-                const msg = document.getElementById('turnMessage');
-                msg.innerText = (currentPhase === 'voting')
-                    ? `Choose which block/obstacle you want to move in ${timeLeft}s. You can change your choice at any time.`
-                    : `Moving the objects now...`;
-                msg.style.textShadow = '1px 1px 0 #000';
-                msg.style.imageRendering = 'pixelated';
-                msg.style.fontFamily = 'monospace';
-    
-                // If time is up
-                if (timeLeft <= 0) {
-                    clearInterval(countdownInterval);
-    
-                    // Check if this player should take over phase control
-                    const myId = getCurrentPlayerId();
-                    const sortedIds = getCurrentPlayerIds().sort(); // consistent ordering
-                    const fallbackLeader = sortedIds[0]; // always first alphabetically
-                    let nextPhase = (currentPhase === 'voting') ? 'moving' : 'voting';
-                    // if (nextPhase === 'moving'){
+        // Update snapshot for any child under /phase
+        currentPhaseSnap = currentPhaseSnap || {};
+        if (nodeName === 'current')      currentPhaseSnap.current = newState;
+        if (nodeName === 'endTime')      currentPhaseSnap.endTime = newState;
+        if (nodeName === 'controllerId') currentPhaseSnap.controllerId = newState;
+        if (nodeName === 'leaseUntil')   currentPhaseSnap.leaseUntil = newState;
+        if (nodeName === 'version')      currentPhaseSnap.version = newState;
+      
+        // Render (this replaces the old endTime countdown block)
+        renderPhase(currentPhaseSnap);
+      
+        // Optional debug logs
+        console.log('[PHASE SNAP]', JSON.stringify(currentPhaseSnap));
+        console.log('[COUNTDOWN ALIVE?]', Boolean(countdownInterval), lastRenderKey);
+      
+        // // Lease handling (keep this part)
+        // if (leaseTimer) { clearInterval(leaseTimer); leaseTimer = null; }
 
-                    //     hideDirectionButtons();
-                    //         // const container = document.getElementById('image-container');
-                    //         // const blocks = container.querySelectorAll('.block');
-                    //         // blocks.forEach(block => {
-        
-                    //         //     const arrows = block.querySelectorAll('.arrow');
-                    //         //     arrows.forEach(arrow => arrow.remove());
-                    //         // });
-
-                    // }else{
-                    //     showDirectionButtons();
-                    // }
-    
-                    if (myId === fallbackLeader) {
-                        console.warn("Fallback or primary controller is advancing phase.");
-    
-                        const nextPhase = (currentPhase === 'voting') ? 'moving' : 'voting';
-                        const duration = (nextPhase === 'voting') ? votingDuration : breakDuration;
-                        if (nextPhase === 'moving'){
-                            finalizeVotes(); 
-                        }
-    
-    
-                        startPhase(nextPhase, duration);
-                    }
-                }
-            }, 500);
-        }
-    } else if (pathNow === 'moveBlock' && 
-            (typeChange === 'onChildAdded' || typeChange === 'onChildChanged')) {
+        // // if (!leaseTimer) {
+        // //     leaseTimer = setInterval(() => {
+        // //       if (txBackoffMs) return;   // pause while backing off
+        // //       renewLease();
+        // //       maybeAdvancePhase();
+        // //     }, PHASE_TICK_MS);
+        // //   }
+          
+        // if (canIBeController(currentPhaseSnap)) {
+        //   renewLease();
+        //   leaseTimer = setInterval(() => {
+        //     renewLease();
+        //     maybeAdvancePhase();
+        //   }, PHASE_TICK_MS);
+        // } else {
+        //   iAmController = false;
+        // }
+      }else if (pathNow === 'moveBlock' &&
+                (typeChange === 'onChildAdded' || typeChange === 'onChildChanged')) {
 
         const color = nodeName;
-        const blockState = newState;
-        console.log("blockState:", blockState);
+        const payload = newState;
+        if (!payload) return;
 
-        if (!blockState) return;
+        // Ignore stale repeats
+        const v = Number(payload.version || 0);
+        if (v) {
+        if (lastMoveVersion[color] && v <= lastMoveVersion[color]) return;
+        lastMoveVersion[color] = v;
+        }
+
         const block = document.querySelector(`.block[data-color="${color}"]`);
+        if (!block) return;
+
         const arrows = block.querySelectorAll('.arrow');
-        if(blockState.move == false){
-            arrows.forEach(a => a.remove());
-            return;
+        if (payload.move === false) {
+        arrows.forEach(a => a.remove());
+        return;
         }
 
-        if (block) {
-            arrows.forEach(a => {
-                if (a.dataset.direction !== blockState.direction) a.remove();
-            });
-            let x = blockState.location.x;
-            let y = blockState.location.y;
+        arrows.forEach(a => { if (a.dataset.direction !== payload.direction) a.remove(); });
 
-            setTimeout(() => {
-                moveBlock(block, x, y, blockState.direction);
-            }, 500);
-            
-        } else {
-            console.warn(`Block not found for ${color}`);
+        const { x, y } = payload.location || {};
+        setTimeout(() => moveBlock(block, x, y, payload.direction), 500);
         }
-    }
+
 
 }
 
+// NEW: one heartbeat, started once
+let leaseHeartbeatId = null;
 
-function evaluateUpdate( path, state, action, actionArgs ) {
-    let isAllowed = false;
-    let newState = null;
+function startLeaseHeartbeat() {
+  if (leaseHeartbeatId) return;
+  leaseHeartbeatId = setInterval(() => {
+    if (txBackoffMs) return;
+    const p = currentPhaseSnap;
+    if (canIBeController(p)) {
+      renewLease();        // writes lease if I'm allowed
+      maybeAdvancePhase(); // writes phase transitions when endTime passes
+    } else {
+      iAmController = false;
+    }
+  }, PHASE_TICK_MS);
+}
 
-    if ((action === 'initialize') && ((state === null))) {
+function stopLeaseHeartbeat() {
+  if (!leaseHeartbeatId) return;
+  clearInterval(leaseHeartbeatId);
+  leaseHeartbeatId = null;
+}
+
+
+
+function canIBeController(p) {
+    const me = getCurrentPlayerId();
+    const now = Date.now();
+    return !p || !p.leaseUntil || now > (p.leaseUntil - PHASE_DRIFT_MS) || p.controllerId === me;
+  }
+  
+  async function renewLease() {
+    try {
+      await updateStateTransaction('phase', 'lease', {});
+      iAmController = true;
+      // success → clear any prior backoff
+      if (txBackoffMs) {
+        console.log('[LEASE OK] clearing backoff');
+        txBackoffMs = 0;
+      }
+    } catch (e) {
+      iAmController = false;
+      // exponential backoff to avoid hammering when evaluator denies
+      txBackoffMs = Math.min((txBackoffMs || 500) * 2, 8000);
+      console.warn('[LEASE ERROR] backing off', txBackoffMs, 'ms', e);
+    }
+  }
+  
+  
+  async function maybeAdvancePhase() {
+    const p = currentPhaseSnap;
+    if (!p || !iAmController) return;
+  
+    const now = Date.now();
+    if (now < (p.endTime || 0)) return;
+  
+    try {
+      const expectVersion = Number(p.version || 0);
+  
+      if (p.current === 'voting') {
+        console.log('[ADVANCE] voting → moving', { expectVersion });
+        finalizeVotes(); // emits moveBlock/*
+        await updateStateTransaction('phase', 'advance', {
+          expectVersion,
+          nextPhase: 'moving',
+          durationMs: 1500
+        });
+      } else if (p.current === 'moving') {
+        console.log('[ADVANCE] moving → voting', { expectVersion });
+        await updateStateTransaction('phase', 'advance', {
+          expectVersion,
+          nextPhase: 'voting',
+          durationMs: votingDuration * 1000
+        });
+      }
+  
+      // success → clear backoff
+      if (txBackoffMs) {
+        console.log('[ADVANCE OK] clearing backoff');
+        txBackoffMs = 0;
+      }
+  
+    } catch (e) {
+      // failure → back off so we don't spin and freeze the page
+      txBackoffMs = Math.min((txBackoffMs || 500) * 2, 8000);
+      console.warn('[ADVANCE ERROR] backing off', txBackoffMs, 'ms', e);
+    }
+  }
+
+// ---- Helpers ----
+function n(x, d = 0) { const v = Number(x); return Number.isFinite(v) ? v : d; }
+
+function evaluateUpdate(path, state, action, args) {
+  let isAllowed = false;
+  let newState  = null;
+  const now     = Date.now();
+
+  // -------------- PHASE transactional logic --------------
+  if (path === 'phase') {
+    const me = getCurrentPlayerId();
+    const p  = state || {};  // existing server state (may be {} on first write)
+
+    const current     = p.current ?? null;
+    const endTime     = n(p.endTime, 0);
+    const controller  = p.controllerId ?? null;
+    const leaseUntil  = n(p.leaseUntil, 0);
+    const version     = n(p.version, 0);
+
+    if (action === 'lease') {
+      // Allow if: phase missing, or lease expired/expiring (with drift), or I already hold it.
+      const leaseOk = !state || (now > (leaseUntil - PHASE_DRIFT_MS)) || (controller === me);
+      if (leaseOk) {
+        newState = {
+          current:      current || 'voting',
+          endTime:      endTime  || (now + votingDuration * 1000),
+          controllerId: me,
+          leaseUntil:   now + PHASE_LEASE_MS,
+          version      // DO NOT bump version on lease
+        };
         isAllowed = true;
-        newState = actionArgs;
+      }
     }
 
-    console.log("Initial State");
-    console.log(state);
-    console.log("Initial actionArgs");
-    console.log(actionArgs);
+    if (action === 'advance') {
+      const { expectVersion, nextPhase, durationMs } = args || {};
+      const expV       = n(expectVersion, version);
+      const holderOk   = (controller === me);
+      // be forgiving: permit nudge if lease only just expired within drift
+      const leaseValid = now <= (leaseUntil + PHASE_DRIFT_MS);
+      const phaseOk    = (nextPhase === 'moving' || nextPhase === 'voting');
+      // bootstrap (0,0) or exact match
+      const versionOk  = (version === expV) || (version === 0 && expV === 0);
 
-    let actionResult = { isAllowed, newState };
-    return actionResult;
+      if (holderOk && leaseValid && phaseOk && versionOk) {
+        newState = {
+          current:      nextPhase,
+          endTime:      now + n(durationMs, 1500),
+          controllerId: controller || me,
+          leaseUntil:   now + PHASE_LEASE_MS,   // renew lease on advance
+          version:      version + 1             // ONLY bump on advance
+        };
+        isAllowed = true;
+      }
+    }
+
+    // Debug tracer so "Transaction failed" isn't opaque
+    if (!isAllowed) {
+      console.warn('[TX DENIED]', { action, args, now, state: { current, endTime, controller, leaseUntil, version } });
+    } else {
+      console.log('[TX OK]', { action, newState });
+    }
+    return { isAllowed, newState };
+  }
+
+  // -------------- default / other paths --------------
+  // keep your other path logic here (e.g., initialize), or:
+  return { isAllowed: false, newState: null };
 }
+
+  
 
 // Function triggered when this client closes the window and the player needs to be removed from the state 
 function removePlayerState( playerId ) {
