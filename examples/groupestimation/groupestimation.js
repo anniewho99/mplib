@@ -254,7 +254,7 @@ const instructionSteps = [
     }
 ];
 
-let currentStep = 0;
+let currentStep = 9;
 
 const params = new URLSearchParams(window.location.search);
 if (params.has("skipinstruction")) {
@@ -997,7 +997,7 @@ let funList = {
 };
 
 // List the node names where we place listeners for any changes to the children of these nodes; set to '' if listening to changes for children of the root
-let listenerPaths = [ 'players', 'blocks', 'slots', 'obs', 'phase', 'moveBlock' ];
+let listenerPaths = [ 'players', 'blocks', 'slots', 'obs', 'phase', 'moveBlock', 'level' ];
 
 //  Initialize the Game Session with all Configs
 initializeMPLIB( sessionConfig , studyId , funList, listenerPaths, verbosity );
@@ -1139,7 +1139,7 @@ function loadLevel(levelNumber) {
             drawBlock(obstacle, true);
         });
     }
-    startLevelTimer(levelNumber);
+    //startLevelTimer(levelNumber);
 }
 
 function getTeammates() {
@@ -1517,44 +1517,19 @@ let currentLevelTimer = null;
 
 // Helper: start timer for the level
 function startLevelTimer(levelNumber) {
-    if (currentLevelTimer) {
-        clearInterval(currentLevelTimer);
-        currentLevelTimer = null;
-    }
-
-    const duration = getLevelTimeLimit(levelNumber);
-    const startTime = Date.now();
-
+    if (currentLevelTimer) { clearInterval(currentLevelTimer); currentLevelTimer = null; }
     currentLevelTimer = setInterval(() => {
-        const elapsed = Date.now() - startTime;
-        const remaining = duration - elapsed;
+    const L = window.currentLevelSnap;
 
-        if (remaining <= 0) {
-            clearInterval(currentLevelTimer);
-            currentLevelTimer = null;
+    if (!L || !L.endsAt || L.status !== 'running') return;
 
-            currentLevel += 1;
-            if (currentLevel === 5) {
-                showLevelCompleteMessage(currentLevel - 1, () => {}); // Prolific redirect
-            } else {
-                clearImageContainer();
-                showLevelCompleteMessage(currentLevel - 1, () => {
-                    loadLevel(currentLevel);
-                    // Kill any leftover countdown from previous level/round
-                    if (countdownInterval) { clearInterval(countdownInterval); countdownInterval = null; }
-                    lastRenderKey = '';
+    const remaining = Math.max(0, L.endsAt - Date.now());
+    const minutes = Math.floor(remaining / 60000);
+    const seconds = Math.floor((remaining % 60000) / 1000);
 
-                    // Immediately re-render from whatever the server says now
-                    if (window.currentPhaseSnap) renderPhase(window.currentPhaseSnap);
+    updateTimerDisplay(minutes, seconds);
+ }, 1000);
 
-                });
-            }
-        } else {
-            const minutes = Math.floor(remaining / 60000);
-            const seconds = Math.floor((remaining % 60000) / 1000);
-            updateTimerDisplay(minutes, seconds);
-        }
-    }, 1000);
 }
 
 // Helper: updates only the timer line under the turn message
@@ -1563,6 +1538,35 @@ function updateTimerDisplay(min, sec) {
     timerEl.textContent = `⏱ Time remaining: ${min}:${sec.toString().padStart(2, '0')}`;
 }
 
+let __lastLoadedLevelIdx;
+
+function renderSharedLevelTimer(levelSnap) {
+    const { status, endsAt } = levelSnap || {};
+    const el = document.getElementById('levelTimerDisplay');
+    if (!el || !endsAt) return;
+  
+    // inner tick function that updates countdown
+    const tick = () => {
+      const ms = Math.max(0, endsAt - Date.now());
+      const m  = Math.floor(ms / 60000);
+      const s  = Math.floor((ms % 60000) / 1000).toString().padStart(2, '0');
+      el.textContent = `⏱ Time remaining: ${m}:${s}`;
+    };
+  
+    // run once immediately
+    tick();
+  
+    // clear any old interval, then start a fresh one
+    if (window.__levelTimerUI) clearInterval(window.__levelTimerUI);
+    window.__levelTimerUI = setInterval(() => {
+      if (status !== 'running') {
+        clearInterval(window.__levelTimerUI);
+        return;
+      }
+      tick();
+    }, 1000);
+  }
+  
 // Helper: use this in level-completion logic to stop the timer
 function stopLevelTimer() {
     if (currentLevelTimer) {
@@ -2016,13 +2020,14 @@ function moveBlock(block, x, y, direction) {
                         
                             showLevelCompleteMessage(currentLevel, () => {
                                 clearImageContainer();
-                                stopLevelTimer();
+                                //stopLevelTimer();
                                 
                                 if (currentLevel != 4){
-                                    loadLevel(currentLevel);
+                                    //loadLevel(currentLevel);
                                     // Kill any leftover countdown from previous level/round
-                                    if (countdownInterval) { clearInterval(countdownInterval); countdownInterval = null; }
+                                    //if (countdownInterval) { clearInterval(countdownInterval); countdownInterval = null; }
                                     lastRenderKey = '';
+                                    endLevel('completed');
 
                                     // Immediately re-render from whatever the server says now
                                     if (window.currentPhaseSnap) renderPhase(window.currentPhaseSnap);
@@ -2605,27 +2610,6 @@ function receiveStateChange(pathNow, nodeName, newState, typeChange ) {
         // Optional debug logs
         console.log('[PHASE SNAP]', JSON.stringify(currentPhaseSnap));
         console.log('[COUNTDOWN ALIVE?]', Boolean(countdownInterval), lastRenderKey);
-      
-        // // Lease handling (keep this part)
-        // if (leaseTimer) { clearInterval(leaseTimer); leaseTimer = null; }
-
-        // // if (!leaseTimer) {
-        // //     leaseTimer = setInterval(() => {
-        // //       if (txBackoffMs) return;   // pause while backing off
-        // //       renewLease();
-        // //       maybeAdvancePhase();
-        // //     }, PHASE_TICK_MS);
-        // //   }
-          
-        // if (canIBeController(currentPhaseSnap)) {
-        //   renewLease();
-        //   leaseTimer = setInterval(() => {
-        //     renewLease();
-        //     maybeAdvancePhase();
-        //   }, PHASE_TICK_MS);
-        // } else {
-        //   iAmController = false;
-        // }
       }else if (pathNow === 'moveBlock' &&
                 (typeChange === 'onChildAdded' || typeChange === 'onChildChanged')) {
 
@@ -2653,9 +2637,41 @@ function receiveStateChange(pathNow, nodeName, newState, typeChange ) {
 
         const { x, y } = payload.location || {};
         setTimeout(() => moveBlock(block, x, y, payload.direction), 500);
+        }else if (pathNow === 'level' &&
+            (typeChange === 'onChildAdded' || typeChange === 'onChildChanged' || typeChange === 'onValue')) {
+        
+            const L = newState || {};
+            window.currentLevelSnap = L; // keep latest
+        
+            // show "Level X of 4"
+            const levelEl = document.getElementById('levelIndicator');
+            if (levelEl && Number.isFinite(L?.idx)) levelEl.textContent = `Level ${L.idx + 1} of 4`;
+        
+            // render countdown from shared endsAt
+            renderSharedLevelTimer(L);
+
+            if (L.status === 'running' && Number.isFinite(L.idx) && L.idx !== __lastLoadedLevelIdx) {
+                clearImageContainer();               // if you have one
+
+                if(L.idx < 4){
+                    loadLevel(L.idx);    
+                }                 // <- call it here
+                __lastLoadedLevelIdx = L.idx;
+              }
+            
+        
+            // end-of-level screen, once per version
+            if (L.status === 'ended') {
+            window.__interLevelShownForVersion ||= new Set();
+            if (!window.__interLevelShownForVersion.has(L.version)) {
+                window.__interLevelShownForVersion.add(L.version);
+                showLevelCompleteMessage(L.idx + 1, () => {
+                
+                });
+            }
+            }
         }
-
-
+        
 }
 
 // NEW: one heartbeat, started once
@@ -2669,6 +2685,14 @@ function startLeaseHeartbeat() {
     if (canIBeController(p)) {
       renewLease();        // writes lease if I'm allowed
       maybeAdvancePhase(); // writes phase transitions when endTime passes
+            // Minimal: also own/maintain the 5-min level timer here
+      initOrRenewLevelIfNeeded();
+
+      // If I'm controller and time's up, end the level centrally
+      const L = window.currentLevelSnap;
+      if (L && L.status === 'running' && Date.now() >= (L.endsAt || 0)) {
+        endLevel('timeout');
+      }
     } else {
       iAmController = false;
     }
@@ -2680,8 +2704,6 @@ function stopLeaseHeartbeat() {
   clearInterval(leaseHeartbeatId);
   leaseHeartbeatId = null;
 }
-
-
 
 function canIBeController(p) {
     const me = getCurrentPlayerId();
@@ -2746,6 +2768,43 @@ function canIBeController(p) {
       console.warn('[ADVANCE ERROR] backing off', txBackoffMs, 'ms', e);
     }
   }
+
+  function initOrRenewLevelIfNeeded() {
+    const me  = getCurrentPlayerId();
+    const now = Date.now();
+    const L   = window.currentLevelSnap;
+  
+    // become/renew controller if lease missing/expired or already mine
+    const canControl = !L || !L.leaseUntil || now > (L.leaseUntil - PHASE_DRIFT_MS) || L.controllerId === me;
+    if (!canControl) return;
+  
+    const idx   = Number.isFinite(L?.idx) ? L.idx : 0;
+    const run   = L?.status === 'running';
+    const start = run ? (L.startedAt || now) : now;
+    const ends  = run ? (L.endsAt   || (now + getLevelTimeLimit(idx))) : (now + getLevelTimeLimit(idx));
+  
+    updateStateDirect('level', {
+      idx,
+      status: 'running',
+      reason: null,
+      controllerId: me,
+      startedAt: start,
+      endsAt: ends,
+      leaseUntil: now + 4000,
+      version: (L?.version ?? 0) + 1
+    }, 'levelLease');
+  }
+  
+  function endLevel(reason) {
+    const L = window.currentLevelSnap;
+    if (!L || L.status !== 'running') return;
+    if (getCurrentPlayerId() !== L.controllerId) return; // only controller ends it
+    updateStateTransaction('level', (curr) => {
+      if (!curr || curr.status !== 'running') return curr;
+      return { ...curr, status: 'ended', reason, leaseUntil: Date.now() + 4000, version: (curr.version ?? 0) + 1 };
+    }, 'levelEnd');
+  }
+  
 
 // ---- Helpers ----
 function n(x, d = 0) { const v = Number(x); return Number.isFinite(v) ? v : d; }
