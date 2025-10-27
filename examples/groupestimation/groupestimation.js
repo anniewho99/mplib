@@ -1103,7 +1103,7 @@ const levelPlacements = {
     },
 };
 
-function loadLevel(levelNumber) {
+function loadLevel(levelNumber, { seedServer = false } = {}) {
     const config = levelPlacements[levelNumber];
     if (!config) {
         console.warn("No config for level", levelNumber);
@@ -1114,9 +1114,14 @@ function loadLevel(levelNumber) {
     GameState.slots = config.slots;
     GameState.obstacles = config.obstacles;
 
-    updateStateDirect('blocks', GameState.blocks, 'initalizeBlock');
-    updateStateDirect('slots', GameState.slots, 'initalizeSlots');
-    //updateStateDirect('obs', GameState.obstacles, 'initalizeObstacle');
+    if (seedServer && iAmController) {
+        updateStateDirect('blocks', GameState.blocks, 'initializeBlocks');
+        updateStateDirect('slots',  GameState.slots,  'initializeSlots');
+        if (GameState.obstacles && Object.keys(GameState.obstacles).length > 0) {
+          updateStateDirect('obs', GameState.obstacles, 'initializeObstacle');
+        }
+      }
+    
 
     drawPerimeterWalls();
 
@@ -1128,18 +1133,14 @@ function loadLevel(levelNumber) {
         drawBlock(block, false);
     });
 
-    // Object.values(GameState.obstacles).forEach(obstacles => {
-    //     drawBlock(obstacles, true);
-    //  });
 
     if (GameState.obstacles && Object.keys(GameState.obstacles).length > 0) {
-        updateStateDirect('obs', GameState.obstacles, 'initializeObstacle');
     
         Object.values(GameState.obstacles).forEach(obstacle => {
             drawBlock(obstacle, true);
         });
     }
-    //startLevelTimer(levelNumber);
+    //resetLevelProgress();
 }
 
 function getTeammates() {
@@ -1362,131 +1363,146 @@ function getTeammates() {
 
 
 
-function showLevelCompleteMessage(levelNumber, callback) {
+function showLevelCompleteMessage(levelNumber, secondsLeft = 15) {
     const screen = document.getElementById('levelCompleteScreen');
-
+  
+    // idempotent: don't re-open for the same level
+    if (screen.dataset.openFor === String(levelNumber)) return;
+    screen.dataset.openFor = String(levelNumber);
+  
+    // helper to close & reset
+    function closeModal() {
+      screen.style.display = 'none';
+      delete screen.dataset.openFor;
+    }
+  
     // Clear any previous content
     screen.innerHTML = '';
-
-    // Create a new message element
+  
+    // Create message container
     const message = document.createElement('div');
-    if(currentLevel < 4){
-        message.style.fontSize = '20px';
-        message.style.fontWeight = 'bold';
-        message.style.color = '#333';
-        message.style.padding = '10px';
-
-    }else{
-        message.style.fontSize = '32px';
-        message.style.fontWeight = 'bold';
-        message.style.color = '#333';
-        message.style.padding = '20px';
+    if (levelNumber < 4) {
+      message.style.fontSize = '20px';
+      message.style.fontWeight = 'bold';
+      message.style.color = '#333';
+      message.style.padding = '10px';
+    } else {
+      message.style.fontSize = '32px';
+      message.style.fontWeight = 'bold';
+      message.style.color = '#333';
+      message.style.padding = '20px';
     }
-
     message.style.fontFamily = 'monospace';
     message.style.textAlign = 'center';
-
-    if (currentLevel === 4) {
-        message.innerHTML = `🎉 You've completed all levels!<br>You will be redirected to a post-trial questionnaire.`;
-        screen.appendChild(message);
-        screen.style.display = 'flex';
-
-        setTimeout(() => {
-            const teammates = getTeammates();
-            showFinishScreenWithQuestions(teammates);
-            //window.location.href = 'https://app.prolific.co/submissions/complete?cc=XXXXXXX'; // Replace with your real code
-        }, 3000);
-    } else {
-        const timeLimitMs = getLevelTimeLimit(levelNumber);
-        const timeLimitMin = Math.floor(timeLimitMs / 60000);
-        
-        // Header based on completion status
-        let fnished = completedLevel;
-        let headerText = completedLevel
-          ? `🎉 You've completed Level ${levelNumber}!`
-          : `Time is up on Level ${levelNumber}.`;
-        
-        // Reset the flag for the next round
-        completedLevel = false;
-        
-        // Full message with header and questionnaire
-        message.innerHTML = `
-          ${headerText}<br>
-          Before moving on to Level ${levelNumber + 1}, please answer a few quick questions about your experience.<br><br>
-        
-          <div>
-            <label><strong>1. How satisfied are you with the gameplay in the last level?<span style="color: red">*</span></strong></label><br>
-            <span>Not at all</span>
-            ${[1,2,3,4,5,6,7].map(v => `<label><input type="radio" name="satisfaction" value="${v}"></label>`).join('')}
-            <span>Very satisfied</span>
-          </div><br>
-        
-          <div>
-            <label><strong>2. How difficult was the task in the last level?<span style="color: red">*</span></strong></label><br>
-            <span>Not difficult at all</span>
-            ${[1,2,3,4,5,6,7].map(v => `<label><input type="radio" name="difficulty" value="${v}"></label>`).join('')}
-            <span>Extremely difficult</span>
-          </div><br>
-        
-          <div>
-            <label><strong>3. Did you feel like you contributed to the outcome?<span style="color: red">*</span></strong></label><br>
-            <span>Not at all</span>
-            ${[1,2,3,4,5,6,7].map(v => `<label><input type="radio" name="contribution" value="${v}"></label>`).join('')}
-            <span>A lot</span>
-          </div><br>
-        
-          <p id="feedbackTimer" style="font-size: 14px; text-align: right; color: gray;"></p>
-        `;
-        
-        screen.appendChild(message);
-        screen.style.display = 'flex';
-
-        document.getElementById("levelIndicator").textContent = `Level ${levelNumber +1} of 4`;
-        
-        // 30s timer
-        let countdown = 15;
-        const timerText = document.getElementById('feedbackTimer');
-        timerText.innerText = `⏱ Time left: ${countdown}s`;
-        
-        const interval = setInterval(() => {
-          countdown--;
-          timerText.innerText = `⏱ Time left: ${countdown}s`;
-          if (countdown === 0) {
-            clearInterval(interval);
-        
-            // Collect responses
-            const satisfaction = document.querySelector('input[name="satisfaction"]:checked')?.value || null;
-            const difficulty = document.querySelector('input[name="difficulty"]:checked')?.value || null;
-            const contribution = document.querySelector('input[name="contribution"]:checked')?.value || null;
-        
-            let myId = getCurrentPlayerId();
-            updateStateDirect(`players/${myId}`, {
-                level: levelNumber - 1,
-                completed: fnished,
-                satisfaction,
-                difficulty,
-                contribution
-              }, 'levelQ');
-        
-            screen.style.display = 'none';
-            callback(); // Proceed to next level
-          }
-        }, 1000);
-        
+  
+    if (levelNumber === 4) {
+      message.innerHTML = `🎉 You've completed all levels!<br>You will be redirected to a post-trial questionnaire.`;
+      screen.appendChild(message);
+      screen.style.display = 'flex';
+  
+      setTimeout(() => {
+        const teammates = getTeammates();
+        showFinishScreenWithQuestions(teammates);
+        // window.location.href = 'https://app.prolific.co/submissions/complete?cc=XXXXXXX';
+        closeModal();
+      }, 3000);
+      return;
     }
-}
+  
+    // Header based on completion status (keep your flag)
+    const finished = completedLevel;
+    const headerText = finished
+      ? `🎉 You've completed Level ${levelNumber}!`
+      : `Time is up on Level ${levelNumber}.`;
+    completedLevel = false; // reset for next round
+  
+    message.innerHTML = `
+      ${headerText}<br>
+      Before moving on to Level ${levelNumber + 1}, please answer a few quick questions about your experience.<br><br>
+  
+      <div>
+        <label><strong>1. How satisfied are you with the gameplay in the last level?<span style="color: red">*</span></strong></label><br>
+        <span>Not at all</span>
+        ${[1,2,3,4,5,6,7].map(v => `<label><input type="radio" name="satisfaction" value="${v}"></label>`).join('')}
+        <span>Very satisfied</span>
+      </div><br>
+  
+      <div>
+        <label><strong>2. How difficult was the task in the last level?<span style="color: red">*</span></strong></label><br>
+        <span>Not difficult at all</span>
+        ${[1,2,3,4,5,6,7].map(v => `<label><input type="radio" name="difficulty" value="${v}"></label>`).join('')}
+        <span>Extremely difficult</span>
+      </div><br>
+  
+      <div>
+        <label><strong>3. Did you feel like you contributed to the outcome?<span style="color: red">*</span></strong></label><br>
+        <span>Not at all</span>
+        ${[1,2,3,4,5,6,7].map(v => `<label><input type="radio" name="contribution" value="${v}"></label>`).join('')}
+        <span>A lot</span>
+      </div><br>
+  
+      <p id="feedbackTimer" style="font-size: 14px; text-align: right; color: gray;"></p>
+    `;
+  
+    screen.appendChild(message);
+    screen.style.display = 'flex';
+  
+    // Set the next level indicator in UI (purely visual)
+    const indicator = document.getElementById("levelIndicator");
+    if (indicator) indicator.textContent = `Level ${levelNumber + 1} of 4`;
+  
+    // Countdown (drive it from secondsLeft; your receiveStateChange should have computed it from intermissionUntil)
+    let countdown = Number.isFinite(secondsLeft) ? secondsLeft : 15;
+    const timerText = document.getElementById('feedbackTimer');
+    timerText.innerText = `⏱ Time left: ${countdown}s`;
+  
+    const interval = setInterval(() => {
+      countdown = Math.max(0, countdown - 1);
+      timerText.innerText = `⏱ Time left: ${countdown}s`;
+      if (countdown === 0) {
+        clearInterval(interval);
+  
+        // Collect responses
+        const satisfaction = document.querySelector('input[name="satisfaction"]:checked')?.value || null;
+        const difficulty   = document.querySelector('input[name="difficulty"]:checked')?.value || null;
+        const contribution = document.querySelector('input[name="contribution"]:checked')?.value || null;
+  
+        // Persist locally to server (player-specific node); this is safe for all clients
+        const myId = getCurrentPlayerId();
+        updateStateDirect(`players/${myId}`, {
+          level: levelNumber - 1,
+          completed: finished,
+          satisfaction,
+          difficulty,
+          contribution
+        }, 'levelQ');
+  
+        // Close modal. Do NOT advance level here.
+        closeModal();
+  
+        // Now just wait: the controller will publish the next level.
+        // Your receiveStateChange('level') 'running' branch should call:
+        //   loadLevel(window.currentLevelSnap.index, { seedServer: false });
+      }
+    }, 1000);
+  }  
 
-
-
-function getLevelTimeLimit(levelNumber) {
-    if (levelNumber === 0 || levelNumber === 1) {
-        return 5 * 60 * 1000; // 5 minutes
-    } else if (levelNumber === 2 || levelNumber === 3) {
-        return 5 * 60  * 1000; // 5 minutes
-    } else {
-        return 5 * 60 * 1000; // default fallback
-    }
-}
+function getLevelLimitMs(idx){
+    // keep your current policy: all 5 minutes
+    return 15 * 1000;
+  }
+  
+function makeLevelState(idx){
+    const now = Date.now();
+    return {
+      index: idx,
+      status: 'running',
+      startedAt: now,
+      endsAt: now + getLevelLimitMs(idx),
+      completedBlocks: 0
+    };
+  }
+  
 
 function drawPerimeterWalls() {
     const container = document.getElementById('image-container');
@@ -1511,71 +1527,27 @@ function drawPerimeterWalls() {
       container.appendChild(d);
     });
   }
-  
 
-let currentLevelTimer = null;
+let levelTimerInterval = null;
+window.currentLevelSnap = null;
 
-// Helper: start timer for the level
-function startLevelTimer(levelNumber) {
-    if (currentLevelTimer) { clearInterval(currentLevelTimer); currentLevelTimer = null; }
-    currentLevelTimer = setInterval(() => {
-    const L = window.currentLevelSnap;
-
-    if (!L || !L.endsAt || L.status !== 'running') return;
-
-    const remaining = Math.max(0, L.endsAt - Date.now());
-    const minutes = Math.floor(remaining / 60000);
-    const seconds = Math.floor((remaining % 60000) / 1000);
-
-    updateTimerDisplay(minutes, seconds);
- }, 1000);
-
-}
-
-// Helper: updates only the timer line under the turn message
-function updateTimerDisplay(min, sec) {
-    const timerEl = document.getElementById('levelTimerDisplay');
-    timerEl.textContent = `⏱ Time remaining: ${min}:${sec.toString().padStart(2, '0')}`;
-}
-
-let __lastLoadedLevelIdx;
-
-function renderSharedLevelTimer(levelSnap) {
-    const { status, endsAt } = levelSnap || {};
+function renderLevelTimer(L){
     const el = document.getElementById('levelTimerDisplay');
-    if (!el || !endsAt) return;
+    if (!el || !L) return;
   
-    // inner tick function that updates countdown
-    const tick = () => {
-      const ms = Math.max(0, endsAt - Date.now());
-      const m  = Math.floor(ms / 60000);
-      const s  = Math.floor((ms % 60000) / 1000).toString().padStart(2, '0');
-      el.textContent = `⏱ Time remaining: ${m}:${s}`;
+    if (levelTimerInterval) { clearInterval(levelTimerInterval); levelTimerInterval = null; }
+  
+    const draw = () => {
+      const ms = Math.max(0, (L.endsAt || 0) - Date.now());
+      const m = Math.floor(ms / 60000);
+      const s = Math.floor((ms % 60000) / 1000);
+      el.textContent = `⏱ Time remaining: ${m}:${s.toString().padStart(2,'0')}`;
     };
   
-    // run once immediately
-    tick();
-  
-    // clear any old interval, then start a fresh one
-    if (window.__levelTimerUI) clearInterval(window.__levelTimerUI);
-    window.__levelTimerUI = setInterval(() => {
-      if (status !== 'running') {
-        clearInterval(window.__levelTimerUI);
-        return;
-      }
-      tick();
-    }, 1000);
+    draw();
+    levelTimerInterval = setInterval(draw, 500);
   }
   
-// Helper: use this in level-completion logic to stop the timer
-function stopLevelTimer() {
-    if (currentLevelTimer) {
-        clearInterval(currentLevelTimer);
-        currentLevelTimer = null;
-    }
-}
-
-console.log("Game Starting...", thisPlayerID);
 
 let GameState = {
     blocks: {},
@@ -1635,10 +1607,7 @@ Game logic and functionality. All functions for gameplay. This includes:
     -
 */
 
-let roundTimer;
-
 let votingDuration = 5; 
-let breakDuration = 2; 
 
 let countdownInterval = null;
 
@@ -1997,6 +1966,10 @@ function moveBlock(block, x, y, direction) {
 
                     lockedBlocks[color] = true;
 
+                    const count = Object.keys(lockedBlocks).length;
+
+                    updateStateDirect('level/completedBlocks', count, 'level:progress');
+
                     const arrows = block.querySelectorAll('.direction-button');
                     arrows.forEach(btn => btn.remove());
 
@@ -2013,30 +1986,9 @@ function moveBlock(block, x, y, direction) {
                         delete GameState.blocks[color]; // Remove from state
 
                         if (Object.keys(lockedBlocks).length === 3) {
-                            console.log("All blocks locked — advancing level...");
-                            currentLevel++;
-                            lockedBlocks = {};  
                             completedLevel = true;
-                        
-                            showLevelCompleteMessage(currentLevel, () => {
-                                clearImageContainer();
-                                //stopLevelTimer();
-                                
-                                if (currentLevel != 4){
-                                    //loadLevel(currentLevel);
-                                    // Kill any leftover countdown from previous level/round
-                                    //if (countdownInterval) { clearInterval(countdownInterval); countdownInterval = null; }
-                                    lastRenderKey = '';
-                                    endLevel('completed');
-
-                                    // Immediately re-render from whatever the server says now
-                                    if (window.currentPhaseSnap) renderPhase(window.currentPhaseSnap);
-
-                                }
-                            });
                         }
                     }, 2000);
-                    // delete GameState.slots[slotColor];
                     break;
                 }
             }
@@ -2046,16 +1998,11 @@ function moveBlock(block, x, y, direction) {
 
 }
 
-
-
-function getBlockLabel(color) {
-    const labelMap = {
-        'blue': 'A',
-        'red': 'B',
-        'yellow': 'C'
-    };
-    return labelMap[color] || '?';
+function resetLevelProgress(){
+    lockedBlocks = {};
 }
+  
+
 function drawSlot(slot) {
     const container = document.getElementById('image-container');
     const div = document.createElement('div');
@@ -2495,6 +2442,47 @@ function _createOtherPlayerAvatar() {
     });
 }
 
+const INTERMISSION_MS = 15_000;
+
+function controllerTickLevel() {
+  const L = window.currentLevelSnap;
+  const now = Date.now();
+
+  // Bootstrap first level
+  if (!L) {
+    updateStateDirect('level', makeLevelState(0), 'level:start');
+    resetLevelProgress?.();
+    clearImageContainer?.();
+    loadLevel?.(0, { seedServer: true }); 
+    return;
+  }
+
+  const timeUp     = now >= (L.endsAt || 0);
+  const blocksDone = (L.completedBlocks || 0) >= 3;
+
+  // A) End the level
+  if (L.status === 'running' && (timeUp || blocksDone)) {
+    updateStateDirect('level/status', 'complete', 'level:complete');
+    updateStateDirect('level/intermissionUntil', now + INTERMISSION_MS, 'level:intermission');
+    return;
+  }
+
+  // B) After intermission, start next level
+  if (L.status === 'complete') {
+    const intermissionUntil = L.intermissionUntil || (now + INTERMISSION_MS); // fallback safety
+    if (now < intermissionUntil) return; // keep waiting while players do questionnaire
+
+    const nextIdx = (L.index || 0) + 1;
+    if (nextIdx >= 4) return; // all levels done; let your end-of-game flow handle it
+
+    updateStateDirect('level', makeLevelState(nextIdx), 'level:next');
+    resetLevelProgress?.();
+    clearImageContainer?.();
+    loadLevel?.(nextIdx, { seedServer: true }); 
+  }
+}
+  
+
 function newGame() {
     // Initialize a game
     //let whoStarts;
@@ -2504,7 +2492,7 @@ function newGame() {
     _createThisPlayerAvatar();
 
 
-    loadLevel(currentLevel);
+    //loadLevel(currentLevel);
 
     (async () => {
         try {
@@ -2610,6 +2598,7 @@ function receiveStateChange(pathNow, nodeName, newState, typeChange ) {
         // Optional debug logs
         console.log('[PHASE SNAP]', JSON.stringify(currentPhaseSnap));
         console.log('[COUNTDOWN ALIVE?]', Boolean(countdownInterval), lastRenderKey);
+
       }else if (pathNow === 'moveBlock' &&
                 (typeChange === 'onChildAdded' || typeChange === 'onChildChanged')) {
 
@@ -2637,73 +2626,112 @@ function receiveStateChange(pathNow, nodeName, newState, typeChange ) {
 
         const { x, y } = payload.location || {};
         setTimeout(() => moveBlock(block, x, y, payload.direction), 500);
-        }else if (pathNow === 'level' &&
-            (typeChange === 'onChildAdded' || typeChange === 'onChildChanged' || typeChange === 'onValue')) {
-        
-            const L = newState || {};
-            window.currentLevelSnap = L; // keep latest
-        
-            // show "Level X of 4"
-            const levelEl = document.getElementById('levelIndicator');
-            if (levelEl && Number.isFinite(L?.idx)) levelEl.textContent = `Level ${L.idx + 1} of 4`;
-        
-            // render countdown from shared endsAt
-            renderSharedLevelTimer(L);
 
-            if (L.status === 'running' && Number.isFinite(L.idx) && L.idx !== __lastLoadedLevelIdx) {
-                clearImageContainer();               // if you have one
+    } else if (pathNow === 'level' &&
+              (typeChange === 'onChildAdded' || typeChange === 'onChildChanged')) {
+    
+      window.currentLevelSnap = window.currentLevelSnap || {};
+    
+      if (nodeName === 'index')            window.currentLevelSnap.index = newState;
+      if (nodeName === 'status')           window.currentLevelSnap.status = newState;
+      if (nodeName === 'startedAt')        window.currentLevelSnap.startedAt = newState;
+      if (nodeName === 'endsAt')           window.currentLevelSnap.endsAt = newState;
+      if (nodeName === 'completedBlocks')  window.currentLevelSnap.completedBlocks = newState;
+      if (nodeName === 'intermissionUntil')window.currentLevelSnap.intermissionUntil = newState;
+    
+      renderLevelTimer(window.currentLevelSnap); // shows ⏱ based on endsAt when running
+    
+      if (window.currentLevelSnap.status === 'complete') {
+      
+        // show questionnaire (UI-only)
+        const key = `${window.currentLevelSnap.index}|${window.currentLevelSnap.intermissionUntil || 0}`;
 
-                if(L.idx < 4){
-                    loadLevel(L.idx);    
-                }                 // <- call it here
-                __lastLoadedLevelIdx = L.idx;
-              }
-            
-        
-            // end-of-level screen, once per version
-            if (L.status === 'ended') {
-            window.__interLevelShownForVersion ||= new Set();
-            if (!window.__interLevelShownForVersion.has(L.version)) {
-                window.__interLevelShownForVersion.add(L.version);
-                showLevelCompleteMessage(L.idx + 1, () => {
-                
-                });
-            }
-            }
+        if (levelCompleteKeyShown !== key) {
+          levelCompleteKeyShown = key;
+      
+          const until = window.currentLevelSnap.intermissionUntil || (Date.now() + 15000);
+          const secondsLeft = Math.max(0, Math.ceil((until - Date.now()) / 1000));
+      
+          showLevelCompleteMessage(window.currentLevelSnap.index + 1, secondsLeft);
         }
-        
+      
+        // we plan to draw the next level as soon as it starts
+        pendingNextDraw = true;
+      
+        if (intermissionTicker) clearInterval(intermissionTicker);
+        intermissionTicker = setInterval(() => {
+          const now = Date.now();
+          const left = Math.max(0, Math.ceil(((window.currentLevelSnap.intermissionUntil || now) - now) / 1000));
+          updateLevelCompleteCountdown?.(left);
+          if (left <= 0) { clearInterval(intermissionTicker); intermissionTicker = null; }
+        }, 500);
+      
+      } else if (window.currentLevelSnap.status === 'running') {
+        // New level actually started (controller just published it)
+        if (pendingNextDraw) {
+          resetLevelProgress?.(); // local bookkeeping
+          clearImageContainer?.();
+          loadLevel(window.currentLevelSnap.index, { seedServer: false }); // draw on EVERY client
+          pendingNextDraw = false;
+        }
+      
+        const el = document.getElementById('levelIndicator');
+        if (el) el.textContent = `Level ${(window.currentLevelSnap.index ?? 0) + 1} of 4`;
+      }
+    }
+    
+
+
 }
+
+let levelCompleteKeyShown = null;
+
+let intermissionTicker = null;
+let pendingNextDraw = true; 
 
 // NEW: one heartbeat, started once
 let leaseHeartbeatId = null;
 
+let leaseWorkInFlight = false;
+
 function startLeaseHeartbeat() {
   if (leaseHeartbeatId) return;
-  leaseHeartbeatId = setInterval(() => {
-    if (txBackoffMs) return;
-    const p = currentPhaseSnap;
-    if (canIBeController(p)) {
-      renewLease();        // writes lease if I'm allowed
-      maybeAdvancePhase(); // writes phase transitions when endTime passes
-            // Minimal: also own/maintain the 5-min level timer here
-      initOrRenewLevelIfNeeded();
 
-      // If I'm controller and time's up, end the level centrally
-      const L = window.currentLevelSnap;
-      if (L && L.status === 'running' && Date.now() >= (L.endsAt || 0)) {
-        endLevel('timeout');
-      }
-    } else {
+  leaseHeartbeatId = setInterval(() => {
+    if (txBackoffMs) return;      // respect backoff
+    if (leaseWorkInFlight) return; // skip if previous tick still running
+
+    const p = currentPhaseSnap;
+    if (!canIBeController(p)) {
       iAmController = false;
+      return;
     }
+
+    leaseWorkInFlight = true;
+
+    // Chain in order; each can be sync or async
+    Promise.resolve(renewLease())
+      .then(() => Promise.resolve(maybeAdvancePhase()))
+      .then(() => Promise.resolve(controllerTickLevel()))
+      .catch((e) => {
+        // optional: adjust backoff or log
+        console.warn('[LEASE HEARTBEAT ERROR]', e);
+      })
+      .finally(() => {
+        leaseWorkInFlight = false;
+      });
+
   }, PHASE_TICK_MS);
 }
+
 
 function stopLeaseHeartbeat() {
   if (!leaseHeartbeatId) return;
   clearInterval(leaseHeartbeatId);
   leaseHeartbeatId = null;
 }
+
+
 
 function canIBeController(p) {
     const me = getCurrentPlayerId();
@@ -2768,43 +2796,6 @@ function canIBeController(p) {
       console.warn('[ADVANCE ERROR] backing off', txBackoffMs, 'ms', e);
     }
   }
-
-  function initOrRenewLevelIfNeeded() {
-    const me  = getCurrentPlayerId();
-    const now = Date.now();
-    const L   = window.currentLevelSnap;
-  
-    // become/renew controller if lease missing/expired or already mine
-    const canControl = !L || !L.leaseUntil || now > (L.leaseUntil - PHASE_DRIFT_MS) || L.controllerId === me;
-    if (!canControl) return;
-  
-    const idx   = Number.isFinite(L?.idx) ? L.idx : 0;
-    const run   = L?.status === 'running';
-    const start = run ? (L.startedAt || now) : now;
-    const ends  = run ? (L.endsAt   || (now + getLevelTimeLimit(idx))) : (now + getLevelTimeLimit(idx));
-  
-    updateStateDirect('level', {
-      idx,
-      status: 'running',
-      reason: null,
-      controllerId: me,
-      startedAt: start,
-      endsAt: ends,
-      leaseUntil: now + 4000,
-      version: (L?.version ?? 0) + 1
-    }, 'levelLease');
-  }
-  
-  function endLevel(reason) {
-    const L = window.currentLevelSnap;
-    if (!L || L.status !== 'running') return;
-    if (getCurrentPlayerId() !== L.controllerId) return; // only controller ends it
-    updateStateTransaction('level', (curr) => {
-      if (!curr || curr.status !== 'running') return curr;
-      return { ...curr, status: 'ended', reason, leaseUntil: Date.now() + 4000, version: (curr.version ?? 0) + 1 };
-    }, 'levelEnd');
-  }
-  
 
 // ---- Helpers ----
 function n(x, d = 0) { const v = Number(x); return Number.isFinite(v) ? v : d; }
