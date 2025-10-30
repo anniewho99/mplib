@@ -1323,6 +1323,7 @@ function getTeammates() {
         
 
         teammateResponses[pid] = {
+            completed: completedLevel,
             collaborative: collab,
             asATeam: team,
             isCompetent: competent,
@@ -1396,7 +1397,7 @@ function showLevelCompleteMessage(levelNumber, callback) {
     } else {
         
         // Header based on completion status
-        let fnished = completedLevel;
+        let finished = completedLevel;
         let headerText = completedLevel
           ? `🎉 You've completed Level ${levelNumber + 1}!`
           : `Time is up on Level ${levelNumber + 1}.`;
@@ -1441,7 +1442,7 @@ function showLevelCompleteMessage(levelNumber, callback) {
         const submitBtn = document.createElement('button');
         submitBtn.className = 'button';
         submitBtn.textContent = 'Submit';
-        submitBtn.onclick = () => submitBetweenLevel(levelNumber, completedLevel);
+        submitBtn.onclick = () => submitBetweenLevel(levelNumber, finished);
         screen.appendChild(submitBtn);
         
     }
@@ -1915,7 +1916,7 @@ function getMinRequiredVotes(color) {
 
 
 function moveBlock(block, x, y, direction) {
-    console.log(`moveBlock called for ${block.dataset.color}, direction: ${x, y}`);
+    // console.log(`moveBlock called for ${block.dataset.color}, direction: ${x}, ${y}}`);
 
     const color = block.dataset.color;
 
@@ -1925,8 +1926,8 @@ function moveBlock(block, x, y, direction) {
     // Don't move if already locked (only applies to non-obstacles)
     if (!isObstacle && lockedBlocks[color]) return;
 
-    block.dataset.x = x;
-    block.dataset.y = y;
+    // block.dataset.x = x;
+    // block.dataset.y = y;
     const arrows = block.querySelectorAll('.arrow');
     arrows.forEach(arrow => {
         const direction = arrow.dataset.direction;
@@ -1978,7 +1979,7 @@ function moveBlock(block, x, y, direction) {
         animateSpriteOnce(clone, 6, 50, 50, 6);
     
         // Clean up
-        setTimeout(() => clone.remove(), 1500);
+        setTimeout(() => clone.remove(), 1200);
     });
     
     // Remove original static arrows
@@ -2621,7 +2622,10 @@ function receiveStateChange(pathNow, nodeName, newState, typeChange ) {
         arrows.forEach(a => { if (a.dataset.direction !== payload.direction) a.remove(); });
 
         const { x, y } = payload.location || {};
-        setTimeout(() => moveBlock(block, x, y, payload.direction), 500);
+
+        block.dataset.x = x;
+        block.dataset.y = y;
+        moveBlock(block, x, y, payload.direction), 500;
         } else if (pathNow === 'level') {
             currentLevelSnap = currentLevelSnap || {};
             if (nodeName === 'index')       currentLevelSnap.index = newState;
@@ -2792,7 +2796,7 @@ function canIBeController(p) {
         await updateStateTransaction('phase', 'advance', {
           expectVersion,
           nextPhase: 'moving',
-          durationMs: 1500
+          durationMs: 2200
         });
       } else if (p.current === 'moving') {
         console.log('[ADVANCE] moving → voting', { expectVersion });
