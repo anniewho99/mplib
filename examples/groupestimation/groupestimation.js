@@ -383,7 +383,7 @@ document.getElementById('nextInstruction').onclick = () => {
 
         let practiceBlock = { x: 2, y: 3, color: 'blue', minVotes: 3 };
         let practiceObstacle = { x: 0, y: 1, id: 'obs1' };
-        let practiceObstacleTwo = { x: 5, y: 0, id: 'obs1' };
+        let practiceObstacleTwo = { x: 5, y: 0, id: 'obs2' };
         cleanupPracticeBoard();
         setTimeout(() => {
         hideNextButton();
@@ -1338,7 +1338,7 @@ function getTeammates() {
     });
 
     if (incompleteTeammate) {
-        alert('Please answer all questions about your teammates. Each description must be at least 50 characters.');
+        alert('Please answer all questions about your teammates. Each description must be at least 20 characters.');
         return;
     }
     
@@ -2625,7 +2625,7 @@ function receiveStateChange(pathNow, nodeName, newState, typeChange ) {
 
         block.dataset.x = x;
         block.dataset.y = y;
-        moveBlock(block, x, y, payload.direction), 500;
+        moveBlock(block, x, y, payload.direction);
         } else if (pathNow === 'level') {
             currentLevelSnap = currentLevelSnap || {};
             if (nodeName === 'index')       currentLevelSnap.index = newState;
