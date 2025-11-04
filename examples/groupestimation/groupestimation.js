@@ -842,7 +842,7 @@ function movePracticeBlock(block, direction) {
   });
 
   // Optional: animate sprite
-  animateSpriteOnce(clone, 6, 50, 50, 6);
+  animateSpriteOnce(clone, 6, 50, 50, 12);
 
   let x = parseInt(block.dataset.x);
   let y = parseInt(block.dataset.y);
@@ -884,14 +884,14 @@ function movePracticeBlock(block, direction) {
           block.style.boxShadow = '0 0 6px gold';
           block.style.border = '2px solid gold';
 
-          block.style.transition = 'opacity 2s';
+          block.style.transition = 'opacity 0.5s';
           block.style.opacity = '0';
           setTimeout(() => {
               block.remove();
 
               document.getElementById("practiceTimer").style.color = "transparent";
               showNextButton();
-          }, 2000);
+          }, 500);
       }
   }, 500); // match with transition duration
 }
@@ -1823,7 +1823,7 @@ function finalizeVotes() {
       location: { x, y },
       direction: plan.willMove ? plan.direction : null,
       move: !!plan.willMove,
-      nowVersion
+      version: nowVersion
     };
   
     // Dynamic label for logging clarity
@@ -1967,10 +1967,10 @@ function moveBlock(block, x, y, direction) {
       });
   
       // Animate sprite
-      animateSpriteOnce(clone, 6, 50, 50, 6);
+      animateSpriteOnce(clone, 6, 50, 50, 12);
   
       // Clean up
-      setTimeout(() => clone.remove(), 1200);
+      setTimeout(() => clone.remove(), 500);
   });
   
   // Remove original static arrows
@@ -2001,7 +2001,7 @@ function moveBlock(block, x, y, direction) {
                   block.style.boxShadow = '0 0 6px gold';
                   block.style.border = '2px solid gold';
 
-                  block.style.transition = 'opacity 2s';
+                  block.style.transition = 'opacity 0.5s';
                   block.style.opacity = '0';
 
                   setTimeout(() => {
@@ -2020,7 +2020,7 @@ function moveBlock(block, x, y, direction) {
                           updateStateTransaction('level', 'toSurvey', { reason: 'cleared' });
                       
                       }
-                  }, 2000);
+                  }, 500);
                   // delete GameState.slots[slotColor];
                   break;
               }
@@ -2359,7 +2359,7 @@ function layoutDirectionalArrows(block, direction, isObstacle) {
 }
 
 
-function animateSpriteOnce(arrowDiv, frameCount = 6, frameWidth = 40, frameHeight = 40, fps = 6) {
+function animateSpriteOnce(arrowDiv, frameCount = 6, frameWidth = 40, frameHeight = 40, fps = 12) {
   let currentFrame = 0;
 
   function step() {
