@@ -928,7 +928,7 @@ function getNumPlayersFromURL() {
   return isNaN(num) ? 5 : Math.max(2, Math.min(num, 5)); // default to 5, clamp between 2–5
 }
 
-let GameName = "groupestimation";
+let GameName = "novsix";
 let NumPlayers = 3;
 let MinPlayers = NumPlayers;
 let MaxPlayers = NumPlayers;
@@ -1542,25 +1542,6 @@ function drawPerimeterWalls() {
 }
 
 
-// let currentLevelTimer = null;
-
-// function startLevelTimerUIFromAuthority(endAt) {
-// if (currentLevelTimer) { clearInterval(currentLevelTimer); currentLevelTimer = null; }
-
-// currentLevelTimer = setInterval(() => {
-//   const remaining = endAt - Date.now();
-//   if (remaining <= 0) {
-//     clearInterval(currentLevelTimer);
-//     currentLevelTimer = null;
-//     return;
-//   }
-//   const minutes = Math.floor(remaining / 60000);
-//   const seconds = Math.floor((remaining % 60000) / 1000);
-//   updateTimerDisplay(minutes, seconds);
-// }, 1000);
-// }
-
-
 // --- Event-driven version ---
 function startLevelTimerUIFromAuthority(startAt) {
   const current = Math.max(0, Math.min(eventNumber - startAt, MAX_EVENTS_PER_LEVEL));
@@ -1573,14 +1554,6 @@ function updateTimerDisplay(current) {
   const timerEl = document.getElementById('levelTimerDisplay');
   timerEl.textContent = `🕹️ Round ${current} of ${MAX_EVENTS_PER_LEVEL}`;
 }
-
-// // Helper: use this in level-completion logic to stop the timer
-// function stopLevelTimer() {
-//   if (currentLevelTimer) {
-//       clearInterval(currentLevelTimer);
-//       currentLevelTimer = null;
-//   }
-// }
 
 console.log("Game Starting...", thisPlayerID);
 
@@ -2686,48 +2659,6 @@ if (L.state === 'play') {
 
 // const LEVEL_LEASE_MS = 4000, LEVEL_DRIFT_MS = 1500;
 const MAX_EVENTS_PER_LEVEL = 40; 
-// function tryAcquireLevelLease() {
-// const me = getCurrentPlayerId();
-// const now = Date.now();
-// updateStateTransaction('level', (L) => {
-//   if (!L) return L;
-//   if (L.controllerId && L.leaseUntil > now) return L;
-//   return { ...L, controllerId: me, leaseUntil: now + LEVEL_LEASE_MS };
-// }, 'level-lease');
-// }
-
-// function renewLevelLeaseIfMine(L) {
-// const me = getCurrentPlayerId();
-// if (L?.controllerId !== me) return;
-// const now = Date.now();
-// if ((L.leaseUntil - now) < LEVEL_DRIFT_MS) {
-//   updateStateDirect('level/leaseUntil', now + LEVEL_LEASE_MS, 'level-lease-renew');
-// }
-// }
-
-// function levelControllerTick() {
-//   const L = currentLevelSnap;
-//   if (!L) return;
-
-//   if (L.state !== 'play') {
-//       return; // stop ticking when we're in "survey" or any other state
-//     }
-
-//   // Acquire/renew the /level lease via transactions (mirrors your phase lease style)
-//   updateStateTransaction('level', 'lease', {});   // tryAcquireLevelLease()
-
-//   const now = Date.now();
-//   const endAt = Number(L.endAt || 0);
-
-//   // A) Time-up → flip to survey (authoritative, idempotent)
-//   if (L.state === 'play' && now >= endAt) {
-//     console.log("level time is up");
-//     if (countdownInterval) { clearInterval(countdownInterval); countdownInterval = null; }
-//     updateStateTransaction('level', 'toSurvey', { reason: 'time' });
-//     return;
-//   }
-// }  
-
 
 // NEW: one heartbeat, started once
 let leaseHeartbeatId = null;
@@ -2745,14 +2676,6 @@ leaseHeartbeatId = setInterval(() => {
   }
 }, PHASE_TICK_MS);
 }
-
-// function stopLeaseHeartbeat() {
-// if (!leaseHeartbeatId) return;
-// clearInterval(leaseHeartbeatId);
-// leaseHeartbeatId = null;
-// }
-
-
 
 function canIBeController(p) {
   const me = getCurrentPlayerId();
@@ -2918,17 +2841,6 @@ if (path === 'phase') {
     }
     return { isAllowed: false, newState: null };
   }
-
-  // if (action === 'lease') {
-  //   const leaseOk = !state || (now > (leaseUntil - PHASE_DRIFT_MS)) || (controller === me);
-  //   if (leaseOk) {
-  //     return {
-  //       isAllowed: true,
-  //       newState: { ...L, controllerId: me, leaseUntil: now + PHASE_LEASE_MS }
-  //     };
-  //   }
-  //   return { isAllowed: false, newState: null };
-  // }
 
   if (action === 'toSurvey') {
       const validReason =
