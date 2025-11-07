@@ -928,7 +928,7 @@ function getNumPlayersFromURL() {
   return isNaN(num) ? 5 : Math.max(2, Math.min(num, 5)); // default to 5, clamp between 2–5
 }
 
-let GameName = "novsix";
+let GameName = "novseven";
 let NumPlayers = 3;
 let MinPlayers = NumPlayers;
 let MaxPlayers = NumPlayers;
