@@ -1175,67 +1175,67 @@ function showFinishScreenWithQuestions(teammates) {
       <div><strong>${name}</strong></div>
       </div>
   
-      <label><strong>How collaborative was this teammate?</strong></label>
+      <label><strong>This player is a good teammate.</strong></label>
       <div style="margin-bottom: 10px;">
-        <span>Not at all</span>
+        <span>Completely disagree</span>
         ${[1,2,3,4,5,6,7].map(v => `<label><input type="radio" name="collab-${id}" value="${v}"></label>`).join('')}
-        <span>Very collaborative</span>
+        <span>Completely agree</span>
       </div>
 
       <label><strong>This player and I were a team.</strong></label>
       <div style="margin-bottom: 10px;">
-        <span>Completely agree</span>
-        ${[1,2,3,4,5,6,7].map(v => `<label><input type="radio" name="team-${id}" value="${v}"></label>`).join('')}
         <span>Completely disagree</span>
+        ${[1,2,3,4,5,6,7].map(v => `<label><input type="radio" name="team-${id}" value="${v}"></label>`).join('')}
+        <span>Completely agree</span>
       </div>
 
       <label><strong>This player was competent.</strong></label>
       <div style="margin-bottom: 10px;">
-        <span>Completely agree</span>
-        ${[1,2,3,4,5,6,7].map(v => `<label><input type="radio" name="competent-${id}" value="${v}"></label>`).join('')}
         <span>Completely disagree</span>
+        ${[1,2,3,4,5,6,7].map(v => `<label><input type="radio" name="competent-${id}" value="${v}"></label>`).join('')}
+        <span>Completely agree</span>
       </div>
 
       <label><strong>I understood this player's intentions.</strong></label>
       <div style="margin-bottom: 10px;">
-        <span>Completely agree</span>
-        ${[1,2,3,4,5,6,7].map(v => `<label><input type="radio" name="intentionthem-${id}" value="${v}"></label>`).join('')}
         <span>Completely disagree</span>
+        ${[1,2,3,4,5,6,7].map(v => `<label><input type="radio" name="intentionthem-${id}" value="${v}"></label>`).join('')}
+        <span>Completely agree</span>
       </div>
 
       <label><strong>This player understood my intentions.</strong></label>
       <div style="margin-bottom: 10px;">
-        <span>Completely agree</span>
-        ${[1,2,3,4,5,6,7].map(v => `<label><input type="radio" name="intentionmy-${id}" value="${v}"></label>`).join('')}
         <span>Completely disagree</span>
+        ${[1,2,3,4,5,6,7].map(v => `<label><input type="radio" name="intentionmy-${id}" value="${v}"></label>`).join('')}
+        <span>Completely agree</span>
       </div>
 
       <label><strong>This player was easy to play with.</strong></label>
       <div style="margin-bottom: 10px;">
-        <span>Completely agree</span>
-        ${[1,2,3,4,5,6,7].map(v => `<label><input type="radio" name="easy-${id}" value="${v}"></label>`).join('')}
         <span>Completely disagree</span>
+        ${[1,2,3,4,5,6,7].map(v => `<label><input type="radio" name="easy-${id}" value="${v}"></label>`).join('')}
+        <span>Completely agree</span>
       </div>
 
       <label><strong>This player was fun to play with.</strong></label>
       <div style="margin-bottom: 10px;">
-        <span>Completely agree</span>
-        ${[1,2,3,4,5,6,7].map(v => `<label><input type="radio" name="fun-${id}" value="${v}"></label>`).join('')}
         <span>Completely disagree</span>
+        ${[1,2,3,4,5,6,7].map(v => `<label><input type="radio" name="fun-${id}" value="${v}"></label>`).join('')}
+        <span>Completely agree</span>
       </div>
 
       <label><strong>This player and I had a similar playing style.</strong></label>
       <div style="margin-bottom: 10px;">
-        <span>Completely agree</span>
-        ${[1,2,3,4,5,6,7].map(v => `<label><input type="radio" name="similar-${id}" value="${v}"></label>`).join('')}
         <span>Completely disagree</span>
+        ${[1,2,3,4,5,6,7].map(v => `<label><input type="radio" name="similar-${id}" value="${v}"></label>`).join('')}
+        <span>Completely agree</span>
       </div>
 
       <label><strong>This player was human-like.</strong></label>
       <div style="margin-bottom: 10px;">
-        <span>Completely agree</span>
-        ${[1,2,3,4,5,6,7].map(v => `<label><input type="radio" name="human-${id}" value="${v}"></label>`).join('')}
         <span>Completely disagree</span>
+        ${[1,2,3,4,5,6,7].map(v => `<label><input type="radio" name="human-${id}" value="${v}"></label>`).join('')}
+        <span>Completely agree</span>
       </div>
   
       <label><strong>How would you describe this teammate? (minimum 20 characters)</strong></label><br>
