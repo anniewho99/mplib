@@ -2926,6 +2926,34 @@ function removePlayerState( playerId ) {
 //   Handle any session change relating to the waiting room or ongoing session 
 // --------------------------------------------------------------------------------------
 
+
+const MAX_WAITING_TIME = 5 * 60 * 1000; // 5 minutes in milliseconds
+
+let waitingTimer;
+
+// Start the waiting timer
+function startWaitingTimer() {
+  const timeoutId = setTimeout(() => {
+    endSessionDueToTimeout();
+  }, MAX_WAITING_TIME);
+
+  // Clear the timeout if the player joins the game before 5 minutes
+  return timeoutId;
+}
+
+// End session and show a timeout message
+function endSessionDueToTimeout() {
+  // Display a message or navigate to an exit screen
+  //alert("The session has timed out. Please try joining again later.");
+  messageWaitingRoom.innerText = " The session has timed out. You have been disconnected from the session. We couldn't find a match for you with other participants at this time. Please close this window. Thank you for your understanding.";
+
+  alert("The session has timed out. You have been disconnected from the session. Please close the current window. ");
+  // Redirect or log the player out if necessary
+  // window.location.href = 'exit_page.html'; // Example of redirection
+  leaveSession();
+  
+}
+
 function joinWaitingRoom() {
   /*
       Functionality to invoke when joining a waiting room.
@@ -2935,6 +2963,16 @@ function joinWaitingRoom() {
           - Creates an appropriate message based on players needed and players in waiting room
           - Displays the waiting room screen
   */
+
+  waitingTimer = startWaitingTimer();
+  let waitingTime = 0; // Initialize waiting time in seconds
+  const waitingTimerInterval = setInterval(() => {
+    waitingTime++;
+    const minutes = Math.floor(waitingTime / 60);
+    const seconds = waitingTime % 60;
+    document.getElementById('waitingTimeDisplay').innerText = `Waiting time: ${minutes}m ${seconds}s`;
+  }, 1000)
+
   playerId = getCurrentPlayerId(); // the playerId for this client
   let numPlayers = getNumberCurrentPlayers(); // the current number of players
   let numNeeded = sessionConfig.minPlayersNeeded - numPlayers; // Number of players still needed (in case the player is currently in a waiting room)
