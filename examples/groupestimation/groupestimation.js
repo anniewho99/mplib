@@ -2444,6 +2444,8 @@ function _createOtherPlayerAvatar() {
 }
 
 function newGame() {
+
+  clearTimeout(waitingTimer);
   // Initialize a game
   //let whoStarts;
   practiceTimerInterval = null;
