@@ -928,7 +928,7 @@ function getNumPlayersFromURL() {
   return isNaN(num) ? 5 : Math.max(2, Math.min(num, 5)); // default to 5, clamp between 2–5
 }
 
-let GameName = "cdba";
+let GameName = "cdab";
 let NumPlayers = 3;
 let MinPlayers = NumPlayers;
 let MaxPlayers = NumPlayers;
@@ -1142,6 +1142,23 @@ const levelPlacements = {
     }
 },
   2: {
+          blocks: {
+              blue: { x: 10, y: 10, color: 'blue', minVotes: 3 },
+              red: { x: 8, y: 1, color: 'red', minVotes: 2},
+              yellow: { x: 1, y: 10, color: 'yellow', minVotes: 1 }
+          },
+          slots: {
+              slot0: { x: 3, y: 6 },
+              slot1: { x: 16, y: 6 }
+          },
+          obstacles: {
+              obs0:{x:9,y:5,id:'obs0', immovable:true},
+              obs1:{x:9,y:7,id:'obs1', immovable:true},
+              obs2:{x:6,y:5,id:'obs2'},
+              obs3:{x:12,y:5,id:'obs3'},
+          }
+    },
+  3: {
     blocks: {
         blue: { x: 12, y: 10, color: 'blue', minVotes: 3 },
         red: { x: 9, y: 1, color: 'red', minVotes: 2},
@@ -1162,23 +1179,6 @@ const levelPlacements = {
         obs7: { x: 10, y: 10, id: 'obs7'}
     }
  },
-  3: {
-    blocks: {
-        blue: { x: 10, y: 10, color: 'blue', minVotes: 3 },
-        red: { x: 8, y: 1, color: 'red', minVotes: 2},
-        yellow: { x: 1, y: 10, color: 'yellow', minVotes: 1 }
-    },
-    slots: {
-        slot0: { x: 3, y: 6 },
-        slot1: { x: 16, y: 6 }
-    },
-    obstacles: {
-        obs0:{x:9,y:5,id:'obs0', immovable:true},
-        obs1:{x:9,y:7,id:'obs1', immovable:true},
-        obs2:{x:6,y:5,id:'obs2'},
-        obs3:{x:12,y:5,id:'obs3'},
-    }
-},
 };
 
 function loadLevel(levelNumber) {
