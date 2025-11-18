@@ -2665,18 +2665,31 @@ const MAX_EVENTS_PER_LEVEL = 40;
 // NEW: one heartbeat, started once
 let leaseHeartbeatId = null;
 
+// function startLeaseHeartbeat() {
+// if (leaseHeartbeatId) return;
+// leaseHeartbeatId = setInterval(() => {
+//   if (txBackoffMs) return;
+//   const p = currentPhaseSnap;
+//   if (canIBeController(p)) {
+//     renewLease();        // writes lease if I'm allowed
+//     maybeAdvancePhase(); // writes phase transitions when endTime passes
+//   } else {
+//     iAmController = false;
+//   }
+// }, PHASE_TICK_MS);
+// }
+
 function startLeaseHeartbeat() {
-if (leaseHeartbeatId) return;
-leaseHeartbeatId = setInterval(() => {
-  if (txBackoffMs) return;
-  const p = currentPhaseSnap;
-  if (canIBeController(p)) {
-    renewLease();        // writes lease if I'm allowed
-    maybeAdvancePhase(); // writes phase transitions when endTime passes
-  } else {
-    iAmController = false;
-  }
-}, PHASE_TICK_MS);
+  if (leaseHeartbeatId) return;
+  leaseHeartbeatId = setInterval(() => {
+    const p = currentPhaseSnap;
+    if (canIBeController(p)) {
+      renewLease();
+      maybeAdvancePhase();
+    } else {
+      iAmController = false;
+    }
+  }, PHASE_TICK_MS);
 }
 
 function canIBeController(p) {
@@ -2707,25 +2720,33 @@ async function maybeAdvancePhase() {
   const p = currentPhaseSnap;
   if (!p || !iAmController) return;
 
-  const now = Date.now();
-  if (now < (p.endTime || 0)) return;
+  // const now = Date.now();
+  // if (now < (p.endTime || 0)) return;
 
   try {
     const expectVersion = Number(p.version || 0);
 
     if (p.current === 'voting') {
       console.log('[ADVANCE] voting → moving', { expectVersion });
-      finalizeVotes(); // emits moveBlock/*
-      await updateStateTransaction('phase', 'advance', {
+
+      const res = await updateStateTransaction('phase', 'advance', {
         expectVersion,
         nextPhase: 'moving',
         durationMs: 2200
       });
+
+      console.log("res is", res);
+      if (res) {
+        finalizeVotes();
+      } else {
+        console.log('[ADVANCE] rejected, NOT finalizing votes');
+      }
     } else if (p.current === 'moving') {
       console.log('[ADVANCE] moving → voting', { expectVersion });
       if(eventNumber > currentLevelSnap.endAt){
         if (countdownInterval) { clearInterval(countdownInterval); countdownInterval = null; }
         updateStateTransaction('level', 'toSurvey', { reason: 'time' });
+        console.log("toSurvey is called");
         return;
       }
       await updateStateTransaction('phase', 'advance', {
@@ -2792,7 +2813,9 @@ if (path === 'phase') {
     // bootstrap (0,0) or exact match
     const versionOk  = (version === expV) || (version === 0 && expV === 0);
 
-    if (holderOk && leaseValid && phaseOk && versionOk) {
+    const timeOk = now >= endTime; 
+
+    if (holderOk && leaseValid && phaseOk && versionOk && timeOk) {
       newState = {
         current:      nextPhase,
         endTime:      now + n(durationMs, 1500),
@@ -2972,7 +2995,7 @@ function joinWaitingRoom() {
     waitingTime++;
     const minutes = Math.floor(waitingTime / 60);
     const seconds = waitingTime % 60;
-    document.getElementById('waitingTimeDisplay').innerText = `Waiting time: ${minutes}m ${seconds}s`;
+    //document.getElementById('waitingTimeDisplay').innerText = `Waiting time: ${minutes}m ${seconds}s`;
   }, 1000)
 
   playerId = getCurrentPlayerId(); // the playerId for this client
