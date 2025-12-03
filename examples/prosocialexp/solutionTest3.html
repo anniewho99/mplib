@@ -86,22 +86,24 @@ const H = W;
 
 const blockColors = { yellow:'#f5e85a', red:'#e74c3c', blue:'#4285f4' };
 // NEW: numeric labels for blocks: Yellow→1, Red→2, Blue→3
-const blockDigit = { yellow:'1', red:'2', blue:'3' };
+const blockDigit = { yellow:'2', red:'2', blue:'3' };
 
 const dirGlyph = { up:'↑', down:'↓', left:'←', right:'→' };
 
 // ======= INITIAL STATE =======
 //level 0
 const INITIAL = {
-  blocks: { blue:{x:9,y:9}, red:{x:7,y:0}, yellow:{x:0,y:9} },
-  slots: { slot0:{x:2,y:5}, slot1:{x:15,y:5} },
+  blocks: {  red:{x:9,y:2}, yellow:{x:1,y:2} },
+  slots: { slot0:{x:4,y:7}},
   obstacles: {
-    obs0:{x:8,y:4,id:'obs0', immovable:true},
-    obs1:{x:8,y:6,id:'obs1', immovable:true},
-    obs2:{x:5,y:4,id:'obs2'},
-    obs3:{x:11,y:4,id:'obs3'},
+    obs0:{x:3,y:5,id:'obs0', immovable:true},
+    obs1:{x:5,y:5,id:'obs1', immovable:true},
+    obs2:{x:7,y:5,id:'obs2', immovable:true},
+    obs3:{x:14,y:5,id:'obs3', immovable:true},
+    obs4:{x:0,y:5,id:'obs4'},
+    obs5:{x:9,y:5,id:'obs5'},
   },
-  locked:{blue:false, red:false, yellow:false},
+  locked:{red:false, yellow:false},
 };
 
 // //level 1
@@ -203,51 +205,55 @@ const DEFAULT_PLAN_TEXT = `
 
 Optimal rounds: 20
 Round 1:
-  - block blue up -> (9,8)
+  - block yellow left -> (0,2)
 Round 2:
-  - block blue right -> (10,8)
+  - block yellow down -> (0,3)
+  - obs obs4 down -> (0,6)
 Round 3:
-  - block blue up -> (10,7)
+  - block yellow down -> (0,4)
+  - obs obs4 down -> (0,7)
 Round 4:
-  - block blue up -> (10,6)
+  - block yellow down -> (0,5)
+  - obs obs4 down -> (0,8)
 Round 5:
-  - block blue right -> (11,6)
+  - block yellow down -> (0,6)
+  - obs obs4 down -> (0,9)
 Round 6:
-  - block blue right -> (12,6)
+  - block yellow down -> (0,7)
+  - obs obs4 down -> (0,10)
 Round 7:
-  - block blue right -> (13,6)
+  - block red down -> (9,3)
+  - obs obs5 down -> (9,6)
 Round 8:
-  - block blue up -> (13,5)
+  - block red down -> (9,4)
+  - obs obs5 down -> (9,7)
 Round 9:
-  - block blue right -> (14,5)
+  - block yellow right -> (1,7)
 Round 10:
-  - block red down -> (7,1)
+  - block red down -> (9,5)
+  - obs obs5 down -> (9,8)
 Round 11:
-  - block yellow up -> (0,8)
-  - block red left -> (6,1)
+  - block red down -> (9,6)
+  - obs obs5 down -> (9,9)
 Round 12:
-  - block yellow up -> (0,7)
-  - block red left -> (5,1)
+  - block yellow right -> (2,7)
 Round 13:
-  - block yellow up -> (0,6)
-  - block red left -> (4,1)
+  - block red down -> (9,7)
+  - obs obs5 down -> (9,10)
 Round 14:
-  - block yellow up -> (0,5)
-  - block red left -> (3,1)
+  - block red left -> (8,7)
 Round 15:
-  - block yellow right -> (1,5)
-  - block red left -> (2,1)
+  - block yellow right -> (3,7)
 Round 16:
-  - block yellow right -> (2,5)
-  - block red down -> (2,2)
+  - block red left -> (7,7)
 Round 17:
-  - block blue right -> (15,5)
+  - block yellow right -> (4,7)
 Round 18:
-  - block red down -> (2,3)
+  - block red left -> (6,7)
 Round 19:
-  - block red down -> (2,4)
+  - block red left -> (5,7)
 Round 20:
-  - block red down -> (2,5)`;
+  - block red left -> (4,7)`;
 
 // //level 1
 // const DEFAULT_PLAN_TEXT = `
