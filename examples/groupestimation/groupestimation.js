@@ -67,7 +67,7 @@ let practiceCompleted = false;
 let playerName = generateRandomName();
 const instructionSteps = [
   {
-      text: `Welcome! In this game, your goal is to work with two other players to move all the blocks into the slots as quickly as possible across four levels.\n\nBelow is a video showing what the game looks like.\nWe'll explain everything step by step!`,
+      text: `Welcome! In this game, your goal is to work with two other players to move all the blocks into the slots as quickly as possible across two levels.\n\nBelow is a video showing what the game looks like.\nWe'll explain everything step by step!`,
 
       demo: `
       <div style="text-align: center;">
@@ -224,7 +224,7 @@ const instructionSteps = [
     },   
   {
           text: `
-            Great job finishing the practice session! You will now be paired with two other participants to finish four levels together.\n
+            Great job finishing the practice session! You will now be paired with two other participants to finish two levels together.\n
             Here's a quick recap before you join the real game:\n
             • Use arrow buttons to choose a direction you want to push a block or obstacle.\n
             • Some blocks need teamwork — look for the "2" or "3" labels to know how many players are required.\n
@@ -997,7 +997,7 @@ let funList = {
 };
 
 // List the node names where we place listeners for any changes to the children of these nodes; set to '' if listening to changes for children of the root
-let listenerPaths = [ 'players', 'blocks', 'slots', 'obs', 'phase', 'moveBlock', 'level' ];
+let listenerPaths = [ 'players', 'blocks', 'slots', 'obs', 'phase', 'moveBlock', 'level', 'localT' ];
 
 //  Initialize the Game Session with all Configs
 initializeMPLIB( sessionConfig , studyId , funList, listenerPaths, verbosity );
@@ -1819,7 +1819,7 @@ let messageFinish = document.getElementById('messageFinish');
 
 
 // Set up correct instructions
-instructionsText.innerHTML = `Welcome! In this game, your goal is to work with two other players to move all the blocks into the slots as quickly as possible across four levels.\n\nBelow is a video showing what the game looks like.\nWe'll explain everything step by step!`;
+instructionsText.innerHTML = `Welcome! In this game, your goal is to work with two other players to move all the blocks into the slots as quickly as possible across two levels.\n\nBelow is a video showing what the game looks like.\nWe'll explain everything step by step!`;
 
 
 //  Game Event Listeners
@@ -2451,6 +2451,16 @@ function drawBlock(block, isObstacle) {
                   level: currentLevel,
                   local_t:Date.now() - phaseStarttime //local variable
               }, 'vote obs');
+
+              updateStateDirect(`localT/${playerId}`, {
+                inPlayer: playerId,
+                obstacle: id,
+                block: null, 
+                direction: dir,
+                event: eventNumber,
+                level: currentLevel,
+                local_t:Date.now() - phaseStarttime //local variable
+            }, 'vote obs');
           } else {
               updateStateDirect(`players/${playerId}`, {
                   block: id,
@@ -2460,6 +2470,16 @@ function drawBlock(block, isObstacle) {
                   level: currentLevel,
                   local_t:Date.now() - phaseStarttime //local variable
               }, 'vote blocks');
+
+              updateStateDirect(`localT/${playerId}`, {
+                inPlayer: playerId,
+                block: id,
+                obstacle: null,
+                direction: dir,
+                event: eventNumber,
+                level: currentLevel,
+                local_t:Date.now() - phaseStarttime //local variable
+            }, 'vote blocks');
           }
       });
       
@@ -2776,9 +2796,29 @@ function receiveStateChange(pathNow, nodeName, newState, typeChange ) {
       if (playerData.obstacle && playerData.direction) {
           console.log(`playerData.block = ${playerData.block}, playerData.obstacle = ${playerData.obstacle}, direction = ${playerData.direction}`);
           addArrowToBlock(playerData.obstacle, playerData.direction, playerId);
+          let currentPlayerId = getCurrentPlayerId();
+          updateStateDirect(`localT/${playerId}`, {
+            inPlayer: currentPlayerId,
+            obstacle: playerData.obstacle,
+            block: null, 
+            direction: playerData.direction,
+            event: eventNumber,
+            level: currentLevel,
+            local_t:Date.now() - phaseStarttime //local variable
+        }, 'vote obs');
       } else if (playerData.block && playerData.direction) {
           console.log(`playerData.block = ${playerData.block}, playerData.obstacle = ${playerData.obstacle}, direction = ${playerData.direction}`);
           addArrowToBlock(playerData.block, playerData.direction, playerId);
+          let currentPlayerId = getCurrentPlayerId();
+          updateStateDirect(`localT/${playerId}`, {
+            inPlayer: currentPlayerId,
+            obstacle: null,
+            block: playerData.block, 
+            direction: playerData.direction,
+            event: eventNumber,
+            level: currentLevel,
+            local_t:Date.now() - phaseStarttime //local variable
+        }, 'vote block');
       }
       if(playerId == "events"){
           eventNumber = newState;
@@ -2870,6 +2910,8 @@ function receiveStateChange(pathNow, nodeName, newState, typeChange ) {
             _lastLevelEndAt = currentLevelSnap.endAt;
             renderLevelFromAuthority(currentLevelSnap);
           }
+        }else if(pathNow === 'localT'){
+          
         }
 }
 
