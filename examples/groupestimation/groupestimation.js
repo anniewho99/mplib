@@ -1106,36 +1106,36 @@ let completedLevel = false;
 const levelPlacements = {
   0: {
     blocks: {
-        red: { x: 3, y: 5, color: 'red', minVotes: 2},
-        yellow: { x: 0, y: 9, color: 'yellow', minVotes: 1 }
+        red: { x: 4, y: 6, color: 'red', minVotes: 2},
+        yellow: { x: 1, y: 10, color: 'yellow', minVotes: 1 }
     },
     slots: {
-        slot0: { x: 5, y: 0 }
+        slot0: { x: 6, y: 1 }
     },
     obstacles: {
-      obs0:{x:4,y:3,id:'obs0', immovable:true},
-      obs1:{x:6,y:5,id:'obs1', immovable:true},
-      obs2:{x:9,y:5,id:'obs2', immovable:true},
-      obs3:{x:12,y:5,id:'obs3', immovable:true},
-      obs4:{x:1,y:2,id:'obs4'},
-      obs5:{x:1,y:5,id:'obs5'},
+      obs0:{x:5,y:4,id:'obs0', immovable:true},
+      obs1:{x:7,y:6,id:'obs1', immovable:true},
+      obs2:{x:10,y:6,id:'obs2', immovable:true},
+      obs3:{x:13,y:6,id:'obs3', immovable:true},
+      obs4:{x:2,y:3,id:'obs4'},
+      obs5:{x:2,y:6,id:'obs5'},
     }
 },
   1: {
     blocks: {
-        red: { x: 3, y: 5, color: 'red', minVotes: 2 },
-        yellow: { x: 0, y: 9, color: 'yellow', minVotes: 1 }
+        red: { x: 4, y: 6, color: 'red', minVotes: 2 },
+        yellow: { x: 1, y: 10, color: 'yellow', minVotes: 1 }
     },
     slots: {
-      slot0: { x: 5, y: 0 }
+      slot0: { x: 6, y: 1 }
     },
     obstacles: {
-      obs0:{x:4,y:3,id:'obs0', immovable:true},
-      obs1:{x:6,y:5,id:'obs1', immovable:true},
-      obs2:{x:9,y:5,id:'obs2', immovable:true},
-      obs3:{x:12,y:5,id:'obs3', immovable:true},
-      obs4:{x:1,y:2,id:'obs4'},
-      obs5:{x:1,y:5,id:'obs5'},
+      obs0:{x:5,y:4,id:'obs0', immovable:true},
+      obs1:{x:7,y:6,id:'obs1', immovable:true},
+      obs2:{x:10,y:6,id:'obs2', immovable:true},
+      obs3:{x:13,y:6,id:'obs3', immovable:true},
+      obs4:{x:2,y:3,id:'obs4'},
+      obs5:{x:2,y:6,id:'obs5'},
     }
 },
 //   2: {
@@ -1588,7 +1588,7 @@ function submitPostTrial() {
   container.innerHTML = `<p> Thank you! Your responses have been recorded.<br>Redirecting to Prolific...</p>`;
 
   setTimeout(() => {
-      window.location.href = 'https://app.prolific.com/submissions/complete?cc=CZTP28SO'; // Replace with your code
+      window.location.href = 'https://app.prolific.com/submissions/complete?cc=C56HRVA1'; // Replace with your code
       endSession();
   }, 3000);
 }
@@ -1670,7 +1670,7 @@ function showLevelCompleteMessage(levelNumber, callback) {
       screen.appendChild(message);
       screen.style.display = 'flex';
 
-      document.getElementById("levelIndicator").textContent = `Level ${levelNumber + 2} of 4`;
+      document.getElementById("levelIndicator").textContent = `Level ${levelNumber + 2} of 2`;
       
       const submitBtn = document.createElement('button');
       submitBtn.className = 'button';
@@ -2230,7 +2230,7 @@ function moveBlock(block, x, y, direction) {
                       block.remove(); // Remove from DOM
                       delete GameState.blocks[color]; // Remove from state
 
-                      if (Object.keys(lockedBlocks).length === 3) {
+                      if (Object.keys(lockedBlocks).length === 2) {
                           console.log("All blocks locked — advancing level...");
                           //currentLevel++;
                           lockedBlocks = {};  
@@ -2454,6 +2454,7 @@ function drawBlock(block, isObstacle) {
 
               updateStateDirect(`localT/${playerId}`, {
                 inPlayer: playerId,
+                player: playerId,
                 obstacle: id,
                 block: null, 
                 direction: dir,
@@ -2473,6 +2474,7 @@ function drawBlock(block, isObstacle) {
 
               updateStateDirect(`localT/${playerId}`, {
                 inPlayer: playerId,
+                player: playerId,
                 block: id,
                 obstacle: null,
                 direction: dir,
@@ -2797,8 +2799,9 @@ function receiveStateChange(pathNow, nodeName, newState, typeChange ) {
           console.log(`playerData.block = ${playerData.block}, playerData.obstacle = ${playerData.obstacle}, direction = ${playerData.direction}`);
           addArrowToBlock(playerData.obstacle, playerData.direction, playerId);
           let currentPlayerId = getCurrentPlayerId();
-          updateStateDirect(`localT/${playerId}`, {
+          updateStateDirect(`localT/${currentPlayerId}`, {
             inPlayer: currentPlayerId,
+            player: playerId,
             obstacle: playerData.obstacle,
             block: null, 
             direction: playerData.direction,
@@ -2810,8 +2813,9 @@ function receiveStateChange(pathNow, nodeName, newState, typeChange ) {
           console.log(`playerData.block = ${playerData.block}, playerData.obstacle = ${playerData.obstacle}, direction = ${playerData.direction}`);
           addArrowToBlock(playerData.block, playerData.direction, playerId);
           let currentPlayerId = getCurrentPlayerId();
-          updateStateDirect(`localT/${playerId}`, {
+          updateStateDirect(`localT/${currentPlayerId}`, {
             inPlayer: currentPlayerId,
+            player: playerId,
             obstacle: null,
             block: playerData.block, 
             direction: playerData.direction,
@@ -2911,7 +2915,7 @@ function receiveStateChange(pathNow, nodeName, newState, typeChange ) {
             renderLevelFromAuthority(currentLevelSnap);
           }
         }else if(pathNow === 'localT'){
-          
+
         }
 }
 
@@ -3395,11 +3399,12 @@ function endSession() {
 
   let err = getSessionError();
 
-  if ( anyPlayerTerminatedAbnormally()) {
-      // Another player closed their window or were disconnected prematurely
-      messageFinish.innerHTML = `<p>Session ended abnormally because the other player closed their window or was disconnected</p>`;
+  // if ( anyPlayerTerminatedAbnormally()) {
+  //     // Another player closed their window or were disconnected prematurely
+  //     messageFinish.innerHTML = `<p>Session ended abnormally because the other player closed their window or was disconnected</p>`;
       
-  } else if (err.errorCode == 1) {
+  // } else 
+  if (err.errorCode == 1) {
       // No sessions available
       messageFinish.innerHTML = `<p>Session ended abnormally because there are no available sessions to join</p>`;
   } else if (err.errorCode==2) {
