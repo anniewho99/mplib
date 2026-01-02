@@ -943,7 +943,7 @@ let playerId;
 
 // ---- Phase Controller Lease ----
 const PHASE_LEASE_MS  = 4000;  // lease lasts ~4s
-const PHASE_TICK_MS   = 1500;  // renew/advance check cadence
+const PHASE_TICK_MS   = 1000;  // renew/advance check cadence
 const PHASE_DRIFT_MS  = 1200;  // drift tolerance
 
 let iAmController     = false;
@@ -2508,7 +2508,8 @@ function addArrowToBlock(color, direction, playerId) {
 
 
   const arrow = document.createElement('div');
-  arrow.classList.add('arrow');
+  //arrow.classList.add('arrow');
+  arrow.classList.add('arrow', 'is-hidden');
   arrow.style.width = '50px';
   arrow.style.height = '50px';
   arrow.style.position = 'absolute';
@@ -2546,6 +2547,10 @@ function addArrowToBlock(color, direction, playerId) {
 
   // Re-layout all arrows of this direction in the block
   layoutDirectionalArrows(block, direction,isObstacle );
+
+  if (playerId === thisPlayerID) {
+    spawnFloatingArrowClone(arrow, color);
+  }
 }
 
 
@@ -2604,6 +2609,50 @@ function layoutDirectionalArrows(block, direction, isObstacle) {
   });
 }
 
+function spawnFloatingArrowClone(arrow, color) {
+  const direction = arrow.dataset.direction;
+  if (!direction) return;
+
+  const arrowRect = arrow.getBoundingClientRect();
+
+  const clone = arrow.cloneNode(true);
+  clone.classList.add('arrow-clone');   // IMPORTANT
+  clone.dataset.sourceColor = color;   
+  clone.dataset.sourcePlayerId = arrow.dataset.playerId;
+  clone.dataset.sourceDirection = direction;
+  clone.classList.remove('is-hidden');
+  clone.classList.add('is-visible');
+  clone.style.position = 'fixed'; // viewport coords, safest
+  clone.style.pointerEvents = 'none';
+  clone.style.left = `${arrowRect.left}px`;
+  clone.style.top = `${arrowRect.top}px`;
+  clone.style.margin = '0';
+  clone.style.zIndex = 2147483647;
+
+  // IMPORTANT: reset transform from layout; we reapply direction cleanly
+  clone.style.transform = 'none';
+  clone.style.transition = 'opacity 150ms linear';
+
+  // Match direction visually (your existing mapping)
+  const rotationMap = {
+    down: 'rotate(90deg)',
+    left: 'rotate(180deg)',
+    up: 'rotate(270deg)',
+    right: 'rotate(0deg)'
+  };
+
+  clone.style.transform = rotationMap[direction] || 'none';
+  clone.style.transformOrigin = 'center center';
+
+  if (direction === 'left') {
+    clone.style.transform += ' scaleY(-1)';
+  }
+
+  document.body.appendChild(clone);
+
+}
+
+
 
 function animateSpriteOnce(arrowDiv, frameCount = 6, frameWidth = 40, frameHeight = 40, fps = 12) {
   let currentFrame = 0;
@@ -2626,6 +2675,10 @@ function removeArrowFromPlayer(playerId) {
 
   const arrows = document.querySelectorAll(`.arrow[data-player-id="${playerId}"]`);
   arrows.forEach(arrow => arrow.remove());
+
+  document.querySelectorAll(
+    `.arrow-clone[data-source-player-id="${playerId}"]`
+  ).forEach(c => c.remove());
 }
 
 
@@ -2883,17 +2936,42 @@ function receiveStateChange(pathNow, nodeName, newState, typeChange ) {
         block.dataset.y = y;
       }
       
+      spawnClonesForBlock(block);
 
-      const arrows = block.querySelectorAll('.arrow');
-      if (payload.move === false) {
-      arrows.forEach(a => a.remove());
-      return;
-      }
+      setTimeout(() => {
+        const arrows = block.querySelectorAll('.arrow');
+        // if (payload.move === false) {
+        // arrows.forEach(a => a.remove());
+        // return;
+        // }
 
-      arrows.forEach(a => { if (a.dataset.direction !== payload.direction) a.remove(); });
+        if (payload.move === false) {
+          // remove BOTH and stop
+          removeClonesForBlock(block);
+          removeOriginalsForBlock(block);
+          return;
+        }
+  
+        arrows.forEach(a => { if (a.dataset.direction !== payload.direction) a.remove(); });
 
+        document.querySelectorAll(
+          `.arrow-clone[data-source-color="${block.dataset.color}"]`
+        ).forEach(c => {
+          if (c.dataset.sourceDirection !== payload.direction) {
+            c.remove();
+          }
+        });
 
-      moveBlock(block, x, y, payload.direction);
+        removeClonesForBlock(block);
+
+        block.querySelectorAll('.arrow').forEach(a => {
+          a.classList.remove('is-hidden');
+          a.classList.add('is-visible');
+        });
+  
+        moveBlock(block, x, y, payload.direction);
+      }, 1000);
+
       } else if (pathNow === 'level') {
           currentLevelSnap = currentLevelSnap || {};
           if (nodeName === 'index')       currentLevelSnap.index = newState;
@@ -2917,6 +2995,27 @@ function receiveStateChange(pathNow, nodeName, newState, typeChange ) {
         }else if(pathNow === 'localT'){
 
         }
+}
+
+function spawnClonesForBlock(block) {
+  block.querySelectorAll('.arrow').forEach(arrow => {
+    // Only spawn clones for OTHER players
+    if (arrow.dataset.playerId !== String(thisPlayerID)) {
+      spawnFloatingArrowClone(arrow, block.dataset.color);
+    }
+  });
+}
+
+
+function removeClonesForBlock(block) {
+  const color = block.dataset.color;
+  document
+    .querySelectorAll(`.arrow-clone[data-source-color="${color}"]`)
+    .forEach(c => c.remove());
+}
+
+function removeOriginalsForBlock(block) {
+  block.querySelectorAll('.arrow').forEach(a => a.remove());
 }
 
 
@@ -3029,7 +3128,7 @@ async function maybeAdvancePhase() {
       const res = await updateStateTransaction('phase', 'advance', {
         expectVersion,
         nextPhase: 'moving',
-        durationMs: 2200
+        durationMs: 3200
       });
 
       console.log("res is", res);

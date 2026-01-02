@@ -378,6 +378,16 @@
         flex-wrap: nowrap;
         gap: 8px;
         }
+        .arrow.is-hidden {
+        visibility: hidden;   /* keeps layout/positioning intact */
+        opacity: 0;
+        }
+        .arrow.is-visible {
+        visibility: visible;
+        opacity: 1;
+        transition: opacity 150ms linear;
+        }
+
 
 
 
