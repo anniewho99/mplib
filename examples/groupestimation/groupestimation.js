@@ -72,7 +72,7 @@ const instructionSteps = [
       demo: `
       <div style="text-align: center;">
           <video width="480" autoplay loop muted playsinline style="border: 2px solid #ccc; border-radius: 8px;">
-              <source src="./images/demo.mp4" type="video/mp4">
+              <source src="./images/demoNoComm.mp4" type="video/mp4">
               Your browser does not support the video tag.
           </video>
       </div>
