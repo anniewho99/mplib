@@ -67,7 +67,7 @@ let practiceCompleted = false;
 let playerName = generateRandomName();
 const instructionSteps = [
   {
-      text: `Welcome! In this game, your goal is to work with two other players to move all the blocks into the slots as quickly as possible across two levels.\n\nBelow is a video showing what the game looks like.\nWe'll explain everything step by step!`,
+      text: `Welcome! In this game, your goal is to work with two other players to move all the blocks into the slots as quickly as possible across four levels.\n\nBelow is a video showing what the game looks like.\nWe'll explain everything step by step!`,
 
       demo: `
       <div style="text-align: center;">
@@ -224,7 +224,7 @@ const instructionSteps = [
     },   
   {
           text: `
-            Great job finishing the practice session! You will now be paired with two other participants to finish two levels together.\n
+            Great job finishing the practice session! You will now be paired with two other participants to finish four levels together.\n
             Here's a quick recap before you join the real game:\n
             • Use arrow buttons to choose a direction you want to push a block or obstacle.\n
             • Some blocks need teamwork — look for the "2" or "3" labels to know how many players are required.\n
@@ -1025,158 +1025,158 @@ let eventNumber = 1;
 
 let completedLevel = false;
 //abcd
-// const levelPlacements = {
-//   0: {
-//       blocks: {
-//           blue: { x: 10, y: 10, color: 'blue', minVotes: 3 },
-//           red: { x: 8, y: 1, color: 'red', minVotes: 2},
-//           yellow: { x: 1, y: 10, color: 'yellow', minVotes: 1 }
-//       },
-//       slots: {
-//           slot0: { x: 3, y: 6 },
-//           slot1: { x: 16, y: 6 }
-//       },
-//       obstacles: {
-//           obs0:{x:9,y:5,id:'obs0', immovable:true},
-//           obs1:{x:9,y:7,id:'obs1', immovable:true},
-//           obs2:{x:6,y:5,id:'obs2'},
-//           obs3:{x:12,y:5,id:'obs3'},
-//       }
-//   },
-//   1: {
-//       blocks: {
-//           blue: { x: 12, y: 10, color: 'blue', minVotes: 3 },
-//           red: { x: 9, y: 1, color: 'red', minVotes: 2},
-//           yellow: { x: 2, y: 10, color: 'yellow', minVotes: 1 }
-//       },
-//       slots: {
-//           slot0: { x: 3, y: 4 },
-//           slot1: { x: 15, y: 4 }
-//       },
-//       obstacles: {
-//           obs0: { x: 6, y: 6, id: 'obs0', immovable: true  },
-//           obs1: { x: 8, y: 4, id: 'obs1', immovable: true},
-//           obs2: { x: 12, y: 5, id: 'obs2', immovable: true  },
-//           obs3: { x: 10, y: 7, id: 'obs3', immovable: true},
-//           obs4: { x: 14, y: 7, id: 'obs4', immovable: true },
-//           obs5: { x: 3, y: 1, id: 'obs5'},
-//           obs6: { x: 3, y: 7, id: 'obs6'},
-//           obs7: { x: 10, y: 10, id: 'obs7'}
-//       }
-//   },
-//   2: {
-//       blocks: {
-//           blue: { x: 16, y: 9, color: 'blue', minVotes: 3 },
-//           red: { x: 6, y: 1, color: 'red', minVotes: 2},
-//           yellow: { x: 6, y: 9, color: 'yellow', minVotes: 1 }
-//       },
-//       slots: {
-//           slot0: { x: 1, y: 6 },
-//           slot1: { x: 9, y: 5 }
-//       },
-//       obstacles: {
-//           obs0: { x: 3, y: 10, id: 'obs0', immovable: true  },
-//           obs1: { x: 13, y: 6, id: 'obs1', immovable: true},
-//           obs2: { x: 2, y: 3, id: 'obs2'},
-//           obs3: { x: 6, y: 6, id: 'obs3'},
-//           obs4: { x: 10, y: 9, id: 'obs4'}
-//       }
-//   },
-//   3: {
-//       blocks: {
-//           blue: { x: 9, y: 4, color: 'blue', minVotes: 3 },
-//           red: { x: 7, y: 1, color: 'red', minVotes: 2 },
-//           yellow: { x: 11, y: 1, color: 'yellow', minVotes: 1 }
-//       },
-//       slots: {
-//           slot0: { x: 3, y: 5 },
-//           slot1: { x: 14, y: 5 }
-//       },
-//       obstacles: {
-//           obs0: { x: 6, y: 4, id: 'obs0', immovable: true  },
-//           obs1: { x: 3, y: 2, id: 'obs1', immovable: true},
-//           obs3: { x: 6, y: 8, id: 'obs3'},
-//           obs4: { x: 15, y: 1, id: 'obs4' },
-//           obs2: { x: 12, y: 4, id: 'obs2', immovable: true  },
-//           obs5: { x: 12, y: 8, id: 'obs5'}
-//       }
-//   },
-// };
-//cdab
 const levelPlacements = {
   0: {
-    blocks: {
-        red: { x: 4, y: 6, color: 'red', minVotes: 2},
-        yellow: { x: 1, y: 10, color: 'yellow', minVotes: 1 }
-    },
-    slots: {
-        slot0: { x: 6, y: 1 }
-    },
-    obstacles: {
-      obs0:{x:5,y:4,id:'obs0', immovable:true},
-      obs1:{x:7,y:6,id:'obs1', immovable:true},
-      obs2:{x:10,y:6,id:'obs2', immovable:true},
-      obs3:{x:13,y:6,id:'obs3', immovable:true},
-      obs4:{x:2,y:3,id:'obs4'},
-      obs5:{x:2,y:6,id:'obs5'},
-    }
-},
+      blocks: {
+          blue: { x: 10, y: 10, color: 'blue', minVotes: 3 },
+          red: { x: 8, y: 1, color: 'red', minVotes: 2},
+          yellow: { x: 1, y: 10, color: 'yellow', minVotes: 1 }
+      },
+      slots: {
+          slot0: { x: 3, y: 6 },
+          slot1: { x: 16, y: 6 }
+      },
+      obstacles: {
+          obs0:{x:9,y:5,id:'obs0', immovable:true},
+          obs1:{x:9,y:7,id:'obs1', immovable:true},
+          obs2:{x:6,y:5,id:'obs2'},
+          obs3:{x:12,y:5,id:'obs3'},
+      }
+  },
   1: {
-    blocks: {
-        red: { x: 4, y: 6, color: 'red', minVotes: 2 },
-        yellow: { x: 1, y: 10, color: 'yellow', minVotes: 1 }
-    },
-    slots: {
-      slot0: { x: 6, y: 1 }
-    },
-    obstacles: {
-      obs0:{x:5,y:4,id:'obs0', immovable:true},
-      obs1:{x:7,y:6,id:'obs1', immovable:true},
-      obs2:{x:10,y:6,id:'obs2', immovable:true},
-      obs3:{x:13,y:6,id:'obs3', immovable:true},
-      obs4:{x:2,y:3,id:'obs4'},
-      obs5:{x:2,y:6,id:'obs5'},
-    }
-},
-//   2: {
-//           blocks: {
-//               blue: { x: 10, y: 10, color: 'blue', minVotes: 3 },
-//               red: { x: 8, y: 1, color: 'red', minVotes: 2},
-//               yellow: { x: 1, y: 10, color: 'yellow', minVotes: 1 }
-//           },
-//           slots: {
-//               slot0: { x: 3, y: 6 },
-//               slot1: { x: 16, y: 6 }
-//           },
-//           obstacles: {
-//               obs0:{x:9,y:5,id:'obs0', immovable:true},
-//               obs1:{x:9,y:7,id:'obs1', immovable:true},
-//               obs2:{x:6,y:5,id:'obs2'},
-//               obs3:{x:12,y:5,id:'obs3'},
-//           }
-//     },
-//   3: {
+      blocks: {
+          blue: { x: 12, y: 10, color: 'blue', minVotes: 3 },
+          red: { x: 9, y: 1, color: 'red', minVotes: 2},
+          yellow: { x: 2, y: 10, color: 'yellow', minVotes: 1 }
+      },
+      slots: {
+          slot0: { x: 3, y: 4 },
+          slot1: { x: 15, y: 4 }
+      },
+      obstacles: {
+          obs0: { x: 6, y: 6, id: 'obs0', immovable: true  },
+          obs1: { x: 8, y: 4, id: 'obs1', immovable: true},
+          obs2: { x: 12, y: 5, id: 'obs2', immovable: true  },
+          obs3: { x: 10, y: 7, id: 'obs3', immovable: true},
+          obs4: { x: 14, y: 7, id: 'obs4', immovable: true },
+          obs5: { x: 3, y: 1, id: 'obs5'},
+          obs6: { x: 3, y: 7, id: 'obs6'},
+          obs7: { x: 10, y: 10, id: 'obs7'}
+      }
+  },
+  2: {
+      blocks: {
+          blue: { x: 16, y: 9, color: 'blue', minVotes: 3 },
+          red: { x: 6, y: 1, color: 'red', minVotes: 2},
+          yellow: { x: 6, y: 9, color: 'yellow', minVotes: 1 }
+      },
+      slots: {
+          slot0: { x: 1, y: 6 },
+          slot1: { x: 9, y: 5 }
+      },
+      obstacles: {
+          obs0: { x: 3, y: 10, id: 'obs0', immovable: true  },
+          obs1: { x: 13, y: 6, id: 'obs1', immovable: true},
+          obs2: { x: 2, y: 3, id: 'obs2'},
+          obs3: { x: 6, y: 6, id: 'obs3'},
+          obs4: { x: 10, y: 9, id: 'obs4'}
+      }
+  },
+  3: {
+      blocks: {
+          blue: { x: 9, y: 4, color: 'blue', minVotes: 3 },
+          red: { x: 7, y: 1, color: 'red', minVotes: 2 },
+          yellow: { x: 11, y: 1, color: 'yellow', minVotes: 1 }
+      },
+      slots: {
+          slot0: { x: 3, y: 5 },
+          slot1: { x: 14, y: 5 }
+      },
+      obstacles: {
+          obs0: { x: 6, y: 4, id: 'obs0', immovable: true  },
+          obs1: { x: 3, y: 2, id: 'obs1', immovable: true},
+          obs3: { x: 6, y: 8, id: 'obs3'},
+          obs4: { x: 15, y: 1, id: 'obs4' },
+          obs2: { x: 12, y: 4, id: 'obs2', immovable: true  },
+          obs5: { x: 12, y: 8, id: 'obs5'}
+      }
+  },
+};
+//cdab
+// const levelPlacements = {
+//   0: {
 //     blocks: {
-//         blue: { x: 12, y: 10, color: 'blue', minVotes: 3 },
-//         red: { x: 9, y: 1, color: 'red', minVotes: 2},
-//         yellow: { x: 2, y: 10, color: 'yellow', minVotes: 1 }
+//         red: { x: 4, y: 6, color: 'red', minVotes: 2},
+//         yellow: { x: 1, y: 10, color: 'yellow', minVotes: 1 }
 //     },
 //     slots: {
-//         slot0: { x: 3, y: 4 },
-//         slot1: { x: 15, y: 4 }
+//         slot0: { x: 6, y: 1 }
 //     },
 //     obstacles: {
-//         obs0: { x: 6, y: 6, id: 'obs0', immovable: true  },
-//         obs1: { x: 8, y: 4, id: 'obs1', immovable: true},
-//         obs2: { x: 12, y: 5, id: 'obs2', immovable: true  },
-//         obs3: { x: 10, y: 7, id: 'obs3', immovable: true},
-//         obs4: { x: 14, y: 7, id: 'obs4', immovable: true },
-//         obs5: { x: 3, y: 1, id: 'obs5'},
-//         obs6: { x: 3, y: 7, id: 'obs6'},
-//         obs7: { x: 10, y: 10, id: 'obs7'}
+//       obs0:{x:5,y:4,id:'obs0', immovable:true},
+//       obs1:{x:7,y:6,id:'obs1', immovable:true},
+//       obs2:{x:10,y:6,id:'obs2', immovable:true},
+//       obs3:{x:13,y:6,id:'obs3', immovable:true},
+//       obs4:{x:2,y:3,id:'obs4'},
+//       obs5:{x:2,y:6,id:'obs5'},
 //     }
-//  },
-};
+// },
+//   1: {
+//     blocks: {
+//         red: { x: 4, y: 6, color: 'red', minVotes: 2 },
+//         yellow: { x: 1, y: 10, color: 'yellow', minVotes: 1 }
+//     },
+//     slots: {
+//       slot0: { x: 6, y: 1 }
+//     },
+//     obstacles: {
+//       obs0:{x:5,y:4,id:'obs0', immovable:true},
+//       obs1:{x:7,y:6,id:'obs1', immovable:true},
+//       obs2:{x:10,y:6,id:'obs2', immovable:true},
+//       obs3:{x:13,y:6,id:'obs3', immovable:true},
+//       obs4:{x:2,y:3,id:'obs4'},
+//       obs5:{x:2,y:6,id:'obs5'},
+//     }
+// },
+// //   2: {
+// //           blocks: {
+// //               blue: { x: 10, y: 10, color: 'blue', minVotes: 3 },
+// //               red: { x: 8, y: 1, color: 'red', minVotes: 2},
+// //               yellow: { x: 1, y: 10, color: 'yellow', minVotes: 1 }
+// //           },
+// //           slots: {
+// //               slot0: { x: 3, y: 6 },
+// //               slot1: { x: 16, y: 6 }
+// //           },
+// //           obstacles: {
+// //               obs0:{x:9,y:5,id:'obs0', immovable:true},
+// //               obs1:{x:9,y:7,id:'obs1', immovable:true},
+// //               obs2:{x:6,y:5,id:'obs2'},
+// //               obs3:{x:12,y:5,id:'obs3'},
+// //           }
+// //     },
+// //   3: {
+// //     blocks: {
+// //         blue: { x: 12, y: 10, color: 'blue', minVotes: 3 },
+// //         red: { x: 9, y: 1, color: 'red', minVotes: 2},
+// //         yellow: { x: 2, y: 10, color: 'yellow', minVotes: 1 }
+// //     },
+// //     slots: {
+// //         slot0: { x: 3, y: 4 },
+// //         slot1: { x: 15, y: 4 }
+// //     },
+// //     obstacles: {
+// //         obs0: { x: 6, y: 6, id: 'obs0', immovable: true  },
+// //         obs1: { x: 8, y: 4, id: 'obs1', immovable: true},
+// //         obs2: { x: 12, y: 5, id: 'obs2', immovable: true  },
+// //         obs3: { x: 10, y: 7, id: 'obs3', immovable: true},
+// //         obs4: { x: 14, y: 7, id: 'obs4', immovable: true },
+// //         obs5: { x: 3, y: 1, id: 'obs5'},
+// //         obs6: { x: 3, y: 7, id: 'obs6'},
+// //         obs7: { x: 10, y: 10, id: 'obs7'}
+// //     }
+// //  },
+// };
 
 // // //bcda
 // const levelPlacements = {
@@ -1617,7 +1617,7 @@ function showLevelCompleteMessage(levelNumber, callback) {
   message.style.fontFamily = 'monospace';
   message.style.textAlign = 'center';
 
-  if (currentLevel === 1) {
+  if (currentLevel === 3) {
       message.innerHTML = `🎉 You've completed all levels!<br>You will be redirected to a post-trial questionnaire.`;
       screen.appendChild(message);
       screen.style.display = 'flex';
@@ -1670,7 +1670,7 @@ function showLevelCompleteMessage(levelNumber, callback) {
       screen.appendChild(message);
       screen.style.display = 'flex';
 
-      document.getElementById("levelIndicator").textContent = `Level ${levelNumber + 2} of 2`;
+      document.getElementById("levelIndicator").textContent = `Level ${levelNumber + 2} of 4`;
       
       const submitBtn = document.createElement('button');
       submitBtn.className = 'button';
@@ -1819,7 +1819,7 @@ let messageFinish = document.getElementById('messageFinish');
 
 
 // Set up correct instructions
-instructionsText.innerHTML = `Welcome! In this game, your goal is to work with two other players to move all the blocks into the slots as quickly as possible across two levels.\n\nBelow is a video showing what the game looks like.\nWe'll explain everything step by step!`;
+instructionsText.innerHTML = `Welcome! In this game, your goal is to work with two other players to move all the blocks into the slots as quickly as possible across four levels.\n\nBelow is a video showing what the game looks like.\nWe'll explain everything step by step!`;
 
 
 //  Game Event Listeners
@@ -2230,7 +2230,7 @@ function moveBlock(block, x, y, direction) {
                       block.remove(); // Remove from DOM
                       delete GameState.blocks[color]; // Remove from state
 
-                      if (Object.keys(lockedBlocks).length === 2) {
+                      if (Object.keys(lockedBlocks).length === 3) {
                           console.log("All blocks locked — advancing level...");
                           //currentLevel++;
                           lockedBlocks = {};  
