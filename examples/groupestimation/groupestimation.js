@@ -187,7 +187,7 @@ const instructionSteps = [
              <div id="practiceTimer" style="text-align:center; font-size:18px; margin-top:10px; color:black;"></div>`
     },   
     {
-      text: `Some blocks require two players to move — like this one. You'll see another player's choice as soon as they click a direction. In this case, another player has already chosen to move the block to the left. Try coordinating with them to move this 2 block into the slot.`,
+      text: `Some blocks require two players to move—like this one. During the actual game, you won’t be able to see the other player’s choice until the countdown has finished. However, during the tutorial, you will be shown the other player’s choice. In this case, another player has already chosen to move the block to the left. Try coordinating with them to move this two-player block into the slot.`,
       demo: `<div id="practiceBoard" style="
               width: 360px;
               height: 360px;

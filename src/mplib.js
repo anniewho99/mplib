@@ -3,15 +3,12 @@
    ----------------------------------------------------------
 */
 
-/* To do    
-   Pong does not terminate properly. When a player ends a session normally, an MPLIB error message "Session ended abnormally" is produced
+/* To do 
+   Do more testing across games
+     
+   focus and blur session changes also call the triggerSessionCallback() and this leads to unexpected behavior; for example when there is a timer for exiting the waiting room
+   Pong: when player has browser out of focus and controls the ball, the ball is very slow  
 
-   When a player removes a session, they should also remove the state associated with the session
-
-   When minplayer=maxplayer, and the session was active before, check that a new player should not be able to join  
-
-   Resolve inconsistency between setting allowReplacements to true and setting minimum and maximum number of players to the same number. The behavior for this setting is not well defined 
-   Maybe only allow replacements if the minimum and maximum number of players is not the same?
 */
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.3/firebase-app.js";
@@ -21,6 +18,8 @@ import {
     push, onChildAdded, onChildChanged,
     onChildRemoved, remove, serverTimestamp, onDisconnect, runTransaction
 } from "https://www.gstatic.com/firebasejs/10.12.3/firebase-database.js"; //"./firebase/firebase-database.js";  //;
+
+const minMinutesBeforeRemoval = 10; // Minumum time after termination before session and state associated with session is removed
 
 // si contains the session information that the client will see
 let si = {
@@ -54,6 +53,20 @@ const firebaseApp = initializeApp(firebasempConfig);
 const auth = getAuth(firebaseApp);
 const db = getDatabase(firebaseApp);
 
+//----------------------------------------------------------
+// Define some new functions we can use to collect metadata
+//----------------------------------------------------------
+function getOSAndBrowser() {
+    /*
+        Grab string information about user OS and Browser.
+
+        This information will be unparsed, it is up to the
+        user to parse the string and do with the information
+        what they wish.
+    */
+    const userAgent = navigator.userAgent;
+    return userAgent;
+};
 
 //------------------------------------------------------
 // Define some new functions we can use in other code
@@ -163,7 +176,7 @@ export function initializeMPLIB( sessionConfigNow , studyIdNow , funList, listen
     if (!isBrowserCompatible()) {
         si.sessionErrorCode = 3;
         si.sessionErrorMsg = 'Browser incompatibility';
-        si.status = 'endSession';
+        si.status = 'terminated';
         callback_sessionChange.endSession();
     } else {
         // 
@@ -172,8 +185,16 @@ export function initializeMPLIB( sessionConfigNow , studyIdNow , funList, listen
             listenerPaths = [ '' ];
         }
 
-        // Do some house cleaning of the database by removing states that are no longer associated with active sessions (e.g. user closed browser)
-        removeOrphanedStatePaths();
+        // Get the server time offset relative to the client time
+        offsetRef = ref(db, ".info/serverTimeOffset");
+        serverTimeOffset = 0;
+        onValue(offsetRef, (snap) => {
+            serverTimeOffset = snap.val();
+            myconsolelog(`Server offset time: ${serverTimeOffset}`);
+        });
+
+        // Do some cleaning of the sessions and states that are no longer active
+        removeTerminatedSessions();
 
         // Reset the session info information
         startTime = new Date(); // record the time at which the library was started (typically start of reading instructions)
@@ -184,6 +205,51 @@ export function initializeMPLIB( sessionConfigNow , studyIdNow , funList, listen
     }
 }
 
+async function removeTerminatedSessions() {
+     
+    // Read out the states data for this study
+    let statesData = await readData( `${studyId}/states` );
+
+    // Now create a list of all sessions for this study
+    let sessionsData = await readData( `${studyId}/sessions` ); 
+
+    let listSessions = [];
+    if (sessionsData != null) {
+        listSessions = Object.keys( sessionsData );
+
+        for (let sessionKey in sessionsData) {
+            let session = sessionsData[ sessionKey ];
+            let status = session.status;
+            if ((status == 'terminated') && (session.sessionEndedAt)) {
+                // Estimate the time elapsed
+                let estimatedServerTime = Date.now() + serverTimeOffset;
+                let minutesElapsed = (estimatedServerTime - session.sessionEndedAt) / (1000 * 60);
+                myconsolelog( `Session ${sessionKey} terminated ${minutesElapsed} minutes ago.`)
+
+                if (minutesElapsed >= minMinutesBeforeRemoval) {
+                    myconsolelog( `Removing session...`)
+
+                    try {
+                        remove(ref(db, `${studyId}/states/${sessionKey}`));
+                        myconsolelog(".... states associated with session removed successfully.");
+                    } catch (error) {
+                        myconsolelog("Error removing data: ", error);
+                    }
+
+                    try {
+                        remove(ref(db, `${studyId}/sessions/${sessionKey}`));
+                        myconsolelog(".... session removed successfully.");
+                    } catch (error) {
+                        myconsolelog("Error removing session: ", error);
+                    }
+                }
+            }
+        }
+    }
+
+}
+
+/*
 async function removeOrphanedStatePaths() {
      
     // Read out the states data for this study
@@ -215,6 +281,7 @@ async function removeOrphanedStatePaths() {
         });
     }
 }
+*/
 
 // Experimental feature: 
 // reading the state at a given path
@@ -250,7 +317,7 @@ function initializeFirebaseListeners() {
             for (var i = 0; i < keys.length; i++) {
                 var sessionId = keys[i];
                 let session = sessions[sessionId];
-                if (session !== null) {
+                if ((session !== null) && ( session.players )) {
                     // Does this session involve this player?
                     if (si.playerId in session.players) {
                         triggerSessionCallback( session , sessionId );
@@ -261,15 +328,17 @@ function initializeFirebaseListeners() {
             };
         };
         
+        /*
         if ((!sessionIsThere) && (si.status == 'sessionStarted')) {
             //If another player cleaned out the session and 
             // the current player has an active session, need to end this session
-            si.status = 'endSession'; 
+            si.status = 'terminated'; 
             si.sessionErrorCode = 4;
             si.sessionErrorMsg = 'Session ended abnormally because another player closed their window or was disconnected';
              
             leaveSession();
         }
+        */
     });
 
     // Set up a listener that removes *other* clients who are disconnecting
@@ -281,13 +350,7 @@ function initializeFirebaseListeners() {
         });
     });
 
-    // Get the server time offset relative to the client time
-    offsetRef = ref(db, ".info/serverTimeOffset");
-    serverTimeOffset = 0;
-    onValue(offsetRef, (snap) => {
-        serverTimeOffset = snap.val();
-        myconsolelog(`Server offset time: ${serverTimeOffset}`);
-    });
+    
 }
 
 function initSessionInfo() {
@@ -311,7 +374,7 @@ function initSessionInfo() {
 
 function triggerSessionCallback( session , sessionId ) {
     // Process the information in "session" and trigger the appropriate callbacks on the client 
-    let currentStatus = session.status; // either 'waiting' or 'active'
+    let currentStatus = session.status; // either 'waiting', 'active', or 'terminated'
     si.numPlayers = Object.keys(session.players).length;
     si.playerIds = Object.keys( session.players );
     si.allPlayersEver = session.allPlayersEver; 
@@ -390,7 +453,7 @@ function triggerSessionCallback( session , sessionId ) {
             }, 1000);
         }
         
-    } else if (si.numPlayers !== numPlayersBefore) {
+    } else if ((si.numPlayers !== numPlayersBefore) && (currentStatus !== 'terminated')) {
         // Redo the mapping of the arrival index for the currently active players
         si.playerIds.forEach(playerId => {
             const rank = getPlayerRank(playerId, si);
@@ -411,6 +474,18 @@ function triggerSessionCallback( session , sessionId ) {
             }
             
         }
+    } else if (currentStatus == 'terminated') {
+        // Has this player initiated the termination?
+        //if ( si.allPlayersEver[ si.playerId ].finishStatus == 'na' ) {
+
+        //i.status = 'terminated'; 
+        // Has another player ended abnormally?
+        if (anyPlayerTerminatedAbnormally()) {   
+            si.sessionErrorCode = 4;
+            si.sessionErrorMsg = 'Session ended abnormally because another player closed their window or was disconnected';             
+        }
+        leaveSession2();
+        
     }
 
     // Does this player have control?
@@ -426,7 +501,7 @@ export function joinSession() {
             // Trigger function when session (active or waiting-room) could not be started
             si.sessionErrorCode = 1;
             si.sessionErrorMsg = 'Unable to join session';
-            si.status = 'endSession';
+            si.status = 'terminated';
             callback_sessionChange.endSession();
         } else {
             // Now that we are in a session (active or waiting room), keep track of presence
@@ -442,7 +517,7 @@ export function joinSession() {
                     myconsolelog("Connected to firebase");
                 } else {
                     myconsolelog("Disconnected from firebase");
-                    si.status = 'endSession';
+                    si.status = 'terminated';
                     si.sessionErrorCode = 2;
                     si.sessionErrorMsg = 'Session Disconnected';
                     callback_sessionChange.endSession();
@@ -457,47 +532,53 @@ export function joinSession() {
 export async function leaveSession() {
     // Run a transaction to remove this player
     sessionUpdate('remove', si.playerId, 'normal').then(result => {
-        //myconsolelog( "Then execution Line 428.... ")
-        if (sessionConfig.recordData) {                         
-            let recordPlayerRef = ref(db, `${studyId}/recordedData/${si.sessionId}/players/${si.playerId}/`);
-            // Get the object that stores all information about this player
-            let playerInfo = {}; 
-            // Add the time that the player left
-            playerInfo.finishStatus = 'normal';
-            playerInfo.leftGameAt = serverTimestamp(); 
-            update(recordPlayerRef, playerInfo);
-        } 
-
-        // remove this player from the game state
-        callback_removePlayerState();
-
-        // Remove the disconnect listener....
-        off(presenceRef);
-        off(connectedRef);
-        off(otherPresenceRef);
-
-        // remove the listener for game state
-        for (let i=0; i<listenerPaths.length; i++) {
-            off(stateRef[i]);
-
-            if ((result !== undefined) && (result.sessionsState === null)) {
-                // The state can be removed as there are no more players left in this session
-                //remove(stateRef[i]);
-                const newState = null;
-                set( stateRef[i] , newState );
-            }
-        }
-
-        // remove the listener for session changes
-        myconsolelog( "Switching off session listener")
-        off(sessionsRef);
-
-        // If this transaction is successful...
-        si.status = 'endSession';
-
-        callback_sessionChange.endSession();
+        leaveSession2();
     });  
 }
+
+function leaveSession2() {
+    if (sessionConfig.recordData) {                         
+        let recordPlayerRef = ref(db, `${studyId}/recordedData/${si.sessionId}/players/${si.playerId}/`);
+        // Get the object that stores all information about this player
+        let playerInfo = {}; 
+        // Add the time that the player left
+        playerInfo.finishStatus = 'normal';
+        playerInfo.leftGameAt = serverTimestamp(); 
+        update(recordPlayerRef, playerInfo);
+    } 
+
+    // remove this player from the game state
+    callback_removePlayerState();
+
+    // Remove the disconnect listener....
+    off(presenceRef);
+    off(connectedRef);
+    off(otherPresenceRef);
+
+    // remove the listener for game state
+    for (let i=0; i<listenerPaths.length; i++) {
+        off(stateRef[i]);
+
+        /*
+        if ((result !== undefined) && (result.sessionsState === null)) {
+            // The state can be removed as there are no more players left in this session
+            //remove(stateRef[i]);
+            const newState = null;
+            set( stateRef[i] , newState );
+        }
+        */
+    }
+
+    // remove the listener for session changes
+    myconsolelog( "Switching off session listener")
+    off(sessionsRef);
+
+    // If this transaction is successful...
+    si.status = 'terminated';
+
+    callback_sessionChange.endSession();
+}
+
 
 // Function to start an active session (e.g. coming out of a waiting room, or when a single player can start a session)
 function startSession() {
@@ -552,7 +633,7 @@ function startSession() {
 
 // Handle event of player closing browser window
 window.addEventListener('beforeunload', function (event) {
-    if ((si.sessionInitiated) && (si.status !== 'endSession')) {
+    if ((si.sessionInitiated) && (si.status !== 'terminated')) {
         // Only remove this player when the session started      
         if (sessionConfig.recordData) {              
             // Update the database here because the browser apparently will not wait until the transaction is finished and therefore 
@@ -573,23 +654,25 @@ window.addEventListener('beforeunload', function (event) {
     }
 });
 
-// // When a client's browser comes into focus, it becomes eligible for object control
-// window.addEventListener('focus', function () {
-//     focusStatus = 'focus';
-//     if ((si.sessionInitiated) && (si.status !== 'endSession')) {
-//         myconsolelog('Player is in focus');
-//         sessionUpdate('focus', si.playerId);
-//     }
-// });
+/*
+// When a client's browser comes into focus, it becomes eligible for object control
+window.addEventListener('focus', function () {
+    focusStatus = 'focus';
+    if ((si.sessionInitiated) && (si.status !== 'terminated')) {
+        myconsolelog('Player is in focus');
+        sessionUpdate('focus', si.playerId);
+    }
+});
 
-// // When a client's browser is out of focus, it becomes ineligible for object control
-// window.addEventListener('blur', function () {
-//     focusStatus = 'blur';
-//     if ((si.sessionInitiated) && (si.status !== 'endSession')) {
-//         myconsolelog('Player has lost focus');
-//         sessionUpdate('blur', si.playerId);
-//     }
-// });
+// When a client's browser is out of focus, it becomes ineligible for object control
+window.addEventListener('blur', function () {
+    focusStatus = 'blur';
+    if ((si.sessionInitiated) && (si.status !== 'terminated')) {
+        myconsolelog('Player has lost focus');
+        sessionUpdate('blur', si.playerId);
+    }
+});
+*/
 
 // Experimental feature: 
 // reading the state at a given path
@@ -696,14 +779,8 @@ export async function updateStateTransaction(path, action, actionArgs) {
                     args: actionArgs
                 };
 
-                try{
-                    let newDataRef = push(recordEventsRef);
-                    set(newDataRef, returnResult);
-                    console.log("Data set successfully");
-
-                }catch(error){
-                    console.error("An error occurerred:", error);
-                }
+                let newDataRef = push(recordEventsRef);
+                set(newDataRef, returnResult);
             }
         }
 
@@ -797,12 +874,14 @@ function removePlayerSession( allSessions , thisPlayer, finishStatus ) {
 
             let numP = Object.keys(allSessions[sessionIdThis].players).length;
             if (numP < sessionConfig.minPlayersNeeded) { 
-                // If there are not enough players left, delete the session
-                // this will produce a null outcome for this session which then be deleted if transaction is successful
-                delete allSessions[sessionIdThis];
+                // If there are not enough players left, flag this session as terminated
+                allSessions[sessionIdThis].status = "terminated";
+
+                let getTimeNow = serverTimestamp();
+                allSessions[sessionIdThis].sessionEndedAt = getTimeNow;
 
             } else if ((sessionConfig.allowReplacements) && ((sessionConfig.maxHoursSession === 0) || (hoursElapsed < sessionConfig.maxHoursSession))) {
-                // If replacemens are allowed for session and there is time remaining to add players ....
+                // If replacements are allowed for this session and there is time remaining to add players ....
                 // Check if we can move a waiting person to move into a session where other players are waiting
                 //let sessions = allSessions;
                 let sortedSessionKeys = sortSessions(allSessions);
@@ -899,7 +978,8 @@ function joinPlayerSession(  allSessions , thisPlayer ) {
         // Check if the maximum hours limit has not been exceeded
         if ((sessionConfig.maxHoursSession === 0) || (hoursElapsed < sessionConfig.maxHoursSession)) {
             let numP = Object.keys(session.players || {}).length;
-            if (numP < sessionConfig.maxPlayersNeeded) {
+            let status = session.status;
+            if ((numP < sessionConfig.maxPlayersNeeded) && (status !== 'terminated')) {
                 proposedSessionId = sortedSessionKeys[i];
                 //let thisSession = allSessions[proposedSessionId];
 
@@ -913,12 +993,16 @@ function joinPlayerSession(  allSessions , thisPlayer ) {
                     waitingRoomStartedAt: serverTimestamp(), 
                     timeElapsedToWaitingRoom: new Date() - startTime,
                     sessionStartedAt: 0, 
+                    sessionEndedAt: 0, 
                     status: focusStatus, 
                     numBlurred: 0,
                     arrivalIndex: count,
                     leftGameAt: 0,
                     finishStatus: 'na',
-                    urlparams: getUrlParameters()
+                    urlparams: getUrlParameters(),
+                    consented: true,
+                    consentTime: serverTimestamp(),
+                    metadata: getOSAndBrowser(),
                 };
                 allSessions[proposedSessionId].players[thisPlayer] = playerData1;
                 allSessions[proposedSessionId].allPlayersEver[thisPlayer] = playerData1;
@@ -973,12 +1057,16 @@ function joinPlayerSession(  allSessions , thisPlayer ) {
                 waitingRoomStartedAt: serverTimestamp(),
                 timeElapsedToWaitingRoom, 
                 sessionStartedAt: 0, 
+                sessionEndedAt: 0, 
                 status: focusStatus, 
                 numBlurred: 0,
                 arrivalIndex: 1,
                 leftGameAt: 0,
                 finishStatus: 'na',
-                urlparams: getUrlParameters()
+                urlparams: getUrlParameters(),
+                consented: true,
+                consentTime: serverTimestamp(),
+                metadata: getOSAndBrowser(),
             };
             let playerData2 = { [thisPlayer]: playerData1 };
             let saveData = {
@@ -988,6 +1076,7 @@ function joinPlayerSession(  allSessions , thisPlayer ) {
                 waitingRoomStartedAt: serverTimestamp(),
                 timeElapsedToWaitingRoom,  
                 sessionStartedAt: 0, 
+                sessionEndedAt: 0, 
                 sessionIndex: numSessions + 1,
                 numPlayersEverJoined: 1
             };
@@ -1062,6 +1151,16 @@ function sortSessions(sessions) {
     return sessionKeys;
 }
 
+export function anyPlayerTerminatedAbnormally() {
+    if (si.allPlayersEver) {
+        let players = si.allPlayersEver; 
+        const hasAbnormalStatus = Object.values(players).some(player => player.finishStatus === 'abnormal');
+        return hasAbnormalStatus;
+    } else {
+        return false;
+    }
+}
+
 // Function to get the rank for a specific playerId based on arrival index among active players
 // Note that this rank will change when other players come or leave the session. Therefore, this is not a stable
 // index for games that do not have a fixed number of players 
@@ -1129,7 +1228,7 @@ function getSessionByPlayerId(sessions, playerId) {
     // Iterate over all session keys
     for (let sessionKey in sessions) {
         // Check if the player id exists in the players of this session
-        if (sessions[sessionKey].players.hasOwnProperty(playerId)) {
+        if ((sessions[sessionKey].players) && sessions[sessionKey].players.hasOwnProperty(playerId) ) {
             return sessionKey;
         }
     }
