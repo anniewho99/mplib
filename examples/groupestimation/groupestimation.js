@@ -2549,7 +2549,7 @@ function addArrowToBlock(color, direction, playerId) {
   layoutDirectionalArrows(block, direction,isObstacle );
 
   if (playerId === thisPlayerID) {
-    spawnFloatingArrowClone(arrow, color);
+    spawnFloatingArrowClone(arrow, block, color, direction);
   }
 }
 
@@ -2609,11 +2609,13 @@ function layoutDirectionalArrows(block, direction, isObstacle) {
   });
 }
 
-function spawnFloatingArrowClone(arrow, color) {
-  const direction = arrow.dataset.direction;
+function spawnFloatingArrowClone(arrow, block, color, direction) {
+  //const direction = arrow.dataset.direction;
   if (!direction) return;
 
   const arrowRect = arrow.getBoundingClientRect();
+
+  const blockRect = block.getBoundingClientRect();
 
   const clone = arrow.cloneNode(true);
   clone.classList.add('arrow-clone');   // IMPORTANT
@@ -2628,6 +2630,16 @@ function spawnFloatingArrowClone(arrow, color) {
   clone.style.top = `${arrowRect.top}px`;
   clone.style.margin = '0';
   clone.style.zIndex = 2147483647;
+
+  if (direction === 'left' || direction === 'right') {
+    clone.style.left = `${arrowRect.left}px`;
+    clone.style.top = `${blockRect.top}px`;
+  }else{
+    clone.style.left = `${blockRect.left}px`;
+    clone.style.top = `${arrowRect.top}px`;
+
+  }
+
 
   // IMPORTANT: reset transform from layout; we reapply direction cleanly
   clone.style.transform = 'none';
