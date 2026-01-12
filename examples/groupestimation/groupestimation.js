@@ -928,7 +928,7 @@ function getNumPlayersFromURL() {
   return isNaN(num) ? 5 : Math.max(2, Math.min(num, 5)); // default to 5, clamp between 2–5
 }
 
-let GameName = "levelTest";
+let GameName = "0112";
 let NumPlayers = 3;
 let MinPlayers = NumPlayers;
 let MaxPlayers = NumPlayers;
@@ -1597,7 +1597,7 @@ function submitPostTrial() {
   container.innerHTML = `<p> Thank you! Your responses have been recorded.<br>Redirecting to Prolific...</p>`;
 
   setTimeout(() => {
-      window.location.href = 'https://app.prolific.com/submissions/complete?cc=C1HMHHYQ'; // Replace with your code
+      window.location.href = 'https://app.prolific.com/submissions/complete?cc=C1EUVCKW'; // Replace with your code
       endSession();
   }, 3000);
 }
