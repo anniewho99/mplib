@@ -997,7 +997,7 @@ let funList = {
 };
 
 // List the node names where we place listeners for any changes to the children of these nodes; set to '' if listening to changes for children of the root
-let listenerPaths = [ 'players', 'blocks', 'slots', 'obs', 'phase', 'moveBlock', 'level', 'localT' ];
+let listenerPaths = [ 'players', 'blocks', 'slots', 'obs', 'phase', 'moveBlock', 'level', 'localT', 'condition' ];
 
 //  Initialize the Game Session with all Configs
 initializeMPLIB( sessionConfig , studyId , funList, listenerPaths, verbosity );
@@ -1024,8 +1024,15 @@ let currentLevel = 0;
 let eventNumber = 1;
 
 let completedLevel = false;
-//abcd
-const levelPlacements = {
+
+function conditionSelector() {
+  const sequences = ['abcd', 'cdab', 'bcda', 'dabc'];
+  const idx = Math.floor(Math.random() * sequences.length);
+  return sequences[idx];
+}
+let levelPlacements;
+//abcd levelPlacements
+const abcd = {
   0: {
       blocks: {
           blue: { x: 10, y: 10, color: 'blue', minVotes: 3 },
@@ -1103,239 +1110,241 @@ const levelPlacements = {
   },
 };
 //cdab
-// const levelPlacements = {
-//   0: {
-//     blocks: {
-//         red: { x: 4, y: 6, color: 'red', minVotes: 2},
-//         yellow: { x: 1, y: 10, color: 'yellow', minVotes: 1 }
-//     },
-//     slots: {
-//         slot0: { x: 6, y: 1 }
-//     },
-//     obstacles: {
-//       obs0:{x:5,y:4,id:'obs0', immovable:true},
-//       obs1:{x:7,y:6,id:'obs1', immovable:true},
-//       obs2:{x:10,y:6,id:'obs2', immovable:true},
-//       obs3:{x:13,y:6,id:'obs3', immovable:true},
-//       obs4:{x:2,y:3,id:'obs4'},
-//       obs5:{x:2,y:6,id:'obs5'},
-//     }
-// },
-//   1: {
-//     blocks: {
-//         red: { x: 4, y: 6, color: 'red', minVotes: 2 },
-//         yellow: { x: 1, y: 10, color: 'yellow', minVotes: 1 }
-//     },
-//     slots: {
-//       slot0: { x: 6, y: 1 }
-//     },
-//     obstacles: {
-//       obs0:{x:5,y:4,id:'obs0', immovable:true},
-//       obs1:{x:7,y:6,id:'obs1', immovable:true},
-//       obs2:{x:10,y:6,id:'obs2', immovable:true},
-//       obs3:{x:13,y:6,id:'obs3', immovable:true},
-//       obs4:{x:2,y:3,id:'obs4'},
-//       obs5:{x:2,y:6,id:'obs5'},
-//     }
-// },
-// //   2: {
-// //           blocks: {
-// //               blue: { x: 10, y: 10, color: 'blue', minVotes: 3 },
-// //               red: { x: 8, y: 1, color: 'red', minVotes: 2},
-// //               yellow: { x: 1, y: 10, color: 'yellow', minVotes: 1 }
-// //           },
-// //           slots: {
-// //               slot0: { x: 3, y: 6 },
-// //               slot1: { x: 16, y: 6 }
-// //           },
-// //           obstacles: {
-// //               obs0:{x:9,y:5,id:'obs0', immovable:true},
-// //               obs1:{x:9,y:7,id:'obs1', immovable:true},
-// //               obs2:{x:6,y:5,id:'obs2'},
-// //               obs3:{x:12,y:5,id:'obs3'},
-// //           }
-// //     },
-// //   3: {
-// //     blocks: {
-// //         blue: { x: 12, y: 10, color: 'blue', minVotes: 3 },
-// //         red: { x: 9, y: 1, color: 'red', minVotes: 2},
-// //         yellow: { x: 2, y: 10, color: 'yellow', minVotes: 1 }
-// //     },
-// //     slots: {
-// //         slot0: { x: 3, y: 4 },
-// //         slot1: { x: 15, y: 4 }
-// //     },
-// //     obstacles: {
-// //         obs0: { x: 6, y: 6, id: 'obs0', immovable: true  },
-// //         obs1: { x: 8, y: 4, id: 'obs1', immovable: true},
-// //         obs2: { x: 12, y: 5, id: 'obs2', immovable: true  },
-// //         obs3: { x: 10, y: 7, id: 'obs3', immovable: true},
-// //         obs4: { x: 14, y: 7, id: 'obs4', immovable: true },
-// //         obs5: { x: 3, y: 1, id: 'obs5'},
-// //         obs6: { x: 3, y: 7, id: 'obs6'},
-// //         obs7: { x: 10, y: 10, id: 'obs7'}
-// //     }
-// //  },
-// };
+const cdab = {
+  0: {
+      blocks: {
+        blue: { x: 16, y: 9, color: 'blue', minVotes: 3 },
+        red: { x: 6, y: 1, color: 'red', minVotes: 2},
+        yellow: { x: 6, y: 9, color: 'yellow', minVotes: 1 }
+    },
+    slots: {
+        slot0: { x: 1, y: 6 },
+        slot1: { x: 9, y: 5 }
+    },
+    obstacles: {
+        obs0: { x: 3, y: 10, id: 'obs0', immovable: true  },
+        obs1: { x: 13, y: 6, id: 'obs1', immovable: true},
+        obs2: { x: 2, y: 3, id: 'obs2'},
+        obs3: { x: 6, y: 6, id: 'obs3'},
+        obs4: { x: 10, y: 9, id: 'obs4'}
+    }
+  },
+  1:{
+        blocks: {
+          blue: { x: 9, y: 4, color: 'blue', minVotes: 3 },
+          red: { x: 7, y: 1, color: 'red', minVotes: 2 },
+          yellow: { x: 11, y: 1, color: 'yellow', minVotes: 1 }
+      },
+      slots: {
+          slot0: { x: 3, y: 5 },
+          slot1: { x: 14, y: 5 }
+      },
+      obstacles: {
+          obs0: { x: 6, y: 4, id: 'obs0', immovable: true  },
+          obs1: { x: 3, y: 2, id: 'obs1', immovable: true},
+          obs3: { x: 6, y: 8, id: 'obs3'},
+          obs4: { x: 15, y: 1, id: 'obs4' },
+          obs2: { x: 12, y: 4, id: 'obs2', immovable: true  },
+          obs5: { x: 12, y: 8, id: 'obs5'}
+      }
+  }, 
+  2: {
+          blocks: {
+              blue: { x: 10, y: 10, color: 'blue', minVotes: 3 },
+              red: { x: 8, y: 1, color: 'red', minVotes: 2},
+              yellow: { x: 1, y: 10, color: 'yellow', minVotes: 1 }
+          },
+          slots: {
+              slot0: { x: 3, y: 6 },
+              slot1: { x: 16, y: 6 }
+          },
+          obstacles: {
+              obs0:{x:9,y:5,id:'obs0', immovable:true},
+              obs1:{x:9,y:7,id:'obs1', immovable:true},
+              obs2:{x:6,y:5,id:'obs2'},
+              obs3:{x:12,y:5,id:'obs3'},
+          }
+    },
+  3: {
+    blocks: {
+        blue: { x: 12, y: 10, color: 'blue', minVotes: 3 },
+        red: { x: 9, y: 1, color: 'red', minVotes: 2},
+        yellow: { x: 2, y: 10, color: 'yellow', minVotes: 1 }
+    },
+    slots: {
+        slot0: { x: 3, y: 4 },
+        slot1: { x: 15, y: 4 }
+    },
+    obstacles: {
+        obs0: { x: 6, y: 6, id: 'obs0', immovable: true  },
+        obs1: { x: 8, y: 4, id: 'obs1', immovable: true},
+        obs2: { x: 12, y: 5, id: 'obs2', immovable: true  },
+        obs3: { x: 10, y: 7, id: 'obs3', immovable: true},
+        obs4: { x: 14, y: 7, id: 'obs4', immovable: true },
+        obs5: { x: 3, y: 1, id: 'obs5'},
+        obs6: { x: 3, y: 7, id: 'obs6'},
+        obs7: { x: 10, y: 10, id: 'obs7'}
+    }
+ },
+};
 
 // // //bcda
-// const levelPlacements = {
-//   0: {
-//     blocks: {
-//         blue: { x: 12, y: 10, color: 'blue', minVotes: 3 },
-//         red: { x: 9, y: 1, color: 'red', minVotes: 2},
-//         yellow: { x: 2, y: 10, color: 'yellow', minVotes: 1 }
-//     },
-//     slots: {
-//         slot0: { x: 3, y: 4 },
-//         slot1: { x: 15, y: 4 }
-//     },
-//     obstacles: {
-//         obs0: { x: 6, y: 6, id: 'obs0', immovable: true  },
-//         obs1: { x: 8, y: 4, id: 'obs1', immovable: true},
-//         obs2: { x: 12, y: 5, id: 'obs2', immovable: true  },
-//         obs3: { x: 10, y: 7, id: 'obs3', immovable: true},
-//         obs4: { x: 14, y: 7, id: 'obs4', immovable: true },
-//         obs5: { x: 3, y: 1, id: 'obs5'},
-//         obs6: { x: 3, y: 7, id: 'obs6'},
-//         obs7: { x: 10, y: 10, id: 'obs7'}
-//     }
-//  },
-//   1: {
-//     blocks: {
-//         blue: { x: 16, y: 9, color: 'blue', minVotes: 3 },
-//         red: { x: 6, y: 1, color: 'red', minVotes: 2},
-//         yellow: { x: 6, y: 9, color: 'yellow', minVotes: 1 }
-//     },
-//     slots: {
-//         slot0: { x: 1, y: 6 },
-//         slot1: { x: 9, y: 5 }
-//     },
-//     obstacles: {
-//         obs0: { x: 3, y: 10, id: 'obs0', immovable: true  },
-//         obs1: { x: 13, y: 6, id: 'obs1', immovable: true},
-//         obs2: { x: 2, y: 3, id: 'obs2'},
-//         obs3: { x: 6, y: 6, id: 'obs3'},
-//         obs4: { x: 10, y: 9, id: 'obs4'}
-//     }
-// },
-//   2: {
-//     blocks: {
-//         blue: { x: 9, y: 4, color: 'blue', minVotes: 3 },
-//         red: { x: 7, y: 1, color: 'red', minVotes: 2 },
-//         yellow: { x: 11, y: 1, color: 'yellow', minVotes: 1 }
-//     },
-//     slots: {
-//         slot0: { x: 3, y: 5 },
-//         slot1: { x: 14, y: 5 }
-//     },
-//     obstacles: {
-//         obs0: { x: 6, y: 4, id: 'obs0', immovable: true  },
-//         obs1: { x: 3, y: 2, id: 'obs1', immovable: true},
-//         obs3: { x: 6, y: 8, id: 'obs3'},
-//         obs4: { x: 15, y: 1, id: 'obs4' },
-//         obs2: { x: 12, y: 4, id: 'obs2', immovable: true  },
-//         obs5: { x: 12, y: 8, id: 'obs5'}
-//     }
-// },
-//   3: {
-//     blocks: {
-//         blue: { x: 10, y: 10, color: 'blue', minVotes: 3 },
-//         red: { x: 8, y: 1, color: 'red', minVotes: 2},
-//         yellow: { x: 1, y: 10, color: 'yellow', minVotes: 1 }
-//     },
-//     slots: {
-//         slot0: { x: 3, y: 6 },
-//         slot1: { x: 16, y: 6 }
-//     },
-//     obstacles: {
-//         obs0:{x:9,y:5,id:'obs0', immovable:true},
-//         obs1:{x:9,y:7,id:'obs1', immovable:true},
-//         obs2:{x:6,y:5,id:'obs2'},
-//         obs3:{x:12,y:5,id:'obs3'},
-//     }
-// },
-// };
-
+const bcda = {
+  0: {
+    blocks: {
+        blue: { x: 12, y: 10, color: 'blue', minVotes: 3 },
+        red: { x: 9, y: 1, color: 'red', minVotes: 2},
+        yellow: { x: 2, y: 10, color: 'yellow', minVotes: 1 }
+    },
+    slots: {
+        slot0: { x: 3, y: 4 },
+        slot1: { x: 15, y: 4 }
+    },
+    obstacles: {
+        obs0: { x: 6, y: 6, id: 'obs0', immovable: true  },
+        obs1: { x: 8, y: 4, id: 'obs1', immovable: true},
+        obs2: { x: 12, y: 5, id: 'obs2', immovable: true  },
+        obs3: { x: 10, y: 7, id: 'obs3', immovable: true},
+        obs4: { x: 14, y: 7, id: 'obs4', immovable: true },
+        obs5: { x: 3, y: 1, id: 'obs5'},
+        obs6: { x: 3, y: 7, id: 'obs6'},
+        obs7: { x: 10, y: 10, id: 'obs7'}
+    }
+ },
+  1: {
+    blocks: {
+        blue: { x: 16, y: 9, color: 'blue', minVotes: 3 },
+        red: { x: 6, y: 1, color: 'red', minVotes: 2},
+        yellow: { x: 6, y: 9, color: 'yellow', minVotes: 1 }
+    },
+    slots: {
+        slot0: { x: 1, y: 6 },
+        slot1: { x: 9, y: 5 }
+    },
+    obstacles: {
+        obs0: { x: 3, y: 10, id: 'obs0', immovable: true  },
+        obs1: { x: 13, y: 6, id: 'obs1', immovable: true},
+        obs2: { x: 2, y: 3, id: 'obs2'},
+        obs3: { x: 6, y: 6, id: 'obs3'},
+        obs4: { x: 10, y: 9, id: 'obs4'}
+    }
+},
+  2: {
+    blocks: {
+        blue: { x: 9, y: 4, color: 'blue', minVotes: 3 },
+        red: { x: 7, y: 1, color: 'red', minVotes: 2 },
+        yellow: { x: 11, y: 1, color: 'yellow', minVotes: 1 }
+    },
+    slots: {
+        slot0: { x: 3, y: 5 },
+        slot1: { x: 14, y: 5 }
+    },
+    obstacles: {
+        obs0: { x: 6, y: 4, id: 'obs0', immovable: true  },
+        obs1: { x: 3, y: 2, id: 'obs1', immovable: true},
+        obs3: { x: 6, y: 8, id: 'obs3'},
+        obs4: { x: 15, y: 1, id: 'obs4' },
+        obs2: { x: 12, y: 4, id: 'obs2', immovable: true  },
+        obs5: { x: 12, y: 8, id: 'obs5'}
+    }
+},
+  3: {
+    blocks: {
+        blue: { x: 10, y: 10, color: 'blue', minVotes: 3 },
+        red: { x: 8, y: 1, color: 'red', minVotes: 2},
+        yellow: { x: 1, y: 10, color: 'yellow', minVotes: 1 }
+    },
+    slots: {
+        slot0: { x: 3, y: 6 },
+        slot1: { x: 16, y: 6 }
+    },
+    obstacles: {
+        obs0:{x:9,y:5,id:'obs0', immovable:true},
+        obs1:{x:9,y:7,id:'obs1', immovable:true},
+        obs2:{x:6,y:5,id:'obs2'},
+        obs3:{x:12,y:5,id:'obs3'},
+    }
+},
+};
 
 // //dabc
-// const levelPlacements = {
-//   0: {
-//     blocks: {
-//         blue: { x: 9, y: 4, color: 'blue', minVotes: 3 },
-//         red: { x: 7, y: 1, color: 'red', minVotes: 2 },
-//         yellow: { x: 11, y: 1, color: 'yellow', minVotes: 1 }
-//     },
-//     slots: {
-//         slot0: { x: 3, y: 5 },
-//         slot1: { x: 14, y: 5 }
-//     },
-//     obstacles: {
-//         obs0: { x: 6, y: 4, id: 'obs0', immovable: true  },
-//         obs1: { x: 3, y: 2, id: 'obs1', immovable: true},
-//         obs3: { x: 6, y: 8, id: 'obs3'},
-//         obs4: { x: 15, y: 1, id: 'obs4' },
-//         obs2: { x: 12, y: 4, id: 'obs2', immovable: true  },
-//         obs5: { x: 12, y: 8, id: 'obs5'}
-//     }
-// },
-//   1:  {
-//     blocks: {
-//         blue: { x: 10, y: 10, color: 'blue', minVotes: 3 },
-//         red: { x: 8, y: 1, color: 'red', minVotes: 2},
-//         yellow: { x: 1, y: 10, color: 'yellow', minVotes: 1 }
-//     },
-//     slots: {
-//         slot0: { x: 3, y: 6 },
-//         slot1: { x: 16, y: 6 }
-//     },
-//     obstacles: {
-//         obs0:{x:9,y:5,id:'obs0', immovable:true},
-//         obs1:{x:9,y:7,id:'obs1', immovable:true},
-//         obs2:{x:6,y:5,id:'obs2'},
-//         obs3:{x:12,y:5,id:'obs3'},
-//     }
-// },
-//   2: {
-//     blocks: {
-//         blue: { x: 12, y: 10, color: 'blue', minVotes: 3 },
-//         red: { x: 9, y: 1, color: 'red', minVotes: 2},
-//         yellow: { x: 2, y: 10, color: 'yellow', minVotes: 1 }
-//     },
-//     slots: {
-//         slot0: { x: 3, y: 4 },
-//         slot1: { x: 15, y: 4 }
-//     },
-//     obstacles: {
-//         obs0: { x: 6, y: 6, id: 'obs0', immovable: true  },
-//         obs1: { x: 8, y: 4, id: 'obs1', immovable: true},
-//         obs2: { x: 12, y: 5, id: 'obs2', immovable: true  },
-//         obs3: { x: 10, y: 7, id: 'obs3', immovable: true},
-//         obs4: { x: 14, y: 7, id: 'obs4', immovable: true },
-//         obs5: { x: 3, y: 1, id: 'obs5'},
-//         obs6: { x: 3, y: 7, id: 'obs6'},
-//         obs7: { x: 10, y: 10, id: 'obs7'}
-//     }
-//  },
-//   3:{
-//     blocks: {
-//         blue: { x: 16, y: 9, color: 'blue', minVotes: 3 },
-//         red: { x: 6, y: 1, color: 'red', minVotes: 2},
-//         yellow: { x: 6, y: 9, color: 'yellow', minVotes: 1 }
-//     },
-//     slots: {
-//         slot0: { x: 1, y: 6 },
-//         slot1: { x: 9, y: 5 }
-//     },
-//     obstacles: {
-//         obs0: { x: 3, y: 10, id: 'obs0', immovable: true  },
-//         obs1: { x: 13, y: 6, id: 'obs1', immovable: true},
-//         obs2: { x: 2, y: 3, id: 'obs2'},
-//         obs3: { x: 6, y: 6, id: 'obs3'},
-//         obs4: { x: 10, y: 9, id: 'obs4'}
-//     }
-// },
-// };
+const dabc = {
+  0: {
+    blocks: {
+        blue: { x: 9, y: 4, color: 'blue', minVotes: 3 },
+        red: { x: 7, y: 1, color: 'red', minVotes: 2 },
+        yellow: { x: 11, y: 1, color: 'yellow', minVotes: 1 }
+    },
+    slots: {
+        slot0: { x: 3, y: 5 },
+        slot1: { x: 14, y: 5 }
+    },
+    obstacles: {
+        obs0: { x: 6, y: 4, id: 'obs0', immovable: true  },
+        obs1: { x: 3, y: 2, id: 'obs1', immovable: true},
+        obs3: { x: 6, y: 8, id: 'obs3'},
+        obs4: { x: 15, y: 1, id: 'obs4' },
+        obs2: { x: 12, y: 4, id: 'obs2', immovable: true  },
+        obs5: { x: 12, y: 8, id: 'obs5'}
+    }
+},
+  1:  {
+    blocks: {
+        blue: { x: 10, y: 10, color: 'blue', minVotes: 3 },
+        red: { x: 8, y: 1, color: 'red', minVotes: 2},
+        yellow: { x: 1, y: 10, color: 'yellow', minVotes: 1 }
+    },
+    slots: {
+        slot0: { x: 3, y: 6 },
+        slot1: { x: 16, y: 6 }
+    },
+    obstacles: {
+        obs0:{x:9,y:5,id:'obs0', immovable:true},
+        obs1:{x:9,y:7,id:'obs1', immovable:true},
+        obs2:{x:6,y:5,id:'obs2'},
+        obs3:{x:12,y:5,id:'obs3'},
+    }
+},
+  2: {
+    blocks: {
+        blue: { x: 12, y: 10, color: 'blue', minVotes: 3 },
+        red: { x: 9, y: 1, color: 'red', minVotes: 2},
+        yellow: { x: 2, y: 10, color: 'yellow', minVotes: 1 }
+    },
+    slots: {
+        slot0: { x: 3, y: 4 },
+        slot1: { x: 15, y: 4 }
+    },
+    obstacles: {
+        obs0: { x: 6, y: 6, id: 'obs0', immovable: true  },
+        obs1: { x: 8, y: 4, id: 'obs1', immovable: true},
+        obs2: { x: 12, y: 5, id: 'obs2', immovable: true  },
+        obs3: { x: 10, y: 7, id: 'obs3', immovable: true},
+        obs4: { x: 14, y: 7, id: 'obs4', immovable: true },
+        obs5: { x: 3, y: 1, id: 'obs5'},
+        obs6: { x: 3, y: 7, id: 'obs6'},
+        obs7: { x: 10, y: 10, id: 'obs7'}
+    }
+ },
+  3:{
+    blocks: {
+        blue: { x: 16, y: 9, color: 'blue', minVotes: 3 },
+        red: { x: 6, y: 1, color: 'red', minVotes: 2},
+        yellow: { x: 6, y: 9, color: 'yellow', minVotes: 1 }
+    },
+    slots: {
+        slot0: { x: 1, y: 6 },
+        slot1: { x: 9, y: 5 }
+    },
+    obstacles: {
+        obs0: { x: 3, y: 10, id: 'obs0', immovable: true  },
+        obs1: { x: 13, y: 6, id: 'obs1', immovable: true},
+        obs2: { x: 2, y: 3, id: 'obs2'},
+        obs3: { x: 6, y: 6, id: 'obs3'},
+        obs4: { x: 10, y: 9, id: 'obs4'}
+    }
+},
+};
 function loadLevel(levelNumber) {
   const config = levelPlacements[levelNumber];
   if (!config) {
@@ -1935,6 +1944,24 @@ function assignAvatarColors() {
   updateStateDirect(`players/${playerId}`, {
       name: playerName
   }, 'update player name');
+
+  if(arrivalIndex == 1){
+    let assignedCondition = conditionSelector();
+
+    updateStateDirect(`condition`, {
+      condition: assignedCondition
+  }, 'update Condition');
+
+    if (assignedCondition == 'abcd'){
+      levelPlacements = abcd;
+    }else if(assignedCondition == 'cdab'){
+      levelPlacements = cdab;
+    }else if(assignedCondition == 'bcda'){
+      levelPlacements = bcda;
+    }else if(assignedCondition == 'dabc'){
+      levelPlacements = dabc;
+    }
+  }
 
   playerColorMap[playerId] = {
       color: 1,
@@ -3005,6 +3032,19 @@ function receiveStateChange(pathNow, nodeName, newState, typeChange ) {
             renderLevelFromAuthority(currentLevelSnap);
           }
         }else if(pathNow === 'localT'){
+
+        }else if (pathNow === 'condition'){
+          const assignedCondition = newState;
+
+          if (assignedCondition == 'abcd'){
+            levelPlacements = abcd;
+          }else if(assignedCondition == 'cdab'){
+            levelPlacements = cdab;
+          }else if(assignedCondition == 'bcda'){
+            levelPlacements = bcda;
+          }else if(assignedCondition == 'dabc'){
+            levelPlacements = dabc;
+          }
 
         }
 }
