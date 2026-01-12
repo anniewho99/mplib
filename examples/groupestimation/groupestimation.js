@@ -928,7 +928,7 @@ function getNumPlayersFromURL() {
   return isNaN(num) ? 5 : Math.max(2, Math.min(num, 5)); // default to 5, clamp between 2–5
 }
 
-let GameName = "noCommTest";
+let GameName = "levelTest";
 let NumPlayers = 3;
 let MinPlayers = NumPlayers;
 let MaxPlayers = NumPlayers;
@@ -1937,7 +1937,7 @@ let playerColorMap = {};
 
 
 function assignAvatarColors() {
-  const arrivalIndex = getCurrentPlayerArrivalIndex(); // 1-based
+
   //const name = document.getElementById('playerName')?.value.trim() || `Player ${arrivalIndex}`;
   const playerId = getCurrentPlayerId();
 
@@ -1945,23 +1945,26 @@ function assignAvatarColors() {
       name: playerName
   }, 'update player name');
 
-  if(arrivalIndex == 1){
-    let assignedCondition = conditionSelector();
+  // const arrivalIndex = getCurrentPlayerArrivalIndex();
+  // if(arrivalIndex == 1){
+  //   let assignedCondition = conditionSelector();
 
-    updateStateDirect(`condition`, {
-      condition: assignedCondition
-  }, 'update Condition');
+  //   updateStateDirect(`condition`, {
+  //     condition: assignedCondition
+  // }, 'update Condition');
 
-    if (assignedCondition == 'abcd'){
-      levelPlacements = abcd;
-    }else if(assignedCondition == 'cdab'){
-      levelPlacements = cdab;
-    }else if(assignedCondition == 'bcda'){
-      levelPlacements = bcda;
-    }else if(assignedCondition == 'dabc'){
-      levelPlacements = dabc;
-    }
-  }
+  // console.log("sending new condition");
+
+  //   if (assignedCondition == 'abcd'){
+  //     levelPlacements = abcd;
+  //   }else if(assignedCondition == 'cdab'){
+  //     levelPlacements = cdab;
+  //   }else if(assignedCondition == 'bcda'){
+  //     levelPlacements = bcda;
+  //   }else if(assignedCondition == 'dabc'){
+  //     levelPlacements = dabc;
+  //   }
+  // }
 
   playerColorMap[playerId] = {
       color: 1,
@@ -3036,6 +3039,9 @@ function receiveStateChange(pathNow, nodeName, newState, typeChange ) {
         }else if (pathNow === 'condition'){
           const assignedCondition = newState;
 
+          console.log('assigned condition is');
+          console.log(assignedCondition);
+
           if (assignedCondition == 'abcd'){
             levelPlacements = abcd;
           }else if(assignedCondition == 'cdab'){
@@ -3046,18 +3052,89 @@ function receiveStateChange(pathNow, nodeName, newState, typeChange ) {
             levelPlacements = dabc;
           }
 
+          startNewGameOnce();
+
         }
 }
 
+let started = false;
+
+function startNewGameOnce() {
+  if (started) return;
+  started = true;
+  newGame();
+
+}
+
+// function removeAllClonesForThisPlayer() {
+//   const selfId = String(thisPlayerID);
+//   document
+//     .querySelectorAll(`.arrow-clone[data-source-player-id="${selfId}"]`)
+//     .forEach(c => c.remove());
+// }
+
+
 function spawnClonesForBlock(block) {
+  // removeAllClonesForThisPlayer();
   block.querySelectorAll('.arrow').forEach(arrow => {
-    // Only spawn clones for OTHER players
-    if (arrow.dataset.playerId !== String(thisPlayerID)) {
-      spawnFloatingArrowClone(arrow, block.dataset.color);
+    if (arrow.dataset.playerId === String(thisPlayerID)) {
+      arrow.classList.remove('is-hidden');
+      arrow.classList.add('is-visible');
+      const rect = arrow.getBoundingClientRect();
+      const direction = arrow.dataset.direction;
+      let clone = document.querySelector(
+        `.arrow-clone[data-source-player-id="${thisPlayerID}"][data-source-direction="${direction}"]`
+      );
+      clone.style.left = `${rect.left}px`;
+      clone.style.top  = `${rect.top}px`;
+    }else{
+      spawnAllClone(arrow, block.dataset.color);
     }
   });
 }
 
+function spawnAllClone(arrow, color) {
+  const direction = arrow.dataset.direction;
+  if (!direction) return;
+
+  const arrowRect = arrow.getBoundingClientRect();
+
+  const clone = arrow.cloneNode(true);
+  clone.classList.add('arrow-clone');   // IMPORTANT
+  clone.dataset.sourceColor = color;   
+  clone.dataset.sourcePlayerId = arrow.dataset.playerId;
+  clone.dataset.sourceDirection = direction;
+  clone.classList.remove('is-hidden');
+  clone.classList.add('is-visible');
+  clone.style.position = 'fixed'; // viewport coords, safest
+  clone.style.pointerEvents = 'none';
+  clone.style.left = `${arrowRect.left}px`;
+  clone.style.top = `${arrowRect.top}px`;
+  clone.style.margin = '0';
+  clone.style.zIndex = 2147483647;
+
+  // IMPORTANT: reset transform from layout; we reapply direction cleanly
+  clone.style.transform = 'none';
+  clone.style.transition = 'opacity 150ms linear';
+
+  // Match direction visually (your existing mapping)
+  const rotationMap = {
+    down: 'rotate(90deg)',
+    left: 'rotate(180deg)',
+    up: 'rotate(270deg)',
+    right: 'rotate(0deg)'
+  };
+
+  clone.style.transform = rotationMap[direction] || 'none';
+  clone.style.transformOrigin = 'center center';
+
+  if (direction === 'left') {
+    clone.style.transform += ' scaleY(-1)';
+  }
+
+  document.body.appendChild(clone);
+
+}
 
 function removeClonesForBlock(block) {
   const color = block.dataset.color;
@@ -3376,7 +3453,33 @@ if (path === 'phase') {
   }
 
   return { isAllowed: false, newState: null };
+}else if (path === 'condition') {
+  const C = state || null;
+
+  if (action === 'set-if-absent') {
+    // If condition already exists, do nothing (abort)
+    if (C && C.condition) {
+      return { isAllowed: false, newState: null };
+    }
+
+    // Otherwise allow exactly one writer
+    const { condition } = args || {};
+    if (!condition) {
+      return { isAllowed: false, newState: null };
+    }
+
+    return {
+      isAllowed: true,
+      newState: {
+        condition,
+        chosenAt: now
+      }
+    };
+  }
+
+  return { isAllowed: false, newState: null };
 }
+
 
   if (!isAllowed) {
     console.warn('[TX DENIED level]', { action, args, now, state });
@@ -3486,6 +3589,15 @@ function updateWaitingRoom() {
   }
 }
 
+async function trySetConditionOnce() {
+  const assigned = conditionSelector();
+
+  await updateStateTransaction('condition', 'set-if-absent', {
+    condition: assigned,
+    chosenAt: Date.now()
+  });
+}
+
 function startSession() {
   /*
       Funtionality to invoke when starting a session.
@@ -3503,6 +3615,8 @@ function startSession() {
   console.log("all player IDs", playerIDsAll);
   playerNumber = sessionInfo.arrivalIndex;*/
 
+  trySetConditionOnce();
+  
   instructionsScreen.style.display = 'none';
   waitingRoomScreen.style.display = 'none';
   gameScreen.style.display = 'block';
@@ -3519,7 +3633,7 @@ function startSession() {
   //thisSession = sessionInfo;
   allPlayerIDs = getCurrentPlayerIds();
   console.log("Session Starts here...", allPlayerIDs);
-  newGame();
+  //newGame();
   //startVotingPhase();
 }
 
