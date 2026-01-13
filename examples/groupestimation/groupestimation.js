@@ -1003,6 +1003,7 @@ let listenerPaths = [ 'players', 'blocks', 'slots', 'obs', 'phase', 'moveBlock',
 initializeMPLIB( sessionConfig , studyId , funList, listenerPaths, verbosity );
 
 
+//forcing a rebuild
 /*
   Game Variables
   --------------
