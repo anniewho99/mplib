@@ -3015,24 +3015,23 @@ function receiveStateChange(pathNow, nodeName, newState, typeChange ) {
           }
         }else if(pathNow === 'localT'){
 
-        }else if (pathNow === 'condition'){
-          const assignedCondition = newState;
-
-          console.log('assigned condition is');
-          console.log(assignedCondition);
-
-          if (assignedCondition == 'abcd'){
-            levelPlacements = abcd;
-          }else if(assignedCondition == 'cdab'){
-            levelPlacements = cdab;
-          }else if(assignedCondition == 'bcda'){
-            levelPlacements = bcda;
-          }else if(assignedCondition == 'dabc'){
-            levelPlacements = dabc;
-          }
-
+        }else if (pathNow === 'condition') {
+          const assignedCondition =
+            (typeof newState === 'string')
+              ? newState
+              : (typeof newState?.condition === 'string' ? newState.condition : null);
+        
+          console.log('[condition raw]', newState, 'parsed=', assignedCondition);
+        
+          if (!assignedCondition) return;
+        
+          if (assignedCondition === 'abcd') levelPlacements = abcd;
+          else if (assignedCondition === 'cdab') levelPlacements = cdab;
+          else if (assignedCondition === 'bcda') levelPlacements = bcda;
+          else if (assignedCondition === 'dabc') levelPlacements = dabc;
+          else return; // ignore anything unexpected
+        
           startNewGameOnce();
-
         }
 }
 
@@ -3425,27 +3424,20 @@ if (path === 'phase') {
 
   return { isAllowed: false, newState: null };
 }else if (path === 'condition') {
-  const C = state || null;
+  const C = state; // can be null, string, or object
 
   if (action === 'set-if-absent') {
-    // If condition already exists, do nothing (abort)
-    if (C && C.condition) {
-      return { isAllowed: false, newState: null };
-    }
+    const alreadySet =
+      (typeof C === 'string' && C.length > 0) ||
+      (C && typeof C.condition === 'string' && C.condition.length > 0);
 
-    // Otherwise allow exactly one writer
-    const { condition } = args || {};
-    if (!condition) {
-      return { isAllowed: false, newState: null };
-    }
+    if (alreadySet) return { isAllowed: false, newState: null };
 
-    return {
-      isAllowed: true,
-      newState: {
-        condition,
-        chosenAt: now
-      }
-    };
+    const condition = args?.condition;
+    const ok = (condition === 'abcd' || condition === 'cdab' || condition === 'bcda' || condition === 'dabc');
+    if (!ok) return { isAllowed: false, newState: null };
+
+    return { isAllowed: true, newState: { condition } };
   }
 
   return { isAllowed: false, newState: null };
@@ -3561,13 +3553,10 @@ function updateWaitingRoom() {
 }
 
 async function trySetConditionOnce() {
-  const assigned = conditionSelector();
-
-  await updateStateTransaction('condition', 'set-if-absent', {
-    condition: assigned,
-    chosenAt: Date.now()
-  });
+  const assigned = conditionSelector(); // 'abcd'|'cdab'|'bcda'|'dabc'
+  await updateStateTransaction('condition', 'set-if-absent', { condition: assigned });
 }
+
 
 function startSession() {
   /*
