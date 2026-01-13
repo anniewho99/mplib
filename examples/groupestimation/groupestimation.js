@@ -1945,27 +1945,6 @@ function assignAvatarColors() {
       name: playerName
   }, 'update player name');
 
-  // const arrivalIndex = getCurrentPlayerArrivalIndex();
-  // if(arrivalIndex == 1){
-  //   let assignedCondition = conditionSelector();
-
-  //   updateStateDirect(`condition`, {
-  //     condition: assignedCondition
-  // }, 'update Condition');
-
-  // console.log("sending new condition");
-
-  //   if (assignedCondition == 'abcd'){
-  //     levelPlacements = abcd;
-  //   }else if(assignedCondition == 'cdab'){
-  //     levelPlacements = cdab;
-  //   }else if(assignedCondition == 'bcda'){
-  //     levelPlacements = bcda;
-  //   }else if(assignedCondition == 'dabc'){
-  //     levelPlacements = dabc;
-  //   }
-  // }
-
   playerColorMap[playerId] = {
       color: 1,
       name: playerName
@@ -3065,14 +3044,6 @@ function startNewGameOnce() {
   newGame();
 
 }
-
-// function removeAllClonesForThisPlayer() {
-//   const selfId = String(thisPlayerID);
-//   document
-//     .querySelectorAll(`.arrow-clone[data-source-player-id="${selfId}"]`)
-//     .forEach(c => c.remove());
-// }
-
 
 function spawnClonesForBlock(block) {
   // removeAllClonesForThisPlayer();

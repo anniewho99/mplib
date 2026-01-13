@@ -1,0 +1,1049 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Block Puzzle Board Editor (Leader + Follower)</title>
+  <style>
+    html,body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:#0b0d10;color:#e7ebf0;}
+    .wrap{display:grid;grid-template-columns:1fr 600px;gap:16px;padding:16px;}
+    canvas{background:#20252b;border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.35);}
+    .panel{background:#11151a;border:1px solid #243040;border-radius:12px;padding:14px;}
+    .panel h2{margin:0 0 10px 0;font-size:16px;color:#bcd;}
+    .row{display:flex;gap:8px;align-items:center;margin:8px 0;flex-wrap:wrap;}
+    button{background:#1b2330;border:1px solid #2d3b50;color:#e7ebf0;padding:8px 10px;border-radius:8px;cursor:pointer;}
+    button:hover{background:#223044;}
+    select{background:#0f141a;color:#dfe6ef;border:1px solid #2a394d;border-radius:8px;padding:6px 8px;}
+    input[type=number]{width:72px;background:#0f141a;color:#dfe6ef;border:1px solid #2a394d;border-radius:8px;padding:6px 8px;}
+    textarea{width:100%;height:210px;background:#0f141a;color:#dfe6ef;border:1px solid #2a394d;border-radius:8px;padding:8px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;}
+    .small{font-size:12px;color:#9bb;}
+    .pill{display:inline-block;padding:2px 6px;border:1px solid #2d3b50;border-radius:999px;font-size:12px;color:#9bb;}
+    .hr{height:1px;background:#243040;margin:12px 0;}
+    pre{white-space:pre-wrap;background:#0f141a;border:1px solid #2a394d;border-radius:8px;padding:8px;margin:0;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;color:#dfe6ef;max-height:170px;overflow:auto;}
+    code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <canvas id="cv" width="820" height="820"></canvas>
+
+    <div class="panel">
+      <h2>Board Editor</h2>
+      <div class="small">Drag blocks/slots/obstacles on the board to reposition. Or type coordinates below.</div>
+
+      <div class="hr"></div>
+
+      <div class="row">
+        <button id="btnApplyInputs">Apply inputs</button>
+        <button id="btnReset">Reset</button>
+        <button id="btnExport">Export JSON</button>
+      </div>
+
+      <div class="hr"></div>
+
+      <h2>Teammate inputs (for follower)</h2>
+      <div class="small">Two other players' votes (target + direction). Select “no vote” if absent.</div>
+
+      <div class="row" style="align-items:flex-end">
+        <div style="flex:1">
+          <div class="small">Player 2 target</div>
+          <select id="p2_type">
+            <option value="none">no vote</option>
+            <option value="block">block</option>
+            <option value="obstacle">obstacle</option>
+          </select>
+          <select id="p2_id"></select>
+        </div>
+        <div style="width:120px">
+          <div class="small">Direction</div>
+          <select id="p2_dir">
+            <option value="up">up</option>
+            <option value="down">down</option>
+            <option value="left">left</option>
+            <option value="right">right</option>
+            <option value="stay">stay</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="row" style="align-items:flex-end;margin-top:8px">
+        <div style="flex:1">
+          <div class="small">Player 3 target</div>
+          <select id="p3_type">
+            <option value="none">no vote</option>
+            <option value="block">block</option>
+            <option value="obstacle">obstacle</option>
+          </select>
+          <select id="p3_id"></select>
+        </div>
+        <div style="width:120px">
+          <div class="small">Direction</div>
+          <select id="p3_dir">
+            <option value="up">up</option>
+            <option value="down">down</option>
+            <option value="left">left</option>
+            <option value="right">right</option>
+            <option value="stay">stay</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="small" style="margin-top:8px">Selections are stored in <code>S.peerVotes</code> and included in JSON export.</div>
+
+      <div class="hr"></div>
+
+      <h2>Follower</h2>
+      <div class="small">Follower runs after teammate votes are provided. It computes a default move first (yellow-to-slot BFS), then applies your vote rules.</div>
+      <div class="row">
+        <button id="btnRunFollower">Run follower</button>
+      </div>
+      <pre id="followerOut">No output yet.</pre>
+
+      <div class="hr"></div>
+
+      <h2>State JSON</h2>
+      <textarea id="txtState"></textarea>
+      <div class="row">
+        <button id="btnLoadJSON">Load JSON</button>
+        <span class="small" id="lblStatus"></span>
+      </div>
+
+      <div class="hr"></div>
+
+      <h2>Quick Inputs</h2>
+      <div class="row"><span class="pill">Blocks (3×3)</span></div>
+      <div class="row">
+        <b style="width:54px">Yellow</b>
+        x <input id="b_y_x" type="number" min="0" max="17" />
+        y <input id="b_y_y" type="number" min="0" max="17" />
+      </div>
+      <div class="row">
+        <b style="width:54px">Red</b>
+        x <input id="b_r_x" type="number" min="0" max="17" />
+        y <input id="b_r_y" type="number" min="0" max="17" />
+      </div>
+      <div class="row">
+        <b style="width:54px">Blue</b>
+        x <input id="b_b_x" type="number" min="0" max="17" />
+        y <input id="b_b_y" type="number" min="0" max="17" />
+      </div>
+
+      <div class="row" style="margin-top:10px"><span class="pill">Slots (3×3 outlines)</span></div>
+      <div class="row">
+        <b style="width:54px">Slot0</b>
+        x <input id="s0_x" type="number" min="0" max="17" />
+        y <input id="s0_y" type="number" min="0" max="17" />
+      </div>
+      <div class="row">
+        <b style="width:54px">Slot1</b>
+        x <input id="s1_x" type="number" min="0" max="17" />
+        y <input id="s1_y" type="number" min="0" max="17" />
+      </div>
+
+      <div class="row" style="margin-top:10px"><span class="pill">Obstacles (2×2)</span></div>
+      <div class="small" id="obsHelp">Edit obstacle positions here (or drag on the canvas).</div>
+      <div id="obsList"></div>
+
+      <div class="small" style="margin-top:8px">Walls: the outermost 1-cell border is rendered as dark brown and treated as non-walkable in leader/follower logic.</div>
+    </div>
+  </div>
+
+<script>
+  // --- Constants / geometry ---
+  const GRID = 18;          // cells: 0..17
+  const BLOCK_SIZE = 3;
+  const OBS_SIZE = 2;
+  const CELL = 40;
+  const PADDING = 20;
+  const W = PADDING*2 + GRID*CELL;
+
+  const COLORS = {
+    yellow: '#f5e85a',
+    red:    '#e74c3c',
+    blue:   '#4285f4',
+    slot:   '#4da3ff',
+    obstacle: '#86efac',
+    obstacleImmovable: '#3a4048',
+    wall:   '#4a2c1a' // dark brown
+  };
+
+  const INITIAL = {
+    blocks: { blue:{x:9,y:9}, red:{x:7,y:0}, yellow:{x:0,y:9} },
+    slots:  { slot0:{x:2,y:5}, slot1:{x:15,y:5} },
+    obstacles: {
+      obs0:{x:8,y:4,id:'obs0', immovable:true},
+      obs1:{x:8,y:6,id:'obs1', immovable:true},
+      obs2:{x:5,y:4,id:'obs2', immovable:false},
+      obs3:{x:11,y:4,id:'obs3', immovable:false},
+    },
+    peerVotes: {
+      p2: { type:'none', id:'', dir:'stay' },
+      p3: { type:'none', id:'', dir:'stay' }
+    },
+    walls: [] // optional internal walls: [{x,y}, ...]
+  };
+
+  function deepCopy(o){ return JSON.parse(JSON.stringify(o)); }
+
+  // --- Canvas setup ---
+  const cv = document.getElementById('cv');
+  cv.width = W; cv.height = W;
+  const ctx = cv.getContext('2d');
+
+  function tlRect(x,y,sz){
+    return { x: PADDING + x*CELL, y: PADDING + y*CELL, w: sz*CELL, h: sz*CELL };
+  }
+
+  function drawGrid(){
+    ctx.clearRect(0,0,W,W);
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0,0,W,W);
+
+    // Walls: outermost 1-cell radius
+    ctx.fillStyle = COLORS.wall;
+    for (let x=0; x<GRID; x++){
+      ctx.fillRect(PADDING + x*CELL, PADDING + 0*CELL, CELL, CELL);
+      ctx.fillRect(PADDING + x*CELL, PADDING + (GRID-1)*CELL, CELL, CELL);
+    }
+    for (let y=0; y<GRID; y++){
+      ctx.fillRect(PADDING + 0*CELL, PADDING + y*CELL, CELL, CELL);
+      ctx.fillRect(PADDING + (GRID-1)*CELL, PADDING + y*CELL, CELL, CELL);
+    }
+
+    // Grid lines
+    ctx.strokeStyle = '#2d3642';
+    ctx.lineWidth = 1;
+    for (let i=0;i<=GRID;i++){
+      ctx.beginPath();
+      ctx.moveTo(PADDING+i*CELL, PADDING);
+      ctx.lineTo(PADDING+i*CELL, PADDING+GRID*CELL);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(PADDING, PADDING+i*CELL);
+      ctx.lineTo(PADDING+GRID*CELL, PADDING+i*CELL);
+      ctx.stroke();
+    }
+  }
+
+  function drawSlot(s){
+    const r = tlRect(s.x, s.y, BLOCK_SIZE);
+    ctx.lineWidth = 6;
+    ctx.strokeStyle = COLORS.slot;
+    ctx.strokeRect(r.x+2, r.y+2, r.w-4, r.h-4);
+  }
+
+  function hatchRect(r){
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(r.x, r.y, r.w, r.h);
+    ctx.clip();
+    ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+    ctx.lineWidth = 2;
+    for (let x=r.x-r.h; x<r.x+r.w; x+=8){
+      ctx.beginPath();
+      ctx.moveTo(x, r.y);
+      ctx.lineTo(x+r.h, r.y+r.h);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  function drawObstacle(ob){
+    const r = tlRect(ob.x, ob.y, OBS_SIZE);
+    ctx.fillStyle = ob.immovable ? COLORS.obstacleImmovable : COLORS.obstacle;
+    ctx.fillRect(r.x+2, r.y+2, r.w-4, r.h-4);
+    if (ob.immovable) hatchRect({x:r.x+2,y:r.y+2,w:r.w-4,h:r.h-4});
+
+    ctx.fillStyle = '#0d1320';
+    ctx.font = '700 12px ui-monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(ob.id, r.x+r.w/2, r.y+r.h/2);
+  }
+
+  function drawBlock(name, pos){
+    const r = tlRect(pos.x, pos.y, BLOCK_SIZE);
+    ctx.fillStyle = COLORS[name] || '#888';
+    ctx.fillRect(r.x+2, r.y+2, r.w-4, r.h-4);
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = '#1d2430';
+    ctx.strokeRect(r.x+1.5, r.y+1.5, r.w-3, r.h-3);
+
+    ctx.fillStyle = '#0d1320';
+    ctx.font = '700 18px ui-monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    const digit = name==='yellow' ? '1' : name==='red' ? '2' : '3';
+    ctx.fillText(digit, r.x+r.w/2, r.y+r.h/2);
+  }
+
+  function render(state){
+    drawGrid();
+    for (const s of Object.values(state.slots)) drawSlot(s);
+    for (const o of Object.values(state.obstacles)) drawObstacle(o);
+    for (const [name,pos] of Object.entries(state.blocks)) drawBlock(name, pos);
+  }
+
+  // --- Overlay: show peer votes and follower choice on the board ---
+  function cellCenterForTL(x, y, sz){
+    const r = tlRect(x, y, sz);
+    return { cx: r.x + r.w/2, cy: r.y + r.h/2 };
+  }
+
+  function drawArrow(cx, cy, dx, dy, color, label){
+    const len = CELL * 1.15;
+    const ex = cx + dx * len;
+    const ey = cy + dy * len;
+
+    ctx.save();
+    ctx.strokeStyle = color;
+    ctx.fillStyle = color;
+    ctx.lineWidth = 5;
+    ctx.lineCap = 'round';
+
+    // line
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(ex, ey);
+    ctx.stroke();
+
+    // arrow head
+    const ang = Math.atan2(ey - cy, ex - cx);
+    const head = 14;
+    ctx.beginPath();
+    ctx.moveTo(ex, ey);
+    ctx.lineTo(ex - head * Math.cos(ang - Math.PI/6), ey - head * Math.sin(ang - Math.PI/6));
+    ctx.lineTo(ex - head * Math.cos(ang + Math.PI/6), ey - head * Math.sin(ang + Math.PI/6));
+    ctx.closePath();
+    ctx.fill();
+
+    // label
+    if (label){
+      ctx.font = '700 12px ui-monospace';
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'bottom';
+      ctx.fillText(label, cx + 8, cy - 8);
+    }
+    ctx.restore();
+  }
+
+  function moveToVector(dir){
+    switch(dir){
+      case 'up': return {dx:0, dy:-1};
+      case 'down': return {dx:0, dy:1};
+      case 'left': return {dx:-1, dy:0};
+      case 'right': return {dx:1, dy:0};
+      default: return {dx:0, dy:0};
+    }
+  }
+
+  function drawMoveOverlay(state, move, color, label){
+    if (!move || move.type === 'none') return;
+    if (!move.dir || move.dir === 'stay') return;
+
+    const v = moveToVector(move.dir);
+    if (v.dx === 0 && v.dy === 0) return;
+
+    if (move.type === 'block'){
+      const b = state.blocks?.[move.id];
+      if (!b) return;
+      const {cx, cy} = cellCenterForTL(b.x|0, b.y|0, BLOCK_SIZE);
+      drawArrow(cx, cy, v.dx, v.dy, color, label);
+      return;
+    }
+
+    if (move.type === 'obstacle'){
+      const o = state.obstacles?.[move.id];
+      if (!o) return;
+      const {cx, cy} = cellCenterForTL(o.x|0, o.y|0, OBS_SIZE);
+      drawArrow(cx, cy, v.dx, v.dy, color, label);
+      return;
+    }
+  }
+
+  function renderAll(){
+    // Base render
+    render(S);
+
+    // Overlays: peer votes + follower choice
+    const pv = S.peerVotes || {};
+    drawMoveOverlay(S, pv.p2, '#37d5c1', 'P2');
+    drawMoveOverlay(S, pv.p3, '#f59e0b', 'P3');
+    drawMoveOverlay(S, LAST_FOLLOWER_CHOICE, '#e879f9', 'F');
+  }
+
+  // --- UI state ---
+  let S = deepCopy(INITIAL);
+  let LAST_FOLLOWER_CHOICE = null; // follower's chosen move for overlay
+
+  function setStatus(msg){
+    document.getElementById('lblStatus').textContent = msg;
+  }
+
+  function sortedObstacleKeys(){
+    return Object.keys(S.obstacles || {}).sort((a,b)=>{
+      const na = parseInt(String(a).replace(/\D+/g,'')) || 0;
+      const nb = parseInt(String(b).replace(/\D+/g,'')) || 0;
+      if (na!==nb) return na-nb;
+      return String(a).localeCompare(String(b));
+    });
+  }
+
+  // --- Walls as a cell set (outer ring + optional internal walls) ---
+  function buildWallSetFromState(state){
+    const wallSet = new Set();
+    for (let x=0; x<GRID; x++){
+      wallSet.add(`${x},0`);
+      wallSet.add(`${x},${GRID-1}`);
+    }
+    for (let y=0; y<GRID; y++){
+      wallSet.add(`0,${y}`);
+      wallSet.add(`${GRID-1},${y}`);
+    }
+    if (Array.isArray(state.walls)){
+      for (const w of state.walls){
+        if (!w) continue;
+        const wx = (w.x|0), wy = (w.y|0);
+        if (wx>=0 && wy>=0 && wx<GRID && wy<GRID) wallSet.add(`${wx},${wy}`);
+      }
+    }
+    return wallSet;
+  }
+
+  function footprintHitsWalls(tlx,tly,sz, wallSet){
+    for (let dy=0; dy<sz; dy++){
+      for (let dx=0; dx<sz; dx++){
+        if (wallSet.has(`${tlx+dx},${tly+dy}`)) return true;
+      }
+    }
+    return false;
+  }
+
+  function inBoundsTL(x,y,sz){
+    return (x>=0 && y>=0 && (x+sz)<=GRID && (y+sz)<=GRID);
+  }
+
+  function rectOverlap(ax,ay,asz, bx,by,bsz){
+    return (ax < bx + bsz && bx < ax + asz && ay < by + bsz && by < ay + asz);
+  }
+
+  // --- Teammate vote UI ---
+  function ensurePeerVotes(){
+    if (!S.peerVotes) S.peerVotes = {};
+    if (!S.peerVotes.p2) S.peerVotes.p2 = { type:'none', id:'', dir:'stay' };
+    if (!S.peerVotes.p3) S.peerVotes.p3 = { type:'none', id:'', dir:'stay' };
+    for (const p of ['p2','p3']){
+      const v = S.peerVotes[p];
+      if (!v.type) v.type = 'none';
+      if (!v.dir) v.dir = 'stay';
+      if (v.type === 'none'){ v.id=''; v.dir='stay'; }
+    }
+  }
+
+  function setSelectOptions(sel, opts, selected){
+    sel.innerHTML = '';
+    for (const o of opts){
+      const opt = document.createElement('option');
+      opt.value = o;
+      opt.textContent = o;
+      sel.appendChild(opt);
+    }
+    if (selected && opts.includes(selected)) sel.value = selected;
+    else if (opts.length) sel.value = opts[0];
+  }
+
+  function refreshPeerVoteUI(){
+    ensurePeerVotes();
+    const blocks = ['blue','red','yellow'];
+    const obsKeys = sortedObstacleKeys();
+
+    const p2t = document.getElementById('p2_type');
+    const p2i = document.getElementById('p2_id');
+    const p2d = document.getElementById('p2_dir');
+
+    const p3t = document.getElementById('p3_type');
+    const p3i = document.getElementById('p3_id');
+    const p3d = document.getElementById('p3_dir');
+
+    // Honor current UI selection; keep state in sync.
+    if (p2t && p2t.value) S.peerVotes.p2.type = p2t.value;
+    if (p3t && p3t.value) S.peerVotes.p3.type = p3t.value;
+
+    if (p2t.value === 'none'){
+      setSelectOptions(p2i, [''], '');
+      p2i.disabled = true;
+      p2d.value = 'stay';
+      p2d.disabled = true;
+    } else {
+      p2i.disabled = false;
+      p2d.disabled = false;
+      setSelectOptions(p2i, (p2t.value==='block') ? blocks : obsKeys, S.peerVotes.p2.id);
+      p2d.value = S.peerVotes.p2.dir || 'stay';
+    }
+
+    if (p3t.value === 'none'){
+      setSelectOptions(p3i, [''], '');
+      p3i.disabled = true;
+      p3d.value = 'stay';
+      p3d.disabled = true;
+    } else {
+      p3i.disabled = false;
+      p3d.disabled = false;
+      setSelectOptions(p3i, (p3t.value==='block') ? blocks : obsKeys, S.peerVotes.p3.id);
+      p3d.value = S.peerVotes.p3.dir || 'stay';
+    }
+  }
+
+  function applyPeerVoteUIToState(){
+    ensurePeerVotes();
+    const p2type = document.getElementById('p2_type').value;
+    const p3type = document.getElementById('p3_type').value;
+
+    S.peerVotes.p2.type = p2type;
+    if (p2type === 'none'){ S.peerVotes.p2.id=''; S.peerVotes.p2.dir='stay'; }
+    else {
+      S.peerVotes.p2.id = document.getElementById('p2_id').value;
+      S.peerVotes.p2.dir = document.getElementById('p2_dir').value;
+    }
+
+    S.peerVotes.p3.type = p3type;
+    if (p3type === 'none'){ S.peerVotes.p3.id=''; S.peerVotes.p3.dir='stay'; }
+    else {
+      S.peerVotes.p3.id = document.getElementById('p3_id').value;
+      S.peerVotes.p3.dir = document.getElementById('p3_dir').value;
+    }
+  }
+
+  function onPeerVoteChanged(){
+    applyPeerVoteUIToState();
+    document.getElementById('txtState').value = JSON.stringify(S, null, 2);
+    renderAll();
+  }
+
+  // --- Obstacle inputs list ---
+  function renderObstacleInputs(){
+    const wrap = document.getElementById('obsList');
+    wrap.innerHTML = '';
+    const keys = sortedObstacleKeys();
+    if (keys.length===0){
+      const div = document.createElement('div');
+      div.className = 'small';
+      div.textContent = 'No obstacles in state.';
+      wrap.appendChild(div);
+      return;
+    }
+    for (const k of keys){
+      const o = S.obstacles[k];
+      const row = document.createElement('div');
+      row.className = 'row';
+      row.style.alignItems = 'center';
+
+      const label = document.createElement('b');
+      label.style.width = '54px';
+      label.textContent = k;
+      row.appendChild(label);
+
+      row.appendChild(document.createTextNode('x '));
+      const ix = document.createElement('input');
+      ix.type = 'number'; ix.min = '0'; ix.max = String(GRID-1);
+      ix.id = `obs_${k}_x`;
+      ix.value = o.x;
+      row.appendChild(ix);
+
+      row.appendChild(document.createTextNode(' y '));
+      const iy = document.createElement('input');
+      iy.type = 'number'; iy.min = '0'; iy.max = String(GRID-1);
+      iy.id = `obs_${k}_y`;
+      iy.value = o.y;
+      row.appendChild(iy);
+
+      const immWrap = document.createElement('label');
+      immWrap.style.marginLeft = '10px';
+      immWrap.style.display = 'inline-flex';
+      immWrap.style.gap = '6px';
+      immWrap.style.alignItems = 'center';
+
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.id = `obs_${k}_imm`;
+      cb.checked = !!o.immovable;
+      immWrap.appendChild(cb);
+
+      const txt = document.createElement('span');
+      txt.className = 'small';
+      txt.textContent = 'immovable';
+      immWrap.appendChild(txt);
+
+      row.appendChild(immWrap);
+      wrap.appendChild(row);
+    }
+  }
+
+  function syncInputsFromState(){
+    document.getElementById('b_y_x').value = S.blocks.yellow.x;
+    document.getElementById('b_y_y').value = S.blocks.yellow.y;
+    document.getElementById('b_r_x').value = S.blocks.red.x;
+    document.getElementById('b_r_y').value = S.blocks.red.y;
+    document.getElementById('b_b_x').value = S.blocks.blue.x;
+    document.getElementById('b_b_y').value = S.blocks.blue.y;
+
+    document.getElementById('s0_x').value = S.slots.slot0.x;
+    document.getElementById('s0_y').value = S.slots.slot0.y;
+    document.getElementById('s1_x').value = S.slots.slot1.x;
+    document.getElementById('s1_y').value = S.slots.slot1.y;
+
+    renderObstacleInputs();
+    refreshPeerVoteUI();
+    document.getElementById('txtState').value = JSON.stringify(S, null, 2);
+    renderAll();
+  }
+
+  function applyInputsToState(){
+    const clamp = (v)=>Math.max(0, Math.min(GRID-1, v|0));
+
+    S.blocks.yellow.x = clamp(+document.getElementById('b_y_x').value);
+    S.blocks.yellow.y = clamp(+document.getElementById('b_y_y').value);
+    S.blocks.red.x    = clamp(+document.getElementById('b_r_x').value);
+    S.blocks.red.y    = clamp(+document.getElementById('b_r_y').value);
+    S.blocks.blue.x   = clamp(+document.getElementById('b_b_x').value);
+    S.blocks.blue.y   = clamp(+document.getElementById('b_b_y').value);
+
+    S.slots.slot0.x = clamp(+document.getElementById('s0_x').value);
+    S.slots.slot0.y = clamp(+document.getElementById('s0_y').value);
+    S.slots.slot1.x = clamp(+document.getElementById('s1_x').value);
+    S.slots.slot1.y = clamp(+document.getElementById('s1_y').value);
+
+    // Obstacles
+    for (const k of sortedObstacleKeys()){
+      const ox = document.getElementById(`obs_${k}_x`);
+      const oy = document.getElementById(`obs_${k}_y`);
+      const oc = document.getElementById(`obs_${k}_imm`);
+      if (!ox || !oy) continue;
+      S.obstacles[k].x = clamp(+ox.value);
+      S.obstacles[k].y = clamp(+oy.value);
+      if (oc) S.obstacles[k].immovable = !!oc.checked;
+    }
+
+    applyPeerVoteUIToState();
+    document.getElementById('txtState').value = JSON.stringify(S, null, 2);
+
+    renderAll();
+    setStatus('Applied inputs.');
+  }
+
+  // --- Dragging ---
+  function mouseToCell(evt){
+    const r = cv.getBoundingClientRect();
+    const mx = evt.clientX - r.left;
+    const my = evt.clientY - r.top;
+    const x = (mx - PADDING) / CELL;
+    const y = (my - PADDING) / CELL;
+    return { x, y, mx, my };
+  }
+
+  function hitTest(state, cellX, cellY){
+    const hits = [];
+    for (const [name,p] of Object.entries(state.blocks)){
+      if (cellX >= p.x && cellX < p.x + BLOCK_SIZE && cellY >= p.y && cellY < p.y + BLOCK_SIZE){
+        hits.push({type:'block', id:name, size:BLOCK_SIZE, x:p.x, y:p.y});
+      }
+    }
+    for (const [sid,s] of Object.entries(state.slots)){
+      if (cellX >= s.x && cellX < s.x + BLOCK_SIZE && cellY >= s.y && cellY < s.y + BLOCK_SIZE){
+        hits.push({type:'slot', id:sid, size:BLOCK_SIZE, x:s.x, y:s.y});
+      }
+    }
+    for (const [oid,o] of Object.entries(state.obstacles)){
+      if (cellX >= o.x && cellX < o.x + OBS_SIZE && cellY >= o.y && cellY < o.y + OBS_SIZE){
+        hits.push({type:'obstacle', id:oid, size:OBS_SIZE, x:o.x, y:o.y});
+      }
+    }
+    hits.sort((a,b)=>a.size-b.size);
+    return hits[hits.length-1] || null;
+  }
+
+  let drag = null;
+
+  cv.addEventListener('mousedown', (evt)=>{
+    const m = mouseToCell(evt);
+    const cellX = Math.floor(m.x);
+    const cellY = Math.floor(m.y);
+    const h = hitTest(S, cellX, cellY);
+    if (!h) return;
+
+    drag = { type: h.type, id: h.id, size: h.size, offX: m.x - h.x, offY: m.y - h.y };
+  });
+
+  window.addEventListener('mousemove', (evt)=>{
+    if (!drag) return;
+    const m = mouseToCell(evt);
+    const nx = Math.round(m.x - drag.offX);
+    const ny = Math.round(m.y - drag.offY);
+
+    const clampedX = Math.max(0, Math.min(GRID-1, nx));
+    const clampedY = Math.max(0, Math.min(GRID-1, ny));
+
+    if (drag.type==='block'){ S.blocks[drag.id].x = clampedX; S.blocks[drag.id].y = clampedY; }
+    else if (drag.type==='slot'){ S.slots[drag.id].x = clampedX; S.slots[drag.id].y = clampedY; }
+    else { S.obstacles[drag.id].x = clampedX; S.obstacles[drag.id].y = clampedY; }
+
+    renderAll();
+  });
+
+  window.addEventListener('mouseup', ()=>{
+    if (!drag) return;
+    drag = null;
+    syncInputsFromState();
+    setStatus('Dragged and updated JSON.');
+  });
+
+  // --- Buttons ---
+  document.getElementById('btnApplyInputs').onclick = applyInputsToState;
+  document.getElementById('btnReset').onclick = ()=>{
+    S = deepCopy(INITIAL);
+    syncInputsFromState();
+    renderAll();
+    setStatus('Reset.');
+  };
+  document.getElementById('btnExport').onclick = ()=>{
+    document.getElementById('txtState').value = JSON.stringify(S, null, 2);
+    document.getElementById('txtState').select();
+    document.execCommand('copy');
+    setStatus('Copied JSON to clipboard.');
+  };
+  document.getElementById('btnLoadJSON').onclick = ()=>{
+    try{
+      const txt = document.getElementById('txtState').value;
+      const parsed = JSON.parse(txt);
+      if (!parsed.blocks || !parsed.slots || !parsed.obstacles) throw new Error('JSON must contain blocks, slots, obstacles');
+      S = parsed;
+      ensurePeerVotes();
+      syncInputsFromState();
+      renderAll();
+      setStatus('Loaded JSON.');
+    }catch(e){
+      setStatus('JSON error: ' + e.message);
+    }
+  };
+
+  // Peer vote UI handlers
+  document.getElementById('p2_type').addEventListener('change', ()=>{ refreshPeerVoteUI(); onPeerVoteChanged(); });
+  document.getElementById('p3_type').addEventListener('change', ()=>{ refreshPeerVoteUI(); onPeerVoteChanged(); });
+  for (const id of ['p2_id','p2_dir','p3_id','p3_dir']){
+    document.getElementById(id).addEventListener('change', onPeerVoteChanged);
+  }
+
+  // --- Core move legality helpers (single-agent) ---
+  const DIR_VEC = {
+    up:{dx:0,dy:-1}, down:{dx:0,dy:1}, left:{dx:-1,dy:0}, right:{dx:1,dy:0}, stay:{dx:0,dy:0}
+  };
+
+  function isMoveLegal(state, move, wallSet){
+    // move: {type:'block'|'obstacle', id:'red'|'blue'|'yellow'|'obs2', dir:'up'...} or {type:'none'}
+    if (!move || move.type === 'none') return false;
+    const d = DIR_VEC[move.dir];
+    if (!d) return false;
+
+    if (move.type === 'block'){
+      const b = state.blocks?.[move.id];
+      if (!b) return false;
+      const nx = (b.x|0) + d.dx;
+      const ny = (b.y|0) + d.dy;
+      if (!inBoundsTL(nx, ny, BLOCK_SIZE)) return false;
+      if (footprintHitsWalls(nx, ny, BLOCK_SIZE, wallSet)) return false;
+
+      // hit obstacles
+      for (const o of Object.values(state.obstacles || {})){
+        if (rectOverlap(nx,ny,BLOCK_SIZE, o.x|0,o.y|0,OBS_SIZE)) return false;
+      }
+      // hit other blocks
+      for (const [bn,ob] of Object.entries(state.blocks || {})){
+        if (bn === move.id) continue;
+        if (rectOverlap(nx,ny,BLOCK_SIZE, ob.x|0,ob.y|0,BLOCK_SIZE)) return false;
+      }
+      return true;
+    }
+
+    if (move.type === 'obstacle'){
+      const o = state.obstacles?.[move.id];
+      if (!o || o.immovable) return false;
+      const nx = (o.x|0) + d.dx;
+      const ny = (o.y|0) + d.dy;
+      if (!inBoundsTL(nx, ny, OBS_SIZE)) return false;
+      if (footprintHitsWalls(nx, ny, OBS_SIZE, wallSet)) return false;
+
+      // hit other obstacles
+      for (const [ok,oo] of Object.entries(state.obstacles || {})){
+        if (ok === move.id) continue;
+        if (rectOverlap(nx,ny,OBS_SIZE, oo.x|0,oo.y|0,OBS_SIZE)) return false;
+      }
+      // hit blocks
+      for (const b of Object.values(state.blocks || {})){
+        if (rectOverlap(nx,ny,OBS_SIZE, b.x|0,b.y|0,BLOCK_SIZE)) return false;
+      }
+      return true;
+    }
+
+    return false;
+  }
+
+  // --- BFS distances for yellow to nearest slot (all walls/obstacles/blocks treated immovable) ---
+  function computeDistForYellow(state, wallSet){
+    const TL_W = GRID - BLOCK_SIZE + 1;
+    const TL_H = GRID - BLOCK_SIZE + 1;
+    const INF = 1e9;
+
+    const dist = Array.from({length: TL_H}, ()=>Array(TL_W).fill(INF));
+    const qx = new Array(TL_W*TL_H);
+    const qy = new Array(TL_W*TL_H);
+    let head=0, tail=0;
+
+    const y0 = state.blocks.yellow;
+    const startKey = `${y0.x|0},${y0.y|0}`;
+
+    function okTL(x,y){
+      if (!inBoundsTL(x,y,BLOCK_SIZE)) return false;
+      if (footprintHitsWalls(x,y,BLOCK_SIZE, wallSet)) return false;
+      // obstacles
+      for (const o of Object.values(state.obstacles || {})){
+        if (rectOverlap(x,y,BLOCK_SIZE, o.x|0,o.y|0,OBS_SIZE)) return false;
+      }
+      // blocks (treat blue/red as immovable, but ignore yellow itself)
+      for (const [bn,b] of Object.entries(state.blocks || {})){
+        if (bn === 'yellow') continue;
+        if (rectOverlap(x,y,BLOCK_SIZE, b.x|0,b.y|0,BLOCK_SIZE)) return false;
+      }
+      return true;
+    }
+
+    // seed from slots (slot TLs)
+    for (const sl of Object.values(state.slots || {})){
+      const sx = sl.x|0, sy = sl.y|0;
+      if (sx<0 || sy<0 || sx>=TL_W || sy>=TL_H) continue;
+      if (!okTL(sx,sy)) continue;
+      if (dist[sy][sx] !== 0){
+        dist[sy][sx] = 0;
+        qx[tail]=sx; qy[tail]=sy; tail++;
+      }
+    }
+
+    const DX=[0,0,-1,1], DY=[-1,1,0,0];
+    while (head<tail){
+      const x=qx[head], y=qy[head]; head++;
+      const nd = dist[y][x] + 1;
+      for (let k=0;k<4;k++){
+        const nx=x+DX[k], ny=y+DY[k];
+        if (nx<0 || ny<0 || nx>=TL_W || ny>=TL_H) continue;
+
+        // allow the current yellow TL even if okTL would reject due to self-overlap
+        const key = `${nx},${ny}`;
+        const ok = (key === startKey) ? true : okTL(nx,ny);
+        if (!ok) continue;
+
+        if (dist[ny][nx] <= nd) continue;
+        dist[ny][nx] = nd;
+        qx[tail]=nx; qy[tail]=ny; tail++;
+      }
+    }
+
+    return { dist, TL_W, TL_H, INF };
+  }
+
+  function getDist(distObj, x,y){
+    const {dist, TL_W, TL_H, INF} = distObj;
+    if (x<0 || y<0 || x>=TL_W || y>=TL_H) return INF;
+    return dist[y][x];
+  }
+
+  // --- Follower default plan + vote integration ---
+  function defaultFollowerPlan(state, wallSet){
+    const distObj = computeDistForYellow(state, wallSet);
+    const y = state.blocks.yellow;
+    const cur = getDist(distObj, y.x|0, y.y|0);
+
+    // Case: yellow has path -> choose one-step that shortens it (and is legal)
+    if (cur < distObj.INF){
+      let best = null;
+      let bestD = cur;
+
+      for (const dir of ['up','down','left','right']){
+        const d = DIR_VEC[dir];
+        const nx = (y.x|0) + d.dx;
+        const ny = (y.y|0) + d.dy;
+        const nd = getDist(distObj, nx, ny);
+        if (nd >= bestD) continue;
+        const mv = {type:'block', id:'yellow', dir};
+        if (!isMoveLegal(state, mv, wallSet)) continue;
+        bestD = nd;
+        best = mv;
+      }
+
+      return { kind:'yellow_move', defaultMove: best, distBefore: cur, distAfter: best ? bestD : cur, obstacleOpenSet: [] };
+    }
+
+    // Case: yellow has no path -> store potential 1-step obstacle moves that open a path
+    const candidates = [];
+    for (const [ok,o] of Object.entries(state.obstacles || {})){
+      if (o.immovable) continue;
+      for (const dir of ['up','down','left','right']){
+        const mv = {type:'obstacle', id:ok, dir};
+        if (!isMoveLegal(state, mv, wallSet)) continue;
+
+        // apply virtual move
+        const t = deepCopy(state);
+        const d = DIR_VEC[dir];
+        t.obstacles[ok].x = (t.obstacles[ok].x|0) + d.dx;
+        t.obstacles[ok].y = (t.obstacles[ok].y|0) + d.dy;
+
+        const dist2 = computeDistForYellow(t, wallSet);
+        const cur2 = getDist(dist2, t.blocks.yellow.x|0, t.blocks.yellow.y|0);
+        if (cur2 < dist2.INF){
+          candidates.push({ ...mv, opensYellowDist: cur2 });
+        }
+      }
+    }
+    // sort: smaller resulting distance is better
+    candidates.sort((a,b)=> (a.opensYellowDist ?? 1e9) - (b.opensYellowDist ?? 1e9));
+    return { kind:'need_obstacle', defaultMove: null, obstacleOpenSet: candidates, distBefore: null, distAfter: null };
+  }
+
+  function voteIsNone(v){ return !v || v.type === 'none'; }
+  function voteKey(v){ return `${v.type}:${v.id}:${v.dir}`; }
+  function votesConsistent(v2,v3){ return !voteIsNone(v2) && !voteIsNone(v3) && voteKey(v2) === voteKey(v3); }
+
+  function chooseFollowerMove(state){
+    const wallSet = buildWallSetFromState(state);
+    const plan = defaultFollowerPlan(state, wallSet);
+
+    const v2 = state.peerVotes?.p2 || {type:'none',id:'',dir:'stay'};
+    const v3 = state.peerVotes?.p3 || {type:'none',id:'',dir:'stay'};
+
+    const v2Legal = !voteIsNone(v2) && isMoveLegal(state, v2, wallSet);
+    const v3Legal = !voteIsNone(v3) && isMoveLegal(state, v3, wallSet);
+
+    // 1) When votes are consistent, follower copies that vote (if legal)
+    if (votesConsistent(v2,v3) && v2Legal){
+      return { chosen: v2, reason: 'votes_consistent_copy', plan, peer: {v2, v3, v2Legal, v3Legal} };
+    }
+
+    // 2) If no other player votes are available nor legal, follower runs the default algorithm.
+    if (!v2Legal && !v3Legal){
+      if (plan.defaultMove && isMoveLegal(state, plan.defaultMove, wallSet)){
+        return { chosen: plan.defaultMove, reason: 'no_legal_peer_votes_default_yellow', plan, peer: {v2, v3, v2Legal, v3Legal} };
+      }
+      if (plan.obstacleOpenSet && plan.obstacleOpenSet.length){
+        return { chosen: plan.obstacleOpenSet[0], reason: 'no_legal_peer_votes_default_obstacle_open', plan, peer: {v2, v3, v2Legal, v3Legal} };
+      }
+      return { chosen: null, reason: 'no_legal_moves', plan, peer: {v2, v3, v2Legal, v3Legal} };
+    }
+
+    // 3) When votes are inconsistent:
+    //   - Follow the 2-block vote if available and legal
+    const redVote = (v2Legal && v2.type==='block' && v2.id==='red') ? v2 :
+                    (v3Legal && v3.type==='block' && v3.id==='red') ? v3 : null;
+    if (redVote){
+      return { chosen: redVote, reason: 'inconsistent_follow_red', plan, peer: {v2, v3, v2Legal, v3Legal} };
+    }
+
+    //   - If other votes are on one-person object, vote the remaining possibility from default algorithm
+    // Interpretation: "one-person object" = obstacles.
+    const peersOnOnePerson = (v2Legal && v2.type==='obstacle') || (v3Legal && v3.type==='obstacle');
+    if (peersOnOnePerson){
+      if (plan.defaultMove && isMoveLegal(state, plan.defaultMove, wallSet)){
+        return { chosen: plan.defaultMove, reason: 'inconsistent_peers_on_obstacles_use_default_yellow', plan, peer: {v2, v3, v2Legal, v3Legal} };
+      }
+      if (plan.obstacleOpenSet && plan.obstacleOpenSet.length){
+        return { chosen: plan.obstacleOpenSet[0], reason: 'inconsistent_peers_on_obstacles_use_default_obstacle_open', plan, peer: {v2, v3, v2Legal, v3Legal} };
+      }
+    }
+
+    //   - If no option is left, copy one of the vote
+    if (v2Legal) return { chosen: v2, reason: 'fallback_copy_v2', plan, peer: {v2, v3, v2Legal, v3Legal} };
+    if (v3Legal) return { chosen: v3, reason: 'fallback_copy_v3', plan, peer: {v2, v3, v2Legal, v3Legal} };
+
+    return { chosen: null, reason: 'no_legal_moves_after_fallbacks', plan, peer: {v2, v3, v2Legal, v3Legal} };
+  }
+
+  function runFollower(){
+    // ensure latest UI edits are captured
+    applyPeerVoteUIToState();
+    const res = chooseFollowerMove(S);
+
+    const lines = [];
+    lines.push('Follower decision');
+    lines.push(`reason: ${res.reason}`);
+    lines.push('');
+    lines.push('Peer votes:');
+    lines.push(`- p2: ${voteIsNone(res.peer.v2) ? '(no vote)' : voteKey(res.peer.v2)}  legal=${res.peer.v2Legal}`);
+    lines.push(`- p3: ${voteIsNone(res.peer.v3) ? '(no vote)' : voteKey(res.peer.v3)}  legal=${res.peer.v3Legal}`);
+    lines.push('');
+
+    lines.push('Default plan (computed first):');
+    if (res.plan.kind === 'yellow_move'){
+      const mv = res.plan.defaultMove;
+      lines.push(`- Yellow distance: ${res.plan.distBefore} -> ${res.plan.distAfter}`);
+      lines.push(`- Default move: ${mv ? voteKey(mv) : '(none: no downhill legal move)'}`);
+    } else {
+      lines.push('- Yellow has no legal path.');
+      lines.push(`- Obstacle-opening candidates: ${res.plan.obstacleOpenSet.length}`);
+      if (res.plan.obstacleOpenSet.length){
+        const top = res.plan.obstacleOpenSet.slice(0,4).map(v=>`${voteKey(v)} (yellowDist=${v.opensYellowDist})`);
+        lines.push('  Top candidates:');
+        for (const t of top) lines.push('  - ' + t);
+      }
+    }
+    lines.push('');
+
+    lines.push('Chosen action:');
+    lines.push(res.chosen ? `- ${voteKey(res.chosen)}` : '- (none)');
+    document.getElementById('followerOut').textContent = lines.join('\n');
+    LAST_FOLLOWER_CHOICE = res.chosen || null;
+    renderAll();
+    setStatus('Follower ran.');
+  }
+
+  document.getElementById('btnRunFollower').onclick = runFollower;
+
+  // Initialize IDs for vote dropdowns
+  function refreshVoteIds(){
+    const blocks = ['blue','red','yellow'];
+    const obsKeys = sortedObstacleKeys();
+    // Update ID lists based on current type selections
+    const p2t = document.getElementById('p2_type').value;
+    const p3t = document.getElementById('p3_type').value;
+    if (p2t === 'block') setSelectOptions(document.getElementById('p2_id'), blocks, S.peerVotes?.p2?.id);
+    if (p2t === 'obstacle') setSelectOptions(document.getElementById('p2_id'), obsKeys, S.peerVotes?.p2?.id);
+    if (p3t === 'block') setSelectOptions(document.getElementById('p3_id'), blocks, S.peerVotes?.p3?.id);
+    if (p3t === 'obstacle') setSelectOptions(document.getElementById('p3_id'), obsKeys, S.peerVotes?.p3?.id);
+    refreshPeerVoteUI();
+  }
+
+  // Ensure initial state / UI
+  ensurePeerVotes();
+  refreshVoteIds();
+  syncInputsFromState();
+  renderAll();
+  setStatus('Ready.');
+
+
+  // --- Peer vote UI handlers (enable selecting non-"no vote") ---
+  function onPeerTypeChanged(){
+    ensurePeerVotes();
+    S.peerVotes.p2.type = document.getElementById('p2_type').value;
+    S.peerVotes.p3.type = document.getElementById('p3_type').value;
+    refreshPeerVoteUI();
+    applyPeerVoteUIToState();
+    document.getElementById('txtState').value = JSON.stringify(S, null, 2);
+  }
+
+  document.getElementById('p2_type').addEventListener('change', onPeerTypeChanged);
+  document.getElementById('p3_type').addEventListener('change', onPeerTypeChanged);
+  document.getElementById('p2_id').addEventListener('change', onPeerVoteChanged);
+  document.getElementById('p2_dir').addEventListener('change', onPeerVoteChanged);
+  document.getElementById('p3_id').addEventListener('change', onPeerVoteChanged);
+  document.getElementById('p3_dir').addEventListener('change', onPeerVoteChanged);
+
+
+  // --- Buttons wiring already set above ---
+</script>
+</body>
+</html>

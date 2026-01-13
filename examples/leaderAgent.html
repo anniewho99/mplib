@@ -1,0 +1,941 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Block Puzzle Board Editor (UI only)</title>
+  <style>
+    html,body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:#0b0d10;color:#e7ebf0;}
+    .wrap{display:grid;grid-template-columns:1fr 600px;gap:16px;padding:16px;}
+    canvas{background:#20252b;border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.35);}
+    .panel{background:#11151a;border:1px solid #243040;border-radius:12px;padding:14px;}
+    .panel h2{margin:0 0 10px 0;font-size:16px;color:#bcd;}
+    .row{display:flex;gap:8px;align-items:center;margin:8px 0;flex-wrap:wrap;}
+    button{background:#1b2330;border:1px solid #2d3b50;color:#e7ebf0;padding:8px 10px;border-radius:8px;cursor:pointer;}
+    button:hover{background:#223044;}
+    input[type=number]{width:72px;background:#0f141a;color:#dfe6ef;border:1px solid #2a394d;border-radius:8px;padding:6px 8px;}
+    textarea{width:100%;height:210px;background:#0f141a;color:#dfe6ef;border:1px solid #2a394d;border-radius:8px;padding:8px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;}
+    .small{font-size:12px;color:#9bb;}
+    .pill{display:inline-block;padding:2px 6px;border:1px solid #2d3b50;border-radius:999px;font-size:12px;color:#9bb;}
+    .hr{height:1px;background:#243040;margin:12px 0;}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <canvas id="cv" width="820" height="820"></canvas>
+
+    <div class="panel">
+
+      <h2>Leader Action</h2>
+
+      <div class="small">This button will run the leader algorithm on the current board state. For now, it is a stub (no algorithm yet).</div>
+      <div class="row">
+        <button id="btnRunLeader">Run leader (stub)</button>
+      </div>
+      <pre id="leaderOut" style="white-space:pre-wrap;background:#0f141a;border:1px solid #2a394d;border-radius:8px;padding:8px;margin:0;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;color:#dfe6ef;max-height:160px;overflow:auto;">No output yet.</pre>
+
+      <div class="hr"></div>
+
+      <h2>Board Editor</h2>
+      <div class="small">Drag blocks/slots/obstacles on the board to reposition. Or type coordinates below. Movement rules will be added later.</div>
+
+      <div class="hr"></div>
+
+      <h2>Quick Inputs</h2>
+      <div class="row"><span class="pill">Blocks (3×3)</span></div>
+      <div class="row">
+        <b style="width:54px">Yellow</b>
+        x <input id="b_y_x" type="number" min="0" max="17" />
+        y <input id="b_y_y" type="number" min="0" max="17" />
+      </div>
+      <div class="row">
+        <b style="width:54px">Red</b>
+        x <input id="b_r_x" type="number" min="0" max="17" />
+        y <input id="b_r_y" type="number" min="0" max="17" />
+      </div>
+      <div class="row">
+        <b style="width:54px">Blue</b>
+        x <input id="b_b_x" type="number" min="0" max="17" />
+        y <input id="b_b_y" type="number" min="0" max="17" />
+      </div>
+
+      <div class="row" style="margin-top:10px"><span class="pill">Slots (3×3 outlines)</span></div>
+      <div class="row">
+        <b style="width:54px">Slot0</b>
+        x <input id="s0_x" type="number" min="0" max="17" />
+        y <input id="s0_y" type="number" min="0" max="17" />
+      </div>
+      <div class="row">
+        <b style="width:54px">Slot1</b>
+        x <input id="s1_x" type="number" min="0" max="17" />
+        y <input id="s1_y" type="number" min="0" max="17" />
+      </div>
+
+      <div class="row" style="margin-top:10px"><span class="pill">Obstacles (2×2)</span></div>
+      <div class="small" id="obsHelp">Edit obstacle positions here (or drag on the canvas). Movement legality is not implemented yet.</div>
+      <div id="obsList"></div>
+
+      <div class="hr"></div>
+
+      <div class="row">
+        <button id="btnApplyInputs">Apply inputs</button>
+        <button id="btnReset">Reset</button>
+        <button id="btnExport">Export JSON</button>
+      </div>
+
+      <div class="hr"></div>
+
+      <!-- <h2>Leader Action</h2>
+      <div class="small">This button will run the leader algorithm on the current board state. For now, it is a stub (no algorithm yet).</div>
+      <div class="row">
+        <button id="btnRunLeader">Run leader (stub)</button>
+      </div>
+      <pre id="leaderOut" style="white-space:pre-wrap;background:#0f141a;border:1px solid #2a394d;border-radius:8px;padding:8px;margin:0;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;color:#dfe6ef;max-height:160px;overflow:auto;">No output yet.</pre> -->
+
+<h2>State JSON</h2>
+      <textarea id="txtState"></textarea>
+      <div class="row">
+        <button id="btnLoadJSON">Load JSON</button>
+        <span class="small" id="lblStatus"></span>
+      </div>
+
+      <div class="small" style="margin-top:8px">Walls: the outermost 1-cell border is rendered as dark brown and treated as non-walkable later (for now it is just visual).</div>
+    </div>
+  </div>
+
+<script>
+  // --- Constants (match your existing visual setup) ---
+  const GRID = 18;          // board cells: 0..17
+  const BLOCK_SIZE = 3;
+  const OBS_SIZE = 2;
+  const CELL = 40;
+  const PADDING = 20;
+  const W = PADDING*2 + GRID*CELL;
+
+  const COLORS = {
+    yellow: '#f5e85a',
+    red:    '#e74c3c',
+    blue:   '#4285f4',
+    slot:   '#4da3ff',
+    obstacle: '#86efac',
+    obstacleImmovable: '#3a4048',
+    wall:   '#4a2c1a' // dark brown
+  };
+
+  const INITIAL = {
+    blocks: { blue:{x:9,y:9}, red:{x:7,y:0}, yellow:{x:0,y:9} },
+    slots:  { slot0:{x:2,y:5}, slot1:{x:15,y:5} },
+    obstacles: {
+      obs0:{x:8,y:4,id:'obs0', immovable:true},
+      obs1:{x:8,y:6,id:'obs1', immovable:true},
+      obs2:{x:5,y:4,id:'obs2', immovable:false},
+      obs3:{x:11,y:4,id:'obs3', immovable:false},
+    }
+  };
+
+  function deepCopy(o){ return JSON.parse(JSON.stringify(o)); }
+
+  // --- Canvas setup ---
+  const cv = document.getElementById('cv');
+  cv.width = W; cv.height = W;
+  const ctx = cv.getContext('2d');
+
+  function tlRect(x,y,sz){
+    return { x: PADDING + x*CELL, y: PADDING + y*CELL, w: sz*CELL, h: sz*CELL };
+  }
+
+  function drawGrid(){
+    ctx.clearRect(0,0,W,W);
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0,0,W,W);
+
+    // Walls: outermost 1-cell radius
+    ctx.fillStyle = COLORS.wall;
+    for (let x=0; x<GRID; x++){
+      // top row
+      ctx.fillRect(PADDING + x*CELL, PADDING + 0*CELL, CELL, CELL);
+      // bottom row
+      ctx.fillRect(PADDING + x*CELL, PADDING + (GRID-1)*CELL, CELL, CELL);
+    }
+    for (let y=0; y<GRID; y++){
+      // left col
+      ctx.fillRect(PADDING + 0*CELL, PADDING + y*CELL, CELL, CELL);
+      // right col
+      ctx.fillRect(PADDING + (GRID-1)*CELL, PADDING + y*CELL, CELL, CELL);
+    }
+
+    // Grid lines
+    ctx.strokeStyle = '#2d3642';
+    ctx.lineWidth = 1;
+    for (let i=0;i<=GRID;i++){
+      ctx.beginPath();
+      ctx.moveTo(PADDING+i*CELL, PADDING);
+      ctx.lineTo(PADDING+i*CELL, PADDING+GRID*CELL);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(PADDING, PADDING+i*CELL);
+      ctx.lineTo(PADDING+GRID*CELL, PADDING+i*CELL);
+      ctx.stroke();
+    }
+  }
+
+  function drawSlot(s){
+    const r = tlRect(s.x, s.y, BLOCK_SIZE);
+    ctx.lineWidth = 6;
+    ctx.strokeStyle = COLORS.slot;
+    ctx.strokeRect(r.x+2, r.y+2, r.w-4, r.h-4);
+  }
+
+  function hatchRect(r){
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(r.x, r.y, r.w, r.h);
+    ctx.clip();
+    ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+    ctx.lineWidth = 2;
+    for (let x=r.x-r.h; x<r.x+r.w; x+=8){
+      ctx.beginPath();
+      ctx.moveTo(x, r.y);
+      ctx.lineTo(x+r.h, r.y+r.h);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  function drawObstacle(ob){
+    const r = tlRect(ob.x, ob.y, OBS_SIZE);
+    ctx.fillStyle = ob.immovable ? COLORS.obstacleImmovable : COLORS.obstacle;
+    ctx.fillRect(r.x+2, r.y+2, r.w-4, r.h-4);
+    if (ob.immovable) hatchRect({x:r.x+2,y:r.y+2,w:r.w-4,h:r.h-4});
+
+    ctx.fillStyle = '#0d1320';
+    ctx.font = '700 12px ui-monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(ob.id, r.x+r.w/2, r.y+r.h/2);
+  }
+
+  function drawBlock(name, pos){
+    const r = tlRect(pos.x, pos.y, BLOCK_SIZE);
+    ctx.fillStyle = COLORS[name] || '#888';
+    ctx.fillRect(r.x+2, r.y+2, r.w-4, r.h-4);
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = '#1d2430';
+    ctx.strokeRect(r.x+1.5, r.y+1.5, r.w-3, r.h-3);
+
+    ctx.fillStyle = '#0d1320';
+    ctx.font = '700 18px ui-monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    const digit = name==='yellow' ? '1' : name==='red' ? '2' : '3';
+    ctx.fillText(digit, r.x+r.w/2, r.y+r.h/2);
+  }
+
+  function render(state){
+    drawGrid();
+    for (const s of Object.values(state.slots)) drawSlot(s);
+    for (const o of Object.values(state.obstacles)) drawObstacle(o);
+    for (const [name,pos] of Object.entries(state.blocks)) drawBlock(name, pos);
+  }
+
+  // --- UI state ---
+  let S = deepCopy(INITIAL);
+
+  function setStatus(msg){
+    document.getElementById('lblStatus').textContent = msg;
+  }
+
+  
+  function sortedObstacleKeys(){
+    return Object.keys(S.obstacles || {}).sort((a,b)=>{
+      const na = parseInt(String(a).replace(/\D+/g,'')) || 0;
+      const nb = parseInt(String(b).replace(/\D+/g,'')) || 0;
+      if (na!==nb) return na-nb;
+      return String(a).localeCompare(String(b));
+    });
+  }
+
+  function renderObstacleInputs(){
+    const wrap = document.getElementById('obsList');
+    if (!wrap) return;
+    wrap.innerHTML = '';
+    const keys = sortedObstacleKeys();
+    if (keys.length===0){
+      const div = document.createElement('div');
+      div.className = 'small';
+      div.textContent = 'No obstacles in state.';
+      wrap.appendChild(div);
+      return;
+    }
+    for (const k of keys){
+      const o = S.obstacles[k];
+      const row = document.createElement('div');
+      row.className = 'row';
+      row.style.alignItems = 'center';
+
+      const label = document.createElement('b');
+      label.style.width = '54px';
+      label.textContent = k;
+      row.appendChild(label);
+
+      row.appendChild(document.createTextNode('x '));
+      const ix = document.createElement('input');
+      ix.type = 'number'; ix.min = '0'; ix.max = String(GRID-1);
+      ix.id = `obs_${k}_x`;
+      ix.value = o.x;
+      row.appendChild(ix);
+
+      row.appendChild(document.createTextNode(' y '));
+      const iy = document.createElement('input');
+      iy.type = 'number'; iy.min = '0'; iy.max = String(GRID-1);
+      iy.id = `obs_${k}_y`;
+      iy.value = o.y;
+      row.appendChild(iy);
+
+      const immWrap = document.createElement('label');
+      immWrap.style.marginLeft = '10px';
+      immWrap.style.display = 'inline-flex';
+      immWrap.style.gap = '6px';
+      immWrap.style.alignItems = 'center';
+
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.id = `obs_${k}_imm`;
+      cb.checked = !!o.immovable;
+      immWrap.appendChild(cb);
+
+      const txt = document.createElement('span');
+      txt.className = 'small';
+      txt.textContent = 'immovable';
+      immWrap.appendChild(txt);
+
+      row.appendChild(immWrap);
+
+      wrap.appendChild(row);
+    }
+  }
+
+function syncInputsFromState(){
+    document.getElementById('b_y_x').value = S.blocks.yellow.x;
+    document.getElementById('b_y_y').value = S.blocks.yellow.y;
+    document.getElementById('b_r_x').value = S.blocks.red.x;
+    document.getElementById('b_r_y').value = S.blocks.red.y;
+    document.getElementById('b_b_x').value = S.blocks.blue.x;
+    document.getElementById('b_b_y').value = S.blocks.blue.y;
+
+    document.getElementById('s0_x').value = S.slots.slot0.x;
+    document.getElementById('s0_y').value = S.slots.slot0.y;
+    document.getElementById('s1_x').value = S.slots.slot1.x;
+    document.getElementById('s1_y').value = S.slots.slot1.y;
+
+    renderObstacleInputs();
+
+    document.getElementById('txtState').value = JSON.stringify(S, null, 2);
+  }
+
+  function applyInputsToState(){
+    const clamp = (v)=>Math.max(0, Math.min(GRID-1, v|0));
+
+    S.blocks.yellow.x = clamp(+document.getElementById('b_y_x').value);
+    S.blocks.yellow.y = clamp(+document.getElementById('b_y_y').value);
+    S.blocks.red.x    = clamp(+document.getElementById('b_r_x').value);
+    S.blocks.red.y    = clamp(+document.getElementById('b_r_y').value);
+    S.blocks.blue.x   = clamp(+document.getElementById('b_b_x').value);
+    S.blocks.blue.y   = clamp(+document.getElementById('b_b_y').value);
+
+    S.slots.slot0.x = clamp(+document.getElementById('s0_x').value);
+    S.slots.slot0.y = clamp(+document.getElementById('s0_y').value);
+    S.slots.slot1.x = clamp(+document.getElementById('s1_x').value);
+    S.slots.slot1.y = clamp(+document.getElementById('s1_y').value);
+
+    document.getElementById('txtState').value = JSON.stringify(S, null, 2);
+    
+    // Obstacles (2x2)
+    for (const k of sortedObstacleKeys()){
+      const ox = document.getElementById(`obs_${k}_x`);
+      const oy = document.getElementById(`obs_${k}_y`);
+      const oc = document.getElementById(`obs_${k}_imm`);
+      if (!ox || !oy) continue;
+      S.obstacles[k].x = clamp(+ox.value);
+      S.obstacles[k].y = clamp(+oy.value);
+      if (oc) S.obstacles[k].immovable = !!oc.checked;
+    }
+
+render(S);
+    setStatus('Applied inputs.');
+  }
+
+  // --- Dragging ---
+  function mouseToCell(evt){
+    const r = cv.getBoundingClientRect();
+    const mx = evt.clientX - r.left;
+    const my = evt.clientY - r.top;
+    const x = (mx - PADDING) / CELL;
+    const y = (my - PADDING) / CELL;
+    return { x, y, mx, my };
+  }
+
+  function hitTest(state, cellX, cellY){
+    const hits = [];
+    // blocks
+    for (const [name,p] of Object.entries(state.blocks)){
+      if (cellX >= p.x && cellX < p.x + BLOCK_SIZE && cellY >= p.y && cellY < p.y + BLOCK_SIZE){
+        hits.push({type:'block', id:name, size:BLOCK_SIZE, x:p.x, y:p.y});
+      }
+    }
+    // slots
+    for (const [sid,s] of Object.entries(state.slots)){
+      if (cellX >= s.x && cellX < s.x + BLOCK_SIZE && cellY >= s.y && cellY < s.y + BLOCK_SIZE){
+        hits.push({type:'slot', id:sid, size:BLOCK_SIZE, x:s.x, y:s.y});
+      }
+    }
+    // obstacles
+    for (const [oid,o] of Object.entries(state.obstacles)){
+      if (cellX >= o.x && cellX < o.x + OBS_SIZE && cellY >= o.y && cellY < o.y + OBS_SIZE){
+        hits.push({type:'obstacle', id:oid, size:OBS_SIZE, x:o.x, y:o.y});
+      }
+    }
+    // prefer smaller (obstacle) and later draws (blocks above)
+    hits.sort((a,b)=>a.size-b.size);
+    return hits[hits.length-1] || null;
+  }
+
+  let drag = null;
+
+  cv.addEventListener('mousedown', (evt)=>{
+    const m = mouseToCell(evt);
+    const cellX = Math.floor(m.x);
+    const cellY = Math.floor(m.y);
+    const h = hitTest(S, cellX, cellY);
+    if (!h) return;
+
+    drag = {
+      type: h.type,
+      id: h.id,
+      size: h.size,
+      offX: m.x - h.x,
+      offY: m.y - h.y
+    };
+  });
+
+  window.addEventListener('mousemove', (evt)=>{
+    if (!drag) return;
+    const m = mouseToCell(evt);
+    const nx = Math.round(m.x - drag.offX);
+    const ny = Math.round(m.y - drag.offY);
+
+    const clampedX = Math.max(0, Math.min(GRID-1, nx));
+    const clampedY = Math.max(0, Math.min(GRID-1, ny));
+
+    if (drag.type==='block'){
+      S.blocks[drag.id].x = clampedX;
+      S.blocks[drag.id].y = clampedY;
+    } else if (drag.type==='slot'){
+      S.slots[drag.id].x = clampedX;
+      S.slots[drag.id].y = clampedY;
+    } else {
+      S.obstacles[drag.id].x = clampedX;
+      S.obstacles[drag.id].y = clampedY;
+    }
+    render(S);
+  });
+
+  window.addEventListener('mouseup', ()=>{
+    if (!drag) return;
+    drag = null;
+    syncInputsFromState();
+    setStatus('Dragged and updated JSON.');
+  });
+
+  // --- Buttons ---
+  document.getElementById('btnApplyInputs').onclick = applyInputsToState;
+  document.getElementById('btnReset').onclick = ()=>{
+    S = deepCopy(INITIAL);
+    syncInputsFromState();
+    render(S);
+    setStatus('Reset.');
+  };
+  document.getElementById('btnExport').onclick = ()=>{
+    document.getElementById('txtState').value = JSON.stringify(S, null, 2);
+    document.getElementById('txtState').select();
+    document.execCommand('copy');
+    setStatus('Copied JSON to clipboard.');
+  };
+  document.getElementById('btnLoadJSON').onclick = ()=>{
+    try{
+      const txt = document.getElementById('txtState').value;
+      const parsed = JSON.parse(txt);
+      // minimal validation
+      if (!parsed.blocks || !parsed.slots || !parsed.obstacles) throw new Error('JSON must contain blocks, slots, obstacles');
+      S = parsed;
+      syncInputsFromState();
+      render(S);
+      setStatus('Loaded JSON.');
+    }catch(e){
+      setStatus('JSON error: ' + e.message);
+    }
+  };
+
+
+  // --- Leader diagnostic (no action selection yet) ---
+// Computes whether movable obstacles are currently affecting shortest paths from blocks to slots.
+// Outputs: needs_obstacle_clearing + affected blocks, plus optional obstacle attribution.
+function runLeaderDiagnostic(){
+  const snapshot = JSON.parse(JSON.stringify(S));
+
+  // ----- Walls -----
+  // Current UI renders an outer wall ring (row/col 0 and GRID-1). We treat it as blocked cells here.
+  // If you later add internal walls, store them as snapshot.walls = [{x,y}, ...] and they will be included.
+  const wallSet = new Set();
+  // outer ring
+  for (let x=0; x<GRID; x++){
+    wallSet.add(`${x},0`);
+    wallSet.add(`${x},${GRID-1}`);
+  }
+  for (let y=0; y<GRID; y++){
+    wallSet.add(`0,${y}`);
+    wallSet.add(`${GRID-1},${y}`);
+  }
+  // optional internal walls
+  if (Array.isArray(snapshot.walls)){
+    for (const w of snapshot.walls){
+      if (w && Number.isFinite(w.x) && Number.isFinite(w.y)){
+        wallSet.add(`${w.x|0},${w.y|0}`);
+      }
+    }
+  }
+
+  // ----- Helpers -----
+  const inBoundsTL = (x,y,sz)=> (x>=0 && y>=0 && (x+sz)<=GRID && (y+sz)<=GRID);
+
+  const rectOverlap = (ax,ay,asz, bx,by,bsz)=>
+    (ax < bx + bsz && bx < ax + asz && ay < by + bsz && by < ay + asz);
+
+  const footprintHitsWalls = (tlx,tly,sz)=>{
+    for (let dy=0; dy<sz; dy++){
+      for (let dx=0; dx<sz; dx++){
+        if (wallSet.has(`${tlx+dx},${tly+dy}`)) return true;
+      }
+    }
+    return false;
+  };
+
+  const obstaclesArr = Object.values(snapshot.obstacles || {});
+  const immObs = obstaclesArr.filter(o=>!!o.immovable);
+  const movObs = obstaclesArr.filter(o=>!o.immovable);
+
+  const slotsArr = Object.values(snapshot.slots || {});
+
+  // TL lattice for 3x3 blocks
+  const TL_W = GRID - BLOCK_SIZE + 1;
+  const TL_H = GRID - BLOCK_SIZE + 1;
+  const INF = 1e9;
+
+  function okBlockTL(x,y, includeMovables){
+    if (!inBoundsTL(x,y,BLOCK_SIZE)) return false;
+    if (footprintHitsWalls(x,y,BLOCK_SIZE)) return false;
+    for (const o of immObs){
+      if (rectOverlap(x,y,BLOCK_SIZE, o.x,o.y,OBS_SIZE)) return false;
+    }
+    if (includeMovables){
+      for (const o of movObs){
+        if (rectOverlap(x,y,BLOCK_SIZE, o.x,o.y,OBS_SIZE)) return false;
+      }
+    }
+    return true;
+  }
+
+  // Multi-source BFS from slot TLs
+  function bfs(includeMovables){
+    const dist = Array.from({length: TL_H}, ()=>Array(TL_W).fill(INF));
+    const qx = new Array(TL_W*TL_H);
+    const qy = new Array(TL_W*TL_H);
+    let head=0, tail=0;
+
+    for (const sl of slotsArr){
+      const sx = sl.x|0, sy = sl.y|0;
+      if (sx<0 || sy<0 || sx>=TL_W || sy>=TL_H) continue;
+      if (!okBlockTL(sx,sy, includeMovables)) continue;
+      if (dist[sy][sx] !== 0){
+        dist[sy][sx] = 0;
+        qx[tail]=sx; qy[tail]=sy; tail++;
+      }
+    }
+
+    const DX=[0,0,-1,1], DY=[-1,1,0,0];
+    while (head<tail){
+      const x=qx[head], y=qy[head]; head++;
+      const nd = dist[y][x] + 1;
+      for (let k=0;k<4;k++){
+        const nx=x+DX[k], ny=y+DY[k];
+        if (nx<0 || ny<0 || nx>=TL_W || ny>=TL_H) continue;
+        if (!okBlockTL(nx,ny, includeMovables)) continue;
+        if (dist[ny][nx] <= nd) continue;
+        dist[ny][nx] = nd;
+        qx[tail]=nx; qy[tail]=ny; tail++;
+      }
+    }
+    return dist;
+  }
+
+  const D_imm = bfs(false);
+  const D_all = bfs(true);
+
+  // ---------------- Obstacle move suggestion (bounded <= 2 moves) ----------------
+  // Without a small move-depth bound, deciding how to reposition obstacles becomes a general planning
+  // problem (large branching over obstacles × directions × time). With the "<=2 moves" assumption,
+  // we can cheaply brute-force the best 1-step and 2-step obstacle adjustments using BFS rescoring.
+
+  const DIRS = [
+    {name:'up',dx:0,dy:-1},
+    {name:'down',dx:0,dy:1},
+    {name:'left',dx:-1,dy:0},
+    {name:'right',dx:1,dy:0},
+  ];
+
+  function obstaclesAsArray(state){
+    return Object.values(state.obstacles || {});
+  }
+
+  function findObstacleById(state, id){
+    for (const [k,o] of Object.entries(state.obstacles || {})){
+      if ((o.id ?? k) === id) return { key:k, obj:o };
+    }
+    return null;
+  }
+
+  function isObstacleMoveLegal(state, obsKey, dir){
+    const o = state.obstacles?.[obsKey];
+    if (!o) return {ok:false, reason:`Missing obstacle ${obsKey}`};
+    if (o.immovable) return {ok:false, reason:`${obsKey} is immovable`};
+
+    const nx = (o.x|0) + dir.dx;
+    const ny = (o.y|0) + dir.dy;
+    if (!inBoundsTL(nx, ny, OBS_SIZE)) return {ok:false, reason:'Out of bounds'};
+    if (footprintHitsWalls(nx, ny, OBS_SIZE)) return {ok:false, reason:'Hits wall'};
+
+    // collide with other obstacles
+    for (const [k2,o2] of Object.entries(state.obstacles || {})){
+      if (k2 === obsKey) continue;
+      if (rectOverlap(nx,ny,OBS_SIZE, o2.x|0,o2.y|0,OBS_SIZE)) return {ok:false, reason:`Hits obstacle ${k2}`};
+    }
+    // collide with blocks (treat blocks as stationary footprints)
+    for (const [bn,b] of Object.entries(state.blocks || {})){
+      if (rectOverlap(nx,ny,OBS_SIZE, b.x|0,b.y|0,BLOCK_SIZE)) return {ok:false, reason:`Hits block ${bn}`};
+    }
+    return {ok:true, reason:'OK'};
+  }
+
+  function applyObstacleMove(state, obsKey, dir){
+    const t = JSON.parse(JSON.stringify(state));
+    t.obstacles[obsKey].x = (t.obstacles[obsKey].x|0) + dir.dx;
+    t.obstacles[obsKey].y = (t.obstacles[obsKey].y|0) + dir.dy;
+    return t;
+  }
+
+  function computeDAllFor(stateX){
+    const obsArr = obstaclesAsArray(stateX);
+    const immX = obsArr.filter(o=>!!o.immovable);
+    const movX = obsArr.filter(o=>!o.immovable);
+
+    function okTL_X(x,y){
+      if (!inBoundsTL(x,y,BLOCK_SIZE)) return false;
+      if (footprintHitsWalls(x,y,BLOCK_SIZE)) return false;
+      for (const o of immX){
+        if (rectOverlap(x,y,BLOCK_SIZE, o.x|0,o.y|0,OBS_SIZE)) return false;
+      }
+      for (const o of movX){
+        if (rectOverlap(x,y,BLOCK_SIZE, o.x|0,o.y|0,OBS_SIZE)) return false;
+      }
+      return true;
+    }
+
+    const dist = Array.from({length: TL_H}, ()=>Array(TL_W).fill(INF));
+    const qx = new Array(TL_W*TL_H);
+    const qy = new Array(TL_W*TL_H);
+    let head=0, tail=0;
+
+    for (const sl of Object.values(stateX.slots || {})){
+      const sx = sl.x|0, sy = sl.y|0;
+      if (sx<0 || sy<0 || sx>=TL_W || sy>=TL_H) continue;
+      if (!okTL_X(sx,sy)) continue;
+      if (dist[sy][sx] !== 0){
+        dist[sy][sx] = 0;
+        qx[tail]=sx; qy[tail]=sy; tail++;
+      }
+    }
+
+    const DX=[0,0,-1,1], DY=[-1,1,0,0];
+    while (head<tail){
+      const x=qx[head], y=qy[head]; head++;
+      const nd = dist[y][x] + 1;
+      for (let k=0;k<4;k++){
+        const nx=x+DX[k], ny=y+DY[k];
+        if (nx<0 || ny<0 || nx>=TL_W || ny>=TL_H) continue;
+        if (!okTL_X(nx,ny)) continue;
+        if (dist[ny][nx] <= nd) continue;
+        dist[ny][nx] = nd;
+        qx[tail]=nx; qy[tail]=ny; tail++;
+      }
+    }
+    return dist;
+  }
+
+  function scoreStateAgainstBaseline(stateX, baselineDAll, blocksToScore){
+    const D = computeDAllFor(stateX);
+    const INF_WIN = 1000;
+    let score = 0;
+    const per = {};
+
+    for (const bn of blocksToScore){
+      const b = stateX.blocks?.[bn];
+      if (!b) continue;
+      const before = getDist(baselineDAll, b.x|0, b.y|0);
+      const after  = getDist(D,             b.x|0, b.y|0);
+
+      let imp = 0;
+      if (before>=INF && after<INF) imp = INF_WIN;
+      else if (before<INF && after<INF) imp = Math.max(0, before-after);
+      else imp = 0;
+
+      score += imp;
+      per[bn] = { before: (before>=INF? null: before), after: (after>=INF? null: after), improvement: imp };
+    }
+    return { score, perBlock: per };
+  }
+
+  function suggestObstaclePlan(affectedEntries){
+    // Candidate obstacles: union of blockers for affected blocks; fallback to all movables.
+    const candidateIds = new Set();
+    for (const e of affectedEntries){
+      for (const oid of (e.blockingObstacles || [])) candidateIds.add(oid);
+    }
+
+    const movableKeys = Object.entries(snapshot.obstacles || {})
+      .filter(([k,o])=>!o.immovable)
+      .map(([k,o])=>({key:k, id:o.id ?? k}));
+
+    let candidateKeys = movableKeys.filter(o=>candidateIds.has(o.id)).map(o=>o.key);
+    if (candidateKeys.length===0) candidateKeys = movableKeys.map(o=>o.key);
+
+    const blocksToScore = affectedEntries.map(e=>e.block);
+    const baseline = D_all;
+
+    let best = null;
+
+    // 1-step
+    for (const ok of candidateKeys){
+      for (const d1 of DIRS){
+        const c1 = isObstacleMoveLegal(snapshot, ok, d1);
+        if (!c1.ok) continue;
+        const s1 = applyObstacleMove(snapshot, ok, d1);
+        const r1 = scoreStateAgainstBaseline(s1, baseline, blocksToScore);
+        const cand = { obstacle: ok, steps:[d1.name], score:r1.score, perBlock:r1.perBlock };
+        if (!best || cand.score > best.score) best = cand;
+      }
+    }
+
+    // 2-step (same obstacle, as per your "at most twice" assumption)
+    for (const ok of candidateKeys){
+      for (const d1 of DIRS){
+        const c1 = isObstacleMoveLegal(snapshot, ok, d1);
+        if (!c1.ok) continue;
+        const s1 = applyObstacleMove(snapshot, ok, d1);
+        for (const d2 of DIRS){
+          const c2 = isObstacleMoveLegal(s1, ok, d2);
+          if (!c2.ok) continue;
+          const s2 = applyObstacleMove(s1, ok, d2);
+          const r2 = scoreStateAgainstBaseline(s2, baseline, blocksToScore);
+          const cand = { obstacle: ok, steps:[d1.name, d2.name], score:r2.score, perBlock:r2.perBlock };
+          if (!best || cand.score > best.score) best = cand;
+        }
+      }
+    }
+
+    return best;
+  }
+
+  function getDist(D, x,y){
+    if (x<0 || y<0 || x>=TL_W || y>=TL_H) return INF;
+    return D[y][x];
+  }
+
+  // Optional: reconstruct an "ideal" shortest path under D_imm and attribute blocking movable obstacles.
+  function reconstructPathAndBlockers(blockTL){
+    const {x:bx, y:by} = blockTL;
+    let d = getDist(D_imm, bx, by);
+    if (d>=INF) return { path: [], blockers: [] };
+
+    const path = [{x:bx,y:by}];
+    const blockers = new Set();
+    const DX=[0,0,-1,1], DY=[-1,1,0,0];
+
+    let cx=bx, cy=by;
+    let guard = 0;
+    while (d>0 && guard++ < 512){
+      // record blockers at current TL along ideal path
+      for (const o of movObs){
+        if (rectOverlap(cx,cy,BLOCK_SIZE, o.x,o.y,OBS_SIZE)) blockers.add(o.id ?? '(unnamed)');
+      }
+      // step downhill
+      let stepped = false;
+      for (let k=0;k<4;k++){
+        const nx=cx+DX[k], ny=cy+DY[k];
+        if (nx<0 || ny<0 || nx>=TL_W || ny>=TL_H) continue;
+        if (getDist(D_imm,nx,ny) === d-1){
+          cx=nx; cy=ny; d=d-1;
+          path.push({x:cx,y:cy});
+          stepped = true;
+          break;
+        }
+      }
+      if (!stepped) break; // cannot follow downhill (should be rare)
+    }
+    // include blockers at final cell
+    for (const o of movObs){
+      if (rectOverlap(cx,cy,BLOCK_SIZE, o.x,o.y,OBS_SIZE)) blockers.add(o.id ?? '(unnamed)');
+    }
+
+    return { path, blockers: Array.from(blockers) };
+  }
+
+  // ----- Compute affected blocks -----
+  const affected = [];
+  const perBlock = [];
+
+  for (const [name,b] of Object.entries(snapshot.blocks || {})){
+    const bx = b.x|0, by = b.y|0;
+    const di = getDist(D_imm, bx, by);
+    const da = getDist(D_all, bx, by);
+
+    let status = "ok";
+    if (da>=INF && di<INF) status = "blocked_by_movable";
+    else if (da>di) status = "detour_due_to_movable";
+    else if (di>=INF && da>=INF) status = "unreachable_even_ignoring_movable";
+
+    const entry = { block:name, TL:{x:bx,y:by}, D_imm:di>=INF?null:di, D_all:da>=INF?null:da, status };
+
+    if (status==="blocked_by_movable" || status==="detour_due_to_movable"){
+      const attrib = reconstructPathAndBlockers({x:bx,y:by});
+      entry.blockingObstacles = attrib.blockers;
+      affected.push(entry);
+    }
+    perBlock.push(entry);
+  }
+
+  const needs = affected.length>0;
+
+  // ----- Output -----
+  const lines = [];
+  lines.push("Leader diagnostic (one-step policy; no full round planning).");
+  lines.push(`needs_obstacle_clearing: ${needs ? "YES" : "NO"}`);
+  lines.push("");
+
+  lines.push("Per-block distances (steps on TL grid):");
+  for (const e of perBlock){
+    const di = (e.D_imm===null ? "INF" : e.D_imm);
+    const da = (e.D_all===null ? "INF" : e.D_all);
+    lines.push(`- ${e.block}: D_imm=${di}, D_all=${da}  => ${e.status}`);
+  }
+
+  // ---------------- If obstacles are needed: output first obstacle-move path ----------------
+  if (needs){
+    lines.push("");
+    lines.push("Affected blocks (movable obstacles are currently impacting shortest paths):");
+    for (const e of affected){
+      const obs = (e.blockingObstacles && e.blockingObstacles.length)
+        ? e.blockingObstacles.join(", ")
+        : "(no specific movable obstacle intersected the ideal path; may be indirect detour)";
+      lines.push(`- ${e.block}: ${e.status}; blocking obstacles: ${obs}`);
+    }
+
+    // Suggest an obstacle move plan (<=2 steps) that improves D_all for the affected blocks.
+    const plan = suggestObstaclePlan(affected);
+    lines.push("");
+    lines.push("Obstacle handling plan (bounded <=2 moves; heuristic):");
+    if (!plan || plan.score <= 0){
+      lines.push("- No beneficial 1–2 step obstacle move found under the current scoring." );
+      lines.push("- Chosen step: (none)");
+    } else {
+      lines.push(`- Planned path: move ${plan.obstacle} ${plan.steps.join(" then ")}`);
+      lines.push(`- Chosen first step: move ${plan.obstacle} ${plan.steps[0]}`);
+      lines.push("- Expected distances for affected blocks (D_all):");
+      for (const [bn,info] of Object.entries(plan.perBlock)){
+        const b0 = (info.before===null ? "INF" : info.before);
+        const b1 = (info.after===null ? "INF" : info.after);
+        lines.push(`  • ${bn}: ${b0} → ${b1} (improvement=${info.improvement})`);
+      }
+    }
+  } else {
+    // ---------------- No obstacle clearing needed: move a 2-cost (red) or 3-cost (blue) block ----------------
+    // Policy (one-step): choose the first downhill TL step (w.r.t. D_all) for red; if none, try blue.
+    // Additionally require that the destination is not blocked by other blocks (and does not hit walls/obstacles).
+
+    function canPlaceBlockAt(x,y,selfName){
+      if (!inBoundsTL(x,y,BLOCK_SIZE)) return false;
+      if (footprintHitsWalls(x,y,BLOCK_SIZE)) return false;
+
+      // obstacles (immovable + movable)
+      for (const o of immObs){
+        if (rectOverlap(x,y,BLOCK_SIZE, o.x|0,o.y|0,OBS_SIZE)) return false;
+      }
+      for (const o of movObs){
+        if (rectOverlap(x,y,BLOCK_SIZE, o.x|0,o.y|0,OBS_SIZE)) return false;
+      }
+
+      // other blocks (treat locked blocks as non-colliding if present; editor state may not include locked)
+      for (const [bn,b] of Object.entries(snapshot.blocks || {})){
+        if (bn === selfName) continue;
+        if (b && b.locked) continue;
+        if (rectOverlap(x,y,BLOCK_SIZE, b.x|0,b.y|0,BLOCK_SIZE)) return false;
+      }
+      return true;
+    }
+
+    function chooseDownhillStep(blockName){
+      const b = snapshot.blocks?.[blockName];
+      if (!b) return null;
+      const x = b.x|0, y = b.y|0;
+      const d0 = getDist(D_all, x, y);
+      if (d0 >= INF) return null;
+
+      let best = null;
+      for (const d of DIRS){
+        const nx = x + d.dx, ny = y + d.dy;
+        const d1 = getDist(D_all, nx, ny);
+        if (d1 >= d0) continue;            // must be downhill (strict improvement)
+        if (!canPlaceBlockAt(nx, ny, blockName)) continue;
+        if (!best || d1 < best.d1){
+          best = { block:blockName, step:d.name, from:{x,y}, to:{x:nx,y:ny}, d0, d1 };
+        }
+      }
+      return best;
+    }
+
+    const pick = chooseDownhillStep('blue') || chooseDownhillStep('red');
+
+    lines.push("");
+    lines.push("No obstacle clearing needed. Block-move policy:");
+    if (!pick){
+      lines.push("- Chosen step: (none)  [No downhill, unblocked move found for red or blue]");
+    } else {
+      lines.push(`- Chosen step: move ${pick.block} ${pick.step}  (D_all ${pick.d0} → ${pick.d1})`);
+      lines.push(`- From TL=(${pick.from.x},${pick.from.y}) to TL=(${pick.to.x},${pick.to.y})`);
+    }
+  }
+
+  lines.push("");
+  lines.push("Snapshot (for reproducibility):");
+  lines.push(JSON.stringify(snapshot, null, 2));
+
+  document.getElementById('leaderOut').textContent = lines.join("\n");
+  setStatus('Leader diagnostic executed (first step chosen).');
+}
+document.getElementById('btnRunLeader').onclick = runLeaderDiagnostic;
+
+  // --- Init ---
+  syncInputsFromState();
+  render(S);
+  setStatus('Ready.');
+</script>
+</body>
+</html>
