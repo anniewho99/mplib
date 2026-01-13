@@ -928,7 +928,7 @@ function getNumPlayersFromURL() {
   return isNaN(num) ? 5 : Math.max(2, Math.min(num, 5)); // default to 5, clamp between 2–5
 }
 
-let GameName = "0112";
+let GameName = "noCommDataCollection";
 let NumPlayers = 3;
 let MinPlayers = NumPlayers;
 let MaxPlayers = NumPlayers;
@@ -997,7 +997,7 @@ let funList = {
 };
 
 // List the node names where we place listeners for any changes to the children of these nodes; set to '' if listening to changes for children of the root
-let listenerPaths = [ 'players', 'blocks', 'slots', 'obs', 'phase', 'moveBlock', 'level', 'localT', 'condition' ];
+let listenerPaths = [ 'players', 'blocks', 'slots', 'obs', 'phase', 'moveBlock', 'level', 'localT' ];
 
 //  Initialize the Game Session with all Configs
 initializeMPLIB( sessionConfig , studyId , funList, listenerPaths, verbosity );
@@ -1025,11 +1025,26 @@ let eventNumber = 1;
 
 let completedLevel = false;
 
-function conditionSelector() {
-  const sequences = ['abcd', 'cdab', 'bcda', 'dabc'];
-  const idx = Math.floor(Math.random() * sequences.length);
-  return sequences[idx];
+let assigendCondition;
+
+function getForcedConditionFromURL() {
+  const cond = new URLSearchParams(window.location.search).get('cond');
+  const allowed = new Set(['abcd', 'cdab', 'bcda', 'dabc']);
+  return allowed.has(cond) ? cond : null;
 }
+
+function applyCondition(cond) {
+  assigendCondition = cond;
+  console.log('assigned condition is', assigendCondition);
+  if (cond === 'abcd') levelPlacements = abcd;
+  else if (cond === 'cdab') levelPlacements = cdab;
+  else if (cond === 'bcda') levelPlacements = bcda;
+  else if (cond === 'dabc') levelPlacements = dabc;
+  else levelPlacements = null;
+}
+
+const forced = getForcedConditionFromURL();
+
 let levelPlacements;
 //abcd levelPlacements
 const abcd = {
@@ -1345,6 +1360,243 @@ const dabc = {
     }
 },
 };
+
+
+applyCondition(forced);
+//cdab
+// const levelPlacements = {
+//   0: {
+//     blocks: {
+//         red: { x: 4, y: 6, color: 'red', minVotes: 2},
+//         yellow: { x: 1, y: 10, color: 'yellow', minVotes: 1 }
+//     },
+//     slots: {
+//         slot0: { x: 6, y: 1 }
+//     },
+//     obstacles: {
+//       obs0:{x:5,y:4,id:'obs0', immovable:true},
+//       obs1:{x:7,y:6,id:'obs1', immovable:true},
+//       obs2:{x:10,y:6,id:'obs2', immovable:true},
+//       obs3:{x:13,y:6,id:'obs3', immovable:true},
+//       obs4:{x:2,y:3,id:'obs4'},
+//       obs5:{x:2,y:6,id:'obs5'},
+//     }
+// },
+//   1: {
+//     blocks: {
+//         red: { x: 4, y: 6, color: 'red', minVotes: 2 },
+//         yellow: { x: 1, y: 10, color: 'yellow', minVotes: 1 }
+//     },
+//     slots: {
+//       slot0: { x: 6, y: 1 }
+//     },
+//     obstacles: {
+//       obs0:{x:5,y:4,id:'obs0', immovable:true},
+//       obs1:{x:7,y:6,id:'obs1', immovable:true},
+//       obs2:{x:10,y:6,id:'obs2', immovable:true},
+//       obs3:{x:13,y:6,id:'obs3', immovable:true},
+//       obs4:{x:2,y:3,id:'obs4'},
+//       obs5:{x:2,y:6,id:'obs5'},
+//     }
+// },
+// //   2: {
+// //           blocks: {
+// //               blue: { x: 10, y: 10, color: 'blue', minVotes: 3 },
+// //               red: { x: 8, y: 1, color: 'red', minVotes: 2},
+// //               yellow: { x: 1, y: 10, color: 'yellow', minVotes: 1 }
+// //           },
+// //           slots: {
+// //               slot0: { x: 3, y: 6 },
+// //               slot1: { x: 16, y: 6 }
+// //           },
+// //           obstacles: {
+// //               obs0:{x:9,y:5,id:'obs0', immovable:true},
+// //               obs1:{x:9,y:7,id:'obs1', immovable:true},
+// //               obs2:{x:6,y:5,id:'obs2'},
+// //               obs3:{x:12,y:5,id:'obs3'},
+// //           }
+// //     },
+// //   3: {
+// //     blocks: {
+// //         blue: { x: 12, y: 10, color: 'blue', minVotes: 3 },
+// //         red: { x: 9, y: 1, color: 'red', minVotes: 2},
+// //         yellow: { x: 2, y: 10, color: 'yellow', minVotes: 1 }
+// //     },
+// //     slots: {
+// //         slot0: { x: 3, y: 4 },
+// //         slot1: { x: 15, y: 4 }
+// //     },
+// //     obstacles: {
+// //         obs0: { x: 6, y: 6, id: 'obs0', immovable: true  },
+// //         obs1: { x: 8, y: 4, id: 'obs1', immovable: true},
+// //         obs2: { x: 12, y: 5, id: 'obs2', immovable: true  },
+// //         obs3: { x: 10, y: 7, id: 'obs3', immovable: true},
+// //         obs4: { x: 14, y: 7, id: 'obs4', immovable: true },
+// //         obs5: { x: 3, y: 1, id: 'obs5'},
+// //         obs6: { x: 3, y: 7, id: 'obs6'},
+// //         obs7: { x: 10, y: 10, id: 'obs7'}
+// //     }
+// //  },
+// };
+
+// // //bcda
+// const levelPlacements = {
+//   0: {
+//     blocks: {
+//         blue: { x: 12, y: 10, color: 'blue', minVotes: 3 },
+//         red: { x: 9, y: 1, color: 'red', minVotes: 2},
+//         yellow: { x: 2, y: 10, color: 'yellow', minVotes: 1 }
+//     },
+//     slots: {
+//         slot0: { x: 3, y: 4 },
+//         slot1: { x: 15, y: 4 }
+//     },
+//     obstacles: {
+//         obs0: { x: 6, y: 6, id: 'obs0', immovable: true  },
+//         obs1: { x: 8, y: 4, id: 'obs1', immovable: true},
+//         obs2: { x: 12, y: 5, id: 'obs2', immovable: true  },
+//         obs3: { x: 10, y: 7, id: 'obs3', immovable: true},
+//         obs4: { x: 14, y: 7, id: 'obs4', immovable: true },
+//         obs5: { x: 3, y: 1, id: 'obs5'},
+//         obs6: { x: 3, y: 7, id: 'obs6'},
+//         obs7: { x: 10, y: 10, id: 'obs7'}
+//     }
+//  },
+//   1: {
+//     blocks: {
+//         blue: { x: 16, y: 9, color: 'blue', minVotes: 3 },
+//         red: { x: 6, y: 1, color: 'red', minVotes: 2},
+//         yellow: { x: 6, y: 9, color: 'yellow', minVotes: 1 }
+//     },
+//     slots: {
+//         slot0: { x: 1, y: 6 },
+//         slot1: { x: 9, y: 5 }
+//     },
+//     obstacles: {
+//         obs0: { x: 3, y: 10, id: 'obs0', immovable: true  },
+//         obs1: { x: 13, y: 6, id: 'obs1', immovable: true},
+//         obs2: { x: 2, y: 3, id: 'obs2'},
+//         obs3: { x: 6, y: 6, id: 'obs3'},
+//         obs4: { x: 10, y: 9, id: 'obs4'}
+//     }
+// },
+//   2: {
+//     blocks: {
+//         blue: { x: 9, y: 4, color: 'blue', minVotes: 3 },
+//         red: { x: 7, y: 1, color: 'red', minVotes: 2 },
+//         yellow: { x: 11, y: 1, color: 'yellow', minVotes: 1 }
+//     },
+//     slots: {
+//         slot0: { x: 3, y: 5 },
+//         slot1: { x: 14, y: 5 }
+//     },
+//     obstacles: {
+//         obs0: { x: 6, y: 4, id: 'obs0', immovable: true  },
+//         obs1: { x: 3, y: 2, id: 'obs1', immovable: true},
+//         obs3: { x: 6, y: 8, id: 'obs3'},
+//         obs4: { x: 15, y: 1, id: 'obs4' },
+//         obs2: { x: 12, y: 4, id: 'obs2', immovable: true  },
+//         obs5: { x: 12, y: 8, id: 'obs5'}
+//     }
+// },
+//   3: {
+//     blocks: {
+//         blue: { x: 10, y: 10, color: 'blue', minVotes: 3 },
+//         red: { x: 8, y: 1, color: 'red', minVotes: 2},
+//         yellow: { x: 1, y: 10, color: 'yellow', minVotes: 1 }
+//     },
+//     slots: {
+//         slot0: { x: 3, y: 6 },
+//         slot1: { x: 16, y: 6 }
+//     },
+//     obstacles: {
+//         obs0:{x:9,y:5,id:'obs0', immovable:true},
+//         obs1:{x:9,y:7,id:'obs1', immovable:true},
+//         obs2:{x:6,y:5,id:'obs2'},
+//         obs3:{x:12,y:5,id:'obs3'},
+//     }
+// },
+// };
+
+
+// //dabc
+// const levelPlacements = {
+//   0: {
+//     blocks: {
+//         blue: { x: 9, y: 4, color: 'blue', minVotes: 3 },
+//         red: { x: 7, y: 1, color: 'red', minVotes: 2 },
+//         yellow: { x: 11, y: 1, color: 'yellow', minVotes: 1 }
+//     },
+//     slots: {
+//         slot0: { x: 3, y: 5 },
+//         slot1: { x: 14, y: 5 }
+//     },
+//     obstacles: {
+//         obs0: { x: 6, y: 4, id: 'obs0', immovable: true  },
+//         obs1: { x: 3, y: 2, id: 'obs1', immovable: true},
+//         obs3: { x: 6, y: 8, id: 'obs3'},
+//         obs4: { x: 15, y: 1, id: 'obs4' },
+//         obs2: { x: 12, y: 4, id: 'obs2', immovable: true  },
+//         obs5: { x: 12, y: 8, id: 'obs5'}
+//     }
+// },
+//   1:  {
+//     blocks: {
+//         blue: { x: 10, y: 10, color: 'blue', minVotes: 3 },
+//         red: { x: 8, y: 1, color: 'red', minVotes: 2},
+//         yellow: { x: 1, y: 10, color: 'yellow', minVotes: 1 }
+//     },
+//     slots: {
+//         slot0: { x: 3, y: 6 },
+//         slot1: { x: 16, y: 6 }
+//     },
+//     obstacles: {
+//         obs0:{x:9,y:5,id:'obs0', immovable:true},
+//         obs1:{x:9,y:7,id:'obs1', immovable:true},
+//         obs2:{x:6,y:5,id:'obs2'},
+//         obs3:{x:12,y:5,id:'obs3'},
+//     }
+// },
+//   2: {
+//     blocks: {
+//         blue: { x: 12, y: 10, color: 'blue', minVotes: 3 },
+//         red: { x: 9, y: 1, color: 'red', minVotes: 2},
+//         yellow: { x: 2, y: 10, color: 'yellow', minVotes: 1 }
+//     },
+//     slots: {
+//         slot0: { x: 3, y: 4 },
+//         slot1: { x: 15, y: 4 }
+//     },
+//     obstacles: {
+//         obs0: { x: 6, y: 6, id: 'obs0', immovable: true  },
+//         obs1: { x: 8, y: 4, id: 'obs1', immovable: true},
+//         obs2: { x: 12, y: 5, id: 'obs2', immovable: true  },
+//         obs3: { x: 10, y: 7, id: 'obs3', immovable: true},
+//         obs4: { x: 14, y: 7, id: 'obs4', immovable: true },
+//         obs5: { x: 3, y: 1, id: 'obs5'},
+//         obs6: { x: 3, y: 7, id: 'obs6'},
+//         obs7: { x: 10, y: 10, id: 'obs7'}
+//     }
+//  },
+//   3:{
+//     blocks: {
+//         blue: { x: 16, y: 9, color: 'blue', minVotes: 3 },
+//         red: { x: 6, y: 1, color: 'red', minVotes: 2},
+//         yellow: { x: 6, y: 9, color: 'yellow', minVotes: 1 }
+//     },
+//     slots: {
+//         slot0: { x: 1, y: 6 },
+//         slot1: { x: 9, y: 5 }
+//     },
+//     obstacles: {
+//         obs0: { x: 3, y: 10, id: 'obs0', immovable: true  },
+//         obs1: { x: 13, y: 6, id: 'obs1', immovable: true},
+//         obs2: { x: 2, y: 3, id: 'obs2'},
+//         obs3: { x: 6, y: 6, id: 'obs3'},
+//         obs4: { x: 10, y: 9, id: 'obs4'}
+//     }
+// },
+// };
 function loadLevel(levelNumber) {
   const config = levelPlacements[levelNumber];
   if (!config) {
@@ -1597,7 +1849,7 @@ function submitPostTrial() {
   container.innerHTML = `<p> Thank you! Your responses have been recorded.<br>Redirecting to Prolific...</p>`;
 
   setTimeout(() => {
-      window.location.href = 'https://app.prolific.com/submissions/complete?cc=C1EUVCKW'; // Replace with your code
+      window.location.href = 'https://app.prolific.com/submissions/complete?cc=C1HMHHYQ'; // Replace with your code
       endSession();
   }, 3000);
 }
@@ -1937,7 +2189,7 @@ let playerColorMap = {};
 
 
 function assignAvatarColors() {
-
+  const arrivalIndex = getCurrentPlayerArrivalIndex(); // 1-based
   //const name = document.getElementById('playerName')?.value.trim() || `Player ${arrivalIndex}`;
   const playerId = getCurrentPlayerId();
 
@@ -2458,6 +2710,7 @@ function drawBlock(block, isObstacle) {
                   direction: dir,
                   event: eventNumber,
                   level: currentLevel,
+                  condition: assigendCondition,
                   local_t:Date.now() - phaseStarttime //local variable
               }, 'vote obs');
 
@@ -2478,6 +2731,7 @@ function drawBlock(block, isObstacle) {
                   direction: dir,
                   event: eventNumber,
                   level: currentLevel,
+                  condition: assigendCondition,
                   local_t:Date.now() - phaseStarttime //local variable
               }, 'vote blocks');
 
@@ -3015,33 +3269,7 @@ function receiveStateChange(pathNow, nodeName, newState, typeChange ) {
           }
         }else if(pathNow === 'localT'){
 
-        }else if (pathNow === 'condition') {
-          const assignedCondition =
-            (typeof newState === 'string')
-              ? newState
-              : (typeof newState?.condition === 'string' ? newState.condition : null);
-        
-          console.log('[condition raw]', newState, 'parsed=', assignedCondition);
-        
-          if (!assignedCondition) return;
-        
-          if (assignedCondition === 'abcd') levelPlacements = abcd;
-          else if (assignedCondition === 'cdab') levelPlacements = cdab;
-          else if (assignedCondition === 'bcda') levelPlacements = bcda;
-          else if (assignedCondition === 'dabc') levelPlacements = dabc;
-          else return; // ignore anything unexpected
-        
-          startNewGameOnce();
         }
-}
-
-let started = false;
-
-function startNewGameOnce() {
-  if (started) return;
-  started = true;
-  newGame();
-
 }
 
 function spawnClonesForBlock(block) {
@@ -3423,26 +3651,7 @@ if (path === 'phase') {
   }
 
   return { isAllowed: false, newState: null };
-}else if (path === 'condition') {
-  const C = state; // can be null, string, or object
-
-  if (action === 'set-if-absent') {
-    const alreadySet =
-      (typeof C === 'string' && C.length > 0) ||
-      (C && typeof C.condition === 'string' && C.condition.length > 0);
-
-    if (alreadySet) return { isAllowed: false, newState: null };
-
-    const condition = args?.condition;
-    const ok = (condition === 'abcd' || condition === 'cdab' || condition === 'bcda' || condition === 'dabc');
-    if (!ok) return { isAllowed: false, newState: null };
-
-    return { isAllowed: true, newState: { condition } };
-  }
-
-  return { isAllowed: false, newState: null };
 }
-
 
   if (!isAllowed) {
     console.warn('[TX DENIED level]', { action, args, now, state });
@@ -3552,12 +3761,6 @@ function updateWaitingRoom() {
   }
 }
 
-async function trySetConditionOnce() {
-  const assigned = conditionSelector(); // 'abcd'|'cdab'|'bcda'|'dabc'
-  await updateStateTransaction('condition', 'set-if-absent', { condition: assigned });
-}
-
-
 function startSession() {
   /*
       Funtionality to invoke when starting a session.
@@ -3575,8 +3778,6 @@ function startSession() {
   console.log("all player IDs", playerIDsAll);
   playerNumber = sessionInfo.arrivalIndex;*/
 
-  trySetConditionOnce();
-  
   instructionsScreen.style.display = 'none';
   waitingRoomScreen.style.display = 'none';
   gameScreen.style.display = 'block';
@@ -3593,7 +3794,7 @@ function startSession() {
   //thisSession = sessionInfo;
   allPlayerIDs = getCurrentPlayerIds();
   console.log("Session Starts here...", allPlayerIDs);
-  //newGame();
+  newGame();
   //startVotingPhase();
 }
 
