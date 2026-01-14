@@ -312,6 +312,12 @@ document.getElementById('nextInstruction').onclick = () => {
       clearInterval(practiceTimerInterval);
       practiceTimerInterval = null;
 
+      if (practiceRestartTimeout) {
+        clearTimeout(practiceRestartTimeout);
+        practiceRestartTimeout = null;
+    }
+
+
       // Clear the visible timer
       const timerEl = document.getElementById('practiceTimer');
       if (timerEl) timerEl.innerText = '';
@@ -354,6 +360,12 @@ document.getElementById('nextInstruction').onclick = () => {
       clearInterval(practiceTimerInterval);
       practiceTimerInterval = null;
 
+      if (practiceRestartTimeout) {
+        clearTimeout(practiceRestartTimeout);
+        practiceRestartTimeout = null;
+    }
+
+
       // Clear the visible timer
       const timerEl = document.getElementById('practiceTimer');
       if (timerEl) timerEl.innerText = '';
@@ -376,6 +388,12 @@ document.getElementById('nextInstruction').onclick = () => {
       // Stop countdown updates
       clearInterval(practiceTimerInterval);
       practiceTimerInterval = null;
+
+      if (practiceRestartTimeout) {
+        clearTimeout(practiceRestartTimeout);
+        practiceRestartTimeout = null;
+    }
+
 
       // Clear the visible timer
       const timerEl = document.getElementById('practiceTimer');
@@ -431,48 +449,47 @@ function generateRandomName() {
 
 let practiceTimerInterval = null;
 
+let practiceRestartTimeout = null;
+  
 function startPracticePhaseCycle() {
-  const timerEl = document.getElementById('practiceTimer');
-  if (!timerEl) {
-    console.warn('practiceTimer not found');
-    return;
-  }
-
-  let countdown = 5;
-  timerEl.innerText = `Choose a direction to move an object – ${countdown}s remaining...`;
-  showDirectionButtons();
-    
-
-  practiceTimerInterval = setInterval(() => {
-    countdown--;
-    if (countdown > 0) {
-      if(currentStep == 7){
-          const blockEl = document.querySelector('.block:not([data-obstacle="true"])');
-          addPracticeArrowToBlock(blockEl, "left", 2);
-      }
-      if(currentStep == 8){
-          const blockEl = document.querySelector('.block:not([data-obstacle="true"])');
-          addPracticeArrowToBlock(blockEl, "left", 2);
-          if(countdown > 3){
-              addPracticeArrowToBlock(blockEl, "down", 3);
-          }else{
-              addPracticeArrowToBlock(blockEl, "left", 3);
-          }
-      }
-      timerEl.innerText = `Choose a direction to move an object – ${countdown}s remaining...`;
-    } else {
+    const timerEl = document.getElementById('practiceTimer');
+    if (!timerEl) return;
+  
+    // Cancel both interval AND pending restart
+    if (practiceTimerInterval) {
       clearInterval(practiceTimerInterval);
+      practiceTimerInterval = null;
+    }
+    if (practiceRestartTimeout) {
+      clearTimeout(practiceRestartTimeout);
+      practiceRestartTimeout = null;
+    }
+  
+    let countdown = 5;
+    timerEl.innerText = `Choose a direction to move an object – ${countdown}s remaining...`;
+    showDirectionButtons();
+  
+    practiceTimerInterval = setInterval(() => {
+      countdown--;
+  
+      if (countdown > 0) {
+        timerEl.innerText = `Choose a direction to move an object – ${countdown}s remaining...`;
+        return;
+      }
+  
+      clearInterval(practiceTimerInterval);
+      practiceTimerInterval = null;
+  
       timerEl.innerText = `Moving...`;
       finalizePracticeVotes();
-
       hideDirectionButtons();
-
-      setTimeout(() => {
-        startPracticePhaseCycle();  
+  
+      practiceRestartTimeout = setTimeout(() => {
+        practiceRestartTimeout = null;
+        startPracticePhaseCycle();
       }, 1500);
-    }
-  }, 1000);
-}
+    }, 1000);
+  }
 
 
 function createPracticeSlot(x, y) {
