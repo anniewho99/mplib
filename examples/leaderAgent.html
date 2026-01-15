@@ -29,7 +29,13 @@
 
       <div class="small">This button will run the leader algorithm on the current board state. For now, it is a stub (no algorithm yet).</div>
       <div class="row">
-        <button id="btnRunLeader">Run leader (stub)</button>
+        <button id="btnRunLeader">Run leader</button>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <label style="display:inline-flex;gap:8px;align-items:center;cursor:pointer">
+          <input id="chkShowPaths" type="checkbox" />
+          <span class="small">Show paths (D_imm dashed vs D_all solid)</span>
+        </label>
       </div>
       <pre id="leaderOut" style="white-space:pre-wrap;background:#0f141a;border:1px solid #2a394d;border-radius:8px;padding:8px;margin:0;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;color:#dfe6ef;max-height:160px;overflow:auto;">No output yet.</pre>
 
@@ -87,7 +93,7 @@
       <!-- <h2>Leader Action</h2>
       <div class="small">This button will run the leader algorithm on the current board state. For now, it is a stub (no algorithm yet).</div>
       <div class="row">
-        <button id="btnRunLeader">Run leader (stub)</button>
+        <button id="btnRunLeader">Run leader</button>
       </div>
       <pre id="leaderOut" style="white-space:pre-wrap;background:#0f141a;border:1px solid #2a394d;border-radius:8px;padding:8px;margin:0;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;color:#dfe6ef;max-height:160px;overflow:auto;">No output yet.</pre> -->
 
@@ -230,15 +236,80 @@
     ctx.fillText(digit, r.x+r.w/2, r.y+r.h/2);
   }
 
+  function tlCenterPx(tl){
+    // TL coords -> pixel center of the 3x3 block footprint
+    const cx = PADDING + (tl.x + BLOCK_SIZE/2) * CELL;
+    const cy = PADDING + (tl.y + BLOCK_SIZE/2) * CELL;
+    return {cx, cy};
+  }
+
+  function drawPathPolyline(path, strokeStyle, lineWidth, dashed){
+    if (!path || path.length < 2) return;
+    ctx.save();
+    ctx.strokeStyle = strokeStyle;
+    ctx.lineWidth = lineWidth;
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    if (dashed) ctx.setLineDash([10, 8]);
+    ctx.beginPath();
+    for (let i=0; i<path.length; i++){
+      const {cx, cy} = tlCenterPx(path[i]);
+      if (i===0) ctx.moveTo(cx, cy);
+      else ctx.lineTo(cx, cy);
+    }
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawPathOverlay(){
+    if (!PATH_OVERLAY || !PATH_OVERLAY.enabled) return;
+
+    // D_imm: dashed (white)
+    for (const [bn, path] of Object.entries(PATH_OVERLAY.imm || {})){
+      drawPathPolyline(path, 'rgba(255,165,0,0.95)', 4, true);
+    }
+
+    // D_all: solid (blue)
+    for (const [bn, path] of Object.entries(PATH_OVERLAY.all || {})){
+      drawPathPolyline(path, 'rgba(77,163,255,0.9)', 3, false);
+    }
+  }
+
+
   function render(state){
     drawGrid();
     for (const s of Object.values(state.slots)) drawSlot(s);
     for (const o of Object.values(state.obstacles)) drawObstacle(o);
     for (const [name,pos] of Object.entries(state.blocks)) drawBlock(name, pos);
+
+    drawPathOverlay();
   }
 
   // --- UI state ---
   let S = deepCopy(INITIAL);
+
+
+  // --- Path overlay state (for visualizing shortest-path routes) ---
+  let PATH_OVERLAY = {
+    enabled: false,
+    imm: {}, // { blockName: [{x,y}, ...] } using TL (top-left) coordinates
+    all: {}  // { blockName: [{x,y}, ...] } using TL (top-left) coordinates
+  };
+
+  const chkShowPaths = document.getElementById('chkShowPaths');
+  if (chkShowPaths){
+    chkShowPaths.addEventListener('change', (e)=>{
+      PATH_OVERLAY.enabled = !!e.target.checked;
+      if (PATH_OVERLAY.enabled){
+        // Recompute paths immediately so the toggle has an effect without needing to press Run leader.
+        runLeaderDiagnostic();
+      } else {
+        PATH_OVERLAY.imm = {};
+        PATH_OVERLAY.all = {};
+        render(S);
+      }
+    });
+  }
 
   function setStatus(msg){
     document.getElementById('lblStatus').textContent = msg;
@@ -479,6 +550,7 @@ render(S);
   // --- Leader diagnostic (no action selection yet) ---
 // Computes whether movable obstacles are currently affecting shortest paths from blocks to slots.
 // Outputs: needs_obstacle_clearing + affected blocks, plus optional obstacle attribution.
+
 function runLeaderDiagnostic(){
   const snapshot = JSON.parse(JSON.stringify(S));
 
@@ -486,7 +558,6 @@ function runLeaderDiagnostic(){
   // Current UI renders an outer wall ring (row/col 0 and GRID-1). We treat it as blocked cells here.
   // If you later add internal walls, store them as snapshot.walls = [{x,y}, ...] and they will be included.
   const wallSet = new Set();
-  // outer ring
   for (let x=0; x<GRID; x++){
     wallSet.add(`${x},0`);
     wallSet.add(`${x},${GRID-1}`);
@@ -495,7 +566,6 @@ function runLeaderDiagnostic(){
     wallSet.add(`0,${y}`);
     wallSet.add(`${GRID-1},${y}`);
   }
-  // optional internal walls
   if (Array.isArray(snapshot.walls)){
     for (const w of snapshot.walls){
       if (w && Number.isFinite(w.x) && Number.isFinite(w.y)){
@@ -524,6 +594,21 @@ function runLeaderDiagnostic(){
   const movObs = obstaclesArr.filter(o=>!o.immovable);
 
   const slotsArr = Object.values(snapshot.slots || {});
+
+  // Lock blocks already in a slot (TL matches slot TL)
+  function isBlockInAnySlotTL(b){
+    const bx = b.x|0, by = b.y|0;
+    for (const sl of slotsArr){
+      if ((sl.x|0) === bx && (sl.y|0) === by) return true;
+    }
+    return false;
+  }
+  for (const [bn,b] of Object.entries(snapshot.blocks || {})){
+    if (b && isBlockInAnySlotTL(b)){
+      b.locked = true;
+      if (S.blocks?.[bn]) S.blocks[bn].locked = true; // persist in editor state
+    }
+  }
 
   // TL lattice for 3x3 blocks
   const TL_W = GRID - BLOCK_SIZE + 1;
@@ -580,28 +665,81 @@ function runLeaderDiagnostic(){
   const D_imm = bfs(false);
   const D_all = bfs(true);
 
-  // ---------------- Obstacle move suggestion (bounded <= 2 moves) ----------------
-  // Without a small move-depth bound, deciding how to reposition obstacles becomes a general planning
-  // problem (large branching over obstacles × directions × time). With the "<=2 moves" assumption,
-  // we can cheaply brute-force the best 1-step and 2-step obstacle adjustments using BFS rescoring.
+  function getDist(D, x,y){
+    if (x<0 || y<0 || x>=TL_W || y>=TL_H) return INF;
+    return D[y][x];
+  }
 
-  const DIRS = [
+  // Reconstruct one downhill path on a given distance field (for visualization)
+  function reconstructDownhillPath(D, startTL){
+    const bx = startTL.x|0, by = startTL.y|0;
+    let d = getDist(D, bx, by);
+    if (d >= INF) return [];
+
+    const path = [{x:bx, y:by}];
+    const DX=[0,0,-1,1], DY=[-1,1,0,0];
+    let cx=bx, cy=by;
+    let guard=0;
+
+    while (d>0 && guard++ < 512){
+      let stepped = false;
+      for (let k=0;k<4;k++){
+        const nx=cx+DX[k], ny=cy+DY[k];
+        if (nx<0 || ny<0 || nx>=TL_W || ny>=TL_H) continue;
+        if (getDist(D, nx, ny) === d-1){
+          cx=nx; cy=ny; d=d-1;
+          path.push({x:cx,y:cy});
+          stepped = true;
+          break;
+        }
+      }
+      if (!stepped) break;
+    }
+    return path;
+  }
+
+  // Update overlay paths (regardless of whether we will move an obstacle or a block)
+  PATH_OVERLAY.imm = {};
+  PATH_OVERLAY.all = {};
+  for (const [bn, b] of Object.entries(snapshot.blocks || {})){
+    if (b && b.locked) continue;
+    PATH_OVERLAY.imm[bn] = reconstructDownhillPath(D_imm, {x:b.x|0, y:b.y|0});
+    PATH_OVERLAY.all[bn] = reconstructDownhillPath(D_all, {x:b.x|0, y:b.y|0});
+  }
+
+  // ----- Determine whether any block is obstacle-blocked or detoured by movable obstacles -----
+  const affected = [];
+  const perBlock = [];
+
+  for (const [name,b] of Object.entries(snapshot.blocks || {})){
+    const bx = b.x|0, by = b.y|0;
+    const di = getDist(D_imm, bx, by);
+    const da = getDist(D_all, bx, by);
+
+    let status = "ok";
+    if (b.locked){
+      status = "in_slot_locked";
+    } else if (da>=INF && di<INF) status = "blocked_by_movable";
+    else if (da>di) status = "detour_due_to_movable";
+    else if (di>=INF && da>=INF) status = "unreachable_even_ignoring_movable";
+
+    const entry = { block:name, TL:{x:bx,y:by}, D_imm:di>=INF?null:di, D_all:da>=INF?null:da, status };
+
+    if (!b.locked && (status==="blocked_by_movable" || status==="detour_due_to_movable")){
+      affected.push(entry);
+    }
+    perBlock.push(entry);
+  }
+
+  const needsObstacleClearing = affected.length>0;
+
+  // ---------------- Obstacle move suggestion (bounded <= 2 moves) ----------------
+  const DIRS_OBS = [
     {name:'up',dx:0,dy:-1},
     {name:'down',dx:0,dy:1},
     {name:'left',dx:-1,dy:0},
     {name:'right',dx:1,dy:0},
   ];
-
-  function obstaclesAsArray(state){
-    return Object.values(state.obstacles || {});
-  }
-
-  function findObstacleById(state, id){
-    for (const [k,o] of Object.entries(state.obstacles || {})){
-      if ((o.id ?? k) === id) return { key:k, obj:o };
-    }
-    return null;
-  }
 
   function isObstacleMoveLegal(state, obsKey, dir){
     const o = state.obstacles?.[obsKey];
@@ -618,8 +756,9 @@ function runLeaderDiagnostic(){
       if (k2 === obsKey) continue;
       if (rectOverlap(nx,ny,OBS_SIZE, o2.x|0,o2.y|0,OBS_SIZE)) return {ok:false, reason:`Hits obstacle ${k2}`};
     }
-    // collide with blocks (treat blocks as stationary footprints)
+    // collide with blocks (ignore locked blocks)
     for (const [bn,b] of Object.entries(state.blocks || {})){
+      if (b && b.locked) continue;
       if (rectOverlap(nx,ny,OBS_SIZE, b.x|0,b.y|0,BLOCK_SIZE)) return {ok:false, reason:`Hits block ${bn}`};
     }
     return {ok:true, reason:'OK'};
@@ -633,7 +772,7 @@ function runLeaderDiagnostic(){
   }
 
   function computeDAllFor(stateX){
-    const obsArr = obstaclesAsArray(stateX);
+    const obsArr = Object.values(stateX.obstacles || {});
     const immX = obsArr.filter(o=>!!o.immovable);
     const movX = obsArr.filter(o=>!o.immovable);
 
@@ -688,7 +827,7 @@ function runLeaderDiagnostic(){
 
     for (const bn of blocksToScore){
       const b = stateX.blocks?.[bn];
-      if (!b) continue;
+      if (!b || b.locked) continue;
       const before = getDist(baselineDAll, b.x|0, b.y|0);
       const after  = getDist(D,             b.x|0, b.y|0);
 
@@ -704,18 +843,9 @@ function runLeaderDiagnostic(){
   }
 
   function suggestObstaclePlan(affectedEntries){
-    // Candidate obstacles: union of blockers for affected blocks; fallback to all movables.
-    const candidateIds = new Set();
-    for (const e of affectedEntries){
-      for (const oid of (e.blockingObstacles || [])) candidateIds.add(oid);
-    }
-
     const movableKeys = Object.entries(snapshot.obstacles || {})
       .filter(([k,o])=>!o.immovable)
       .map(([k,o])=>({key:k, id:o.id ?? k}));
-
-    let candidateKeys = movableKeys.filter(o=>candidateIds.has(o.id)).map(o=>o.key);
-    if (candidateKeys.length===0) candidateKeys = movableKeys.map(o=>o.key);
 
     const blocksToScore = affectedEntries.map(e=>e.block);
     const baseline = D_all;
@@ -723,8 +853,8 @@ function runLeaderDiagnostic(){
     let best = null;
 
     // 1-step
-    for (const ok of candidateKeys){
-      for (const d1 of DIRS){
+    for (const ok of movableKeys.map(o=>o.key)){
+      for (const d1 of DIRS_OBS){
         const c1 = isObstacleMoveLegal(snapshot, ok, d1);
         if (!c1.ok) continue;
         const s1 = applyObstacleMove(snapshot, ok, d1);
@@ -734,13 +864,13 @@ function runLeaderDiagnostic(){
       }
     }
 
-    // 2-step (same obstacle, as per your "at most twice" assumption)
-    for (const ok of candidateKeys){
-      for (const d1 of DIRS){
+    // 2-step (same obstacle, at most twice)
+    for (const ok of movableKeys.map(o=>o.key)){
+      for (const d1 of DIRS_OBS){
         const c1 = isObstacleMoveLegal(snapshot, ok, d1);
         if (!c1.ok) continue;
         const s1 = applyObstacleMove(snapshot, ok, d1);
-        for (const d2 of DIRS){
+        for (const d2 of DIRS_OBS){
           const c2 = isObstacleMoveLegal(s1, ok, d2);
           if (!c2.ok) continue;
           const s2 = applyObstacleMove(s1, ok, d2);
@@ -754,80 +884,81 @@ function runLeaderDiagnostic(){
     return best;
   }
 
-  function getDist(D, x,y){
-    if (x<0 || y<0 || x>=TL_W || y>=TL_H) return INF;
-    return D[y][x];
-  }
+  // ---------------- Block move selection helpers (only used when no obstacle to clear) ----------------
+  const DIRS_BLOCK = [
+    {name:"UP", dx:0, dy:-1},
+    {name:"DOWN", dx:0, dy:1},
+    {name:"LEFT", dx:-1, dy:0},
+    {name:"RIGHT", dx:1, dy:0},
+  ];
+  function canPlaceBlockAt(x,y,selfName){
+    if (!inBoundsTL(x,y,BLOCK_SIZE)) return false;
+    if (footprintHitsWalls(x,y,BLOCK_SIZE)) return false;
 
-  // Optional: reconstruct an "ideal" shortest path under D_imm and attribute blocking movable obstacles.
-  function reconstructPathAndBlockers(blockTL){
-    const {x:bx, y:by} = blockTL;
-    let d = getDist(D_imm, bx, by);
-    if (d>=INF) return { path: [], blockers: [] };
-
-    const path = [{x:bx,y:by}];
-    const blockers = new Set();
-    const DX=[0,0,-1,1], DY=[-1,1,0,0];
-
-    let cx=bx, cy=by;
-    let guard = 0;
-    while (d>0 && guard++ < 512){
-      // record blockers at current TL along ideal path
-      for (const o of movObs){
-        if (rectOverlap(cx,cy,BLOCK_SIZE, o.x,o.y,OBS_SIZE)) blockers.add(o.id ?? '(unnamed)');
-      }
-      // step downhill
-      let stepped = false;
-      for (let k=0;k<4;k++){
-        const nx=cx+DX[k], ny=cy+DY[k];
-        if (nx<0 || ny<0 || nx>=TL_W || ny>=TL_H) continue;
-        if (getDist(D_imm,nx,ny) === d-1){
-          cx=nx; cy=ny; d=d-1;
-          path.push({x:cx,y:cy});
-          stepped = true;
-          break;
-        }
-      }
-      if (!stepped) break; // cannot follow downhill (should be rare)
+    for (const o of immObs){
+      if (rectOverlap(x,y,BLOCK_SIZE, o.x|0,o.y|0,OBS_SIZE)) return false;
     }
-    // include blockers at final cell
     for (const o of movObs){
-      if (rectOverlap(cx,cy,BLOCK_SIZE, o.x,o.y,OBS_SIZE)) blockers.add(o.id ?? '(unnamed)');
+      if (rectOverlap(x,y,BLOCK_SIZE, o.x|0,o.y|0,OBS_SIZE)) return false;
     }
 
-    return { path, blockers: Array.from(blockers) };
-  }
-
-  // ----- Compute affected blocks -----
-  const affected = [];
-  const perBlock = [];
-
-  for (const [name,b] of Object.entries(snapshot.blocks || {})){
-    const bx = b.x|0, by = b.y|0;
-    const di = getDist(D_imm, bx, by);
-    const da = getDist(D_all, bx, by);
-
-    let status = "ok";
-    if (da>=INF && di<INF) status = "blocked_by_movable";
-    else if (da>di) status = "detour_due_to_movable";
-    else if (di>=INF && da>=INF) status = "unreachable_even_ignoring_movable";
-
-    const entry = { block:name, TL:{x:bx,y:by}, D_imm:di>=INF?null:di, D_all:da>=INF?null:da, status };
-
-    if (status==="blocked_by_movable" || status==="detour_due_to_movable"){
-      const attrib = reconstructPathAndBlockers({x:bx,y:by});
-      entry.blockingObstacles = attrib.blockers;
-      affected.push(entry);
+    for (const [bn,b] of Object.entries(snapshot.blocks || {})){
+      if (bn === selfName) continue;
+      if (b && b.locked) continue;
+      if (rectOverlap(x,y,BLOCK_SIZE, b.x|0,b.y|0,BLOCK_SIZE)) return false;
     }
-    perBlock.push(entry);
+    return true;
   }
 
-  const needs = affected.length>0;
+  function okBlockTL_withBlocks(x,y, selfName){
+    if (!inBoundsTL(x,y,BLOCK_SIZE)) return false;
+    if (footprintHitsWalls(x,y,BLOCK_SIZE)) return false;
+    for (const o of immObs){
+      if (rectOverlap(x,y,BLOCK_SIZE, o.x|0,o.y|0,OBS_SIZE)) return false;
+    }
+    // treat other blocks as obstacles (ignore locked blocks)
+    for (const [bn,b] of Object.entries(snapshot.blocks || {})){
+      if (bn === selfName) continue;
+      if (b && b.locked) continue;
+      if (rectOverlap(x,y,BLOCK_SIZE, b.x|0,b.y|0,BLOCK_SIZE)) return false;
+    }
+    return true;
+  }
 
-  // ----- Output -----
+  function bfsImmWithBlocks(selfName){
+    const dist = Array.from({length: TL_H}, ()=>Array(TL_W).fill(INF));
+    const qx = new Array(TL_W*TL_H);
+    const qy = new Array(TL_W*TL_H);
+    let head=0, tail=0;
+
+    for (const sl of slotsArr){
+      const sx = sl.x|0, sy = sl.y|0;
+      if (sx<0 || sy<0 || sx>=TL_W || sy>=TL_H) continue;
+      if (!okBlockTL_withBlocks(sx,sy, selfName)) continue;
+      dist[sy][sx] = 0;
+      qx[tail]=sx; qy[tail]=sy; tail++;
+    }
+
+    const DX=[0,0,-1,1], DY=[-1,1,0,0];
+    while (head<tail){
+      const x=qx[head], y=qy[head]; head++;
+      const nd = dist[y][x] + 1;
+      for (let k=0;k<4;k++){
+        const nx=x+DX[k], ny=y+DY[k];
+        if (nx<0 || ny<0 || nx>=TL_W || ny>=TL_H) continue;
+        if (!okBlockTL_withBlocks(nx,ny, selfName)) continue;
+        if (dist[ny][nx] <= nd) continue;
+        dist[ny][nx] = nd;
+        qx[tail]=nx; qy[tail]=ny; tail++;
+      }
+    }
+    return dist;
+  }
+
+  // ----- Compose output -----
   const lines = [];
-  lines.push("Leader diagnostic (one-step policy; no full round planning).");
-  lines.push(`needs_obstacle_clearing: ${needs ? "YES" : "NO"}`);
+  lines.push("Leader diagnostic (one-step policy).");
+  lines.push(`needs_obstacle_clearing: ${needsObstacleClearing ? "YES" : "NO"}`);
   lines.push("");
 
   lines.push("Per-block distances (steps on TL grid):");
@@ -837,23 +968,12 @@ function runLeaderDiagnostic(){
     lines.push(`- ${e.block}: D_imm=${di}, D_all=${da}  => ${e.status}`);
   }
 
-  // ---------------- If obstacles are needed: output first obstacle-move path ----------------
-  if (needs){
-    lines.push("");
-    lines.push("Affected blocks (movable obstacles are currently impacting shortest paths):");
-    for (const e of affected){
-      const obs = (e.blockingObstacles && e.blockingObstacles.length)
-        ? e.blockingObstacles.join(", ")
-        : "(no specific movable obstacle intersected the ideal path; may be indirect detour)";
-      lines.push(`- ${e.block}: ${e.status}; blocking obstacles: ${obs}`);
-    }
-
-    // Suggest an obstacle move plan (<=2 steps) that improves D_all for the affected blocks.
-    const plan = suggestObstaclePlan(affected);
+  if (needsObstacleClearing){
     lines.push("");
     lines.push("Obstacle handling plan (bounded <=2 moves; heuristic):");
+    const plan = suggestObstaclePlan(affected);
     if (!plan || plan.score <= 0){
-      lines.push("- No beneficial 1–2 step obstacle move found under the current scoring." );
+      lines.push("- No beneficial 1–2 step obstacle move found under the current scoring.");
       lines.push("- Chosen step: (none)");
     } else {
       lines.push(`- Planned path: move ${plan.obstacle} ${plan.steps.join(" then ")}`);
@@ -866,71 +986,85 @@ function runLeaderDiagnostic(){
       }
     }
   } else {
-    // ---------------- No obstacle clearing needed: move a 2-cost (red) or 3-cost (blue) block ----------------
-    // Policy (one-step): choose the first downhill TL step (w.r.t. D_all) for red; if none, try blue.
-    // Additionally require that the destination is not blocked by other blocks (and does not hit walls/obstacles).
-
-    function canPlaceBlockAt(x,y,selfName){
-      if (!inBoundsTL(x,y,BLOCK_SIZE)) return false;
-      if (footprintHitsWalls(x,y,BLOCK_SIZE)) return false;
-
-      // obstacles (immovable + movable)
-      for (const o of immObs){
-        if (rectOverlap(x,y,BLOCK_SIZE, o.x|0,o.y|0,OBS_SIZE)) return false;
-      }
-      for (const o of movObs){
-        if (rectOverlap(x,y,BLOCK_SIZE, o.x|0,o.y|0,OBS_SIZE)) return false;
-      }
-
-      // other blocks (treat locked blocks as non-colliding if present; editor state may not include locked)
-      for (const [bn,b] of Object.entries(snapshot.blocks || {})){
-        if (bn === selfName) continue;
-        if (b && b.locked) continue;
-        if (rectOverlap(x,y,BLOCK_SIZE, b.x|0,b.y|0,BLOCK_SIZE)) return false;
-      }
-      return true;
-    }
-
-    function chooseDownhillStep(blockName){
+    // Only consider block moves if there is no obstacle to clear.
+    // Eligibility: (1) not locked/in slot, (2) not blocked by other blocks relative to D_imm,
+    // then take the first downhill move under D_all. Priority order: blue -> red -> yellow.
+    function chooseDownhillStepWithBlockGate(blockName){
       const b = snapshot.blocks?.[blockName];
-      if (!b) return null;
-      const x = b.x|0, y = b.y|0;
-      const d0 = getDist(D_all, x, y);
-      if (d0 >= INF) return null;
+      if (!b || b.locked) return {block:blockName, ok:false, reason:"locked/in slot"};
 
-      let best = null;
-      for (const d of DIRS){
+      const x = b.x|0, y = b.y|0;
+
+      // Since needsObstacleClearing is false globally, di==da for all movable blocks, but we keep this explicit.
+      const di0 = getDist(D_imm, x, y);
+      const da0 = getDist(D_all, x, y);
+      const obstacleBlocked = (di0 < INF && (da0 >= INF || da0 > di0));
+      if (obstacleBlocked){
+        return {block:blockName, ok:false, reason:`obstacle-blocked (D_imm ${di0>=INF?'INF':di0} vs D_all ${da0>=INF?'INF':da0})`};
+      }
+
+      const D_imm_blocks = bfsImmWithBlocks(blockName);
+      const dib0 = getDist(D_imm_blocks, x, y);
+      const blockedByOtherBlocks =
+        (di0 < INF && dib0 >= INF) || (di0 < INF && dib0 > di0);
+
+      if (blockedByOtherBlocks){
+        return {block:blockName, ok:false, reason:`blocked by other blocks (D_imm ${di0>=INF?'INF':di0} vs D_imm+blocks ${dib0>=INF?'INF':dib0})`};
+      }
+
+      // Now pick a downhill step under D_all that is currently legal.
+      for (const d of DIRS_BLOCK){
         const nx = x + d.dx, ny = y + d.dy;
         const d1 = getDist(D_all, nx, ny);
-        if (d1 >= d0) continue;            // must be downhill (strict improvement)
+        if (d1 >= da0) continue;
         if (!canPlaceBlockAt(nx, ny, blockName)) continue;
-        if (!best || d1 < best.d1){
-          best = { block:blockName, step:d.name, from:{x,y}, to:{x:nx,y:ny}, d0, d1 };
-        }
+        return {block:blockName, ok:true, step:d.name, from:{x,y}, to:{x:nx,y:ny}, d0:da0, d1};
       }
-      return best;
+      return {block:blockName, ok:false, reason:"no downhill legal move"};
     }
 
-    const pick = chooseDownhillStep('blue') || chooseDownhillStep('red');
+    const order = ["blue","red","yellow"];
+    let pick = null;
+    const notes = [];
+
+    for (const bn of order){
+      const r = chooseDownhillStepWithBlockGate(bn);
+      if (r.ok && !pick){
+        pick = r;
+      } else if (!r.ok){
+        notes.push(`- ${bn}: skipped (${r.reason})`);
+      }
+    }
 
     lines.push("");
-    lines.push("No obstacle clearing needed. Block-move policy:");
+    lines.push("Block-move policy (only when no obstacle to clear):");
+    lines.push("- Priority order: blue → red → yellow");
     if (!pick){
-      lines.push("- Chosen step: (none)  [No downhill, unblocked move found for red or blue]");
+      lines.push("- Chosen step: (none)  [No eligible downhill move found]");
+      if (notes.length){
+        lines.push("");
+        lines.push("Why blocks were skipped:");
+        lines.push(...notes);
+      }
     } else {
       lines.push(`- Chosen step: move ${pick.block} ${pick.step}  (D_all ${pick.d0} → ${pick.d1})`);
       lines.push(`- From TL=(${pick.from.x},${pick.from.y}) to TL=(${pick.to.x},${pick.to.y})`);
+      if (notes.length){
+        lines.push("");
+        lines.push("Other blocks skipped:");
+        lines.push(...notes);
+      }
     }
   }
 
-  lines.push("");
-  lines.push("Snapshot (for reproducibility):");
-  lines.push(JSON.stringify(snapshot, null, 2));
-
   document.getElementById('leaderOut').textContent = lines.join("\n");
-  setStatus('Leader diagnostic executed (first step chosen).');
+  setStatus('Leader diagnostic executed.');
+
+  // Re-render so path overlays update immediately
+  render(S);
 }
 document.getElementById('btnRunLeader').onclick = runLeaderDiagnostic;
+
 
   // --- Init ---
   syncInputsFromState();
