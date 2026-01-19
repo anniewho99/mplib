@@ -962,7 +962,7 @@ function getNumPlayersFromURL() {
   return isNaN(num) ? 5 : Math.max(2, Math.min(num, 5)); // default to 5, clamp between 2–5
 }
 
-let GameName = "noCommDataCollection";
+let GameName = "noCommDataCDAB";
 let NumPlayers = 3;
 let MinPlayers = NumPlayers;
 let MaxPlayers = NumPlayers;
@@ -1068,6 +1068,10 @@ function getForcedConditionFromURL() {
   return allowed.has(cond) ? cond : null;
 }
 
+assigendCondition ='cdab';
+
+console.log('assigned condition is', assigendCondition);
+
 function applyCondition(cond) {
   assigendCondition = cond;
   console.log('assigned condition is', assigendCondition);
@@ -1078,9 +1082,9 @@ function applyCondition(cond) {
   else levelPlacements = null;
 }
 
-const forced = getForcedConditionFromURL();
+//const forced = getForcedConditionFromURL();
 
-let levelPlacements;
+
 //abcd levelPlacements
 const abcd = {
   0: {
@@ -1397,7 +1401,9 @@ const dabc = {
 };
 
 
-applyCondition(forced);
+// applyCondition(forced);
+
+let levelPlacements = cdab;
 //cdab
 // const levelPlacements = {
 //   0: {
