@@ -257,7 +257,7 @@ const instructionSteps = [
   }
 ];
 
-let currentStep = 0;
+let currentStep = 9;
 
 const params = new URLSearchParams(window.location.search);
 if (params.has("skipinstruction")) {
@@ -963,7 +963,7 @@ function getNumPlayersFromURL() {
 }
 
 let GameName = "noCommDataCDAB";
-let NumPlayers = 3;
+let NumPlayers = 1;
 let MinPlayers = NumPlayers;
 let MaxPlayers = NumPlayers;
 let MaxSessions = 0;

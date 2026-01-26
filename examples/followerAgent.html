@@ -41,7 +41,7 @@
       <div class="hr"></div>
 
       <h2>Teammate inputs (for follower)</h2>
-      <div class="small">Two other players' votes (target + direction). Select “no vote” if absent.</div>
+      <div class="small">Two other players' votes (target + direction). Select "no vote" if absent.</div>
 
       <div class="row" style="align-items:flex-end">
         <div style="flex:1">
@@ -92,7 +92,7 @@
       <div class="hr"></div>
 
       <h2>Follower</h2>
-      <div class="small">Follower runs after teammate votes are provided. It computes a default move first (yellow-to-slot BFS), then applies your vote rules.</div>
+      <div class="small">Follower computes default options (yellow moves + obstacle clearing for all blocks), then applies vote rules.</div>
       <div class="row">
         <button id="btnRunFollower">Run follower</button>
       </div>
@@ -732,13 +732,14 @@
     document.getElementById(id).addEventListener('change', onPeerVoteChanged);
   }
 
-  // --- Core move legality helpers (single-agent) ---
+  // --- NEW FOLLOWER ALGORITHM ---
+
+  // Core move legality helpers
   const DIR_VEC = {
     up:{dx:0,dy:-1}, down:{dx:0,dy:1}, left:{dx:-1,dy:0}, right:{dx:1,dy:0}, stay:{dx:0,dy:0}
   };
 
   function isMoveLegal(state, move, wallSet){
-    // move: {type:'block'|'obstacle', id:'red'|'blue'|'yellow'|'obs2', dir:'up'...} or {type:'none'}
     if (!move || move.type === 'none') return false;
     const d = DIR_VEC[move.dir];
     if (!d) return false;
@@ -751,11 +752,9 @@
       if (!inBoundsTL(nx, ny, BLOCK_SIZE)) return false;
       if (footprintHitsWalls(nx, ny, BLOCK_SIZE, wallSet)) return false;
 
-      // hit obstacles
       for (const o of Object.values(state.obstacles || {})){
         if (rectOverlap(nx,ny,BLOCK_SIZE, o.x|0,o.y|0,OBS_SIZE)) return false;
       }
-      // hit other blocks
       for (const [bn,ob] of Object.entries(state.blocks || {})){
         if (bn === move.id) continue;
         if (rectOverlap(nx,ny,BLOCK_SIZE, ob.x|0,ob.y|0,BLOCK_SIZE)) return false;
@@ -771,12 +770,10 @@
       if (!inBoundsTL(nx, ny, OBS_SIZE)) return false;
       if (footprintHitsWalls(nx, ny, OBS_SIZE, wallSet)) return false;
 
-      // hit other obstacles
       for (const [ok,oo] of Object.entries(state.obstacles || {})){
         if (ok === move.id) continue;
         if (rectOverlap(nx,ny,OBS_SIZE, oo.x|0,oo.y|0,OBS_SIZE)) return false;
       }
-      // hit blocks
       for (const b of Object.values(state.blocks || {})){
         if (rectOverlap(nx,ny,OBS_SIZE, b.x|0,b.y|0,BLOCK_SIZE)) return false;
       }
@@ -786,8 +783,26 @@
     return false;
   }
 
-  // --- BFS distances for yellow to nearest slot (all walls/obstacles/blocks treated immovable) ---
-  function computeDistForYellow(state, wallSet){
+  function applyMove(state, move){
+    const newState = deepCopy(state);
+    const d = DIR_VEC[move.dir];
+    if (!d) return newState;
+
+    if (move.type === 'block'){
+      if (newState.blocks[move.id]){
+        newState.blocks[move.id].x += d.dx;
+        newState.blocks[move.id].y += d.dy;
+      }
+    } else if (move.type === 'obstacle'){
+      if (newState.obstacles[move.id]){
+        newState.obstacles[move.id].x += d.dx;
+        newState.obstacles[move.id].y += d.dy;
+      }
+    }
+    return newState;
+  }
+
+  function computeDistForBlock(state, wallSet, blockName, includeMovables){
     const TL_W = GRID - BLOCK_SIZE + 1;
     const TL_H = GRID - BLOCK_SIZE + 1;
     const INF = 1e9;
@@ -797,25 +812,33 @@
     const qy = new Array(TL_W*TL_H);
     let head=0, tail=0;
 
-    const y0 = state.blocks.yellow;
-    const startKey = `${y0.x|0},${y0.y|0}`;
+    const block = state.blocks[blockName];
+    const startKey = `${block.x|0},${block.y|0}`;
+
+    const immObs = Object.values(state.obstacles || {}).filter(o=>!!o.immovable);
+    const movObs = Object.values(state.obstacles || {}).filter(o=>!o.immovable);
 
     function okTL(x,y){
       if (!inBoundsTL(x,y,BLOCK_SIZE)) return false;
       if (footprintHitsWalls(x,y,BLOCK_SIZE, wallSet)) return false;
-      // obstacles
-      for (const o of Object.values(state.obstacles || {})){
+      
+      for (const o of immObs){
         if (rectOverlap(x,y,BLOCK_SIZE, o.x|0,o.y|0,OBS_SIZE)) return false;
       }
-      // blocks (treat blue/red as immovable, but ignore yellow itself)
+      
+      if (includeMovables){
+        for (const o of movObs){
+          if (rectOverlap(x,y,BLOCK_SIZE, o.x|0,o.y|0,OBS_SIZE)) return false;
+        }
+      }
+      
       for (const [bn,b] of Object.entries(state.blocks || {})){
-        if (bn === 'yellow') continue;
+        if (bn === blockName) continue;
         if (rectOverlap(x,y,BLOCK_SIZE, b.x|0,b.y|0,BLOCK_SIZE)) return false;
       }
       return true;
     }
 
-    // seed from slots (slot TLs)
     for (const sl of Object.values(state.slots || {})){
       const sx = sl.x|0, sy = sl.y|0;
       if (sx<0 || sy<0 || sx>=TL_W || sy>=TL_H) continue;
@@ -834,7 +857,6 @@
         const nx=x+DX[k], ny=y+DY[k];
         if (nx<0 || ny<0 || nx>=TL_W || ny>=TL_H) continue;
 
-        // allow the current yellow TL even if okTL would reject due to self-overlap
         const key = `${nx},${ny}`;
         const ok = (key === startKey) ? true : okTL(nx,ny);
         if (!ok) continue;
@@ -854,196 +876,276 @@
     return dist[y][x];
   }
 
-  // --- Follower default plan + vote integration ---
-  function defaultFollowerPlan(state, wallSet){
-    const distObj = computeDistForYellow(state, wallSet);
+  function scoreImprovement(before, after, INF){
+    if (before >= INF && after < INF) return 1000;
+    if (before < INF && after < INF) return Math.max(0, before - after);
+    return 0;
+  }
+
+  function findObstacleMovesForBlock(state, wallSet, blockName){
+    const baselineDist = computeDistForBlock(state, wallSet, blockName, true);
+    const b = state.blocks[blockName];
+    const baselineVal = getDist(baselineDist, b.x|0, b.y|0);
+
+    const movableObs = Object.entries(state.obstacles || {})
+      .filter(([k,o]) => !o.immovable)
+      .map(([k,o]) => k);
+
+    const candidates = [];
+
+    // 1-step
+    for (const obsKey of movableObs){
+      for (const dir of ['up','down','left','right']){
+        const move = {type:'obstacle', id:obsKey, dir};
+        if (!isMoveLegal(state, move, wallSet)) continue;
+
+        const testState = applyMove(state, move);
+        const newDist = computeDistForBlock(testState, wallSet, blockName, true);
+        const afterVal = getDist(newDist, testState.blocks[blockName].x|0, testState.blocks[blockName].y|0);
+
+        const improvement = scoreImprovement(baselineVal, afterVal, baselineDist.INF);
+
+        if (improvement > 0){
+          candidates.push({
+            ...move,
+            benefit: `clear_for_${blockName}`,
+            improvement,
+            steps: 1
+          });
+        }
+      }
+    }
+
+    // 2-step
+    for (const obsKey of movableObs){
+      for (const dir1 of ['up','down','left','right']){
+        const move1 = {type:'obstacle', id:obsKey, dir:dir1};
+        if (!isMoveLegal(state, move1, wallSet)) continue;
+
+        const state1 = applyMove(state, move1);
+
+        for (const dir2 of ['up','down','left','right']){
+          const move2 = {type:'obstacle', id:obsKey, dir:dir2};
+          if (!isMoveLegal(state1, move2, wallSet)) continue;
+
+          const state2 = applyMove(state1, move2);
+          const newDist = computeDistForBlock(state2, wallSet, blockName, true);
+          const afterVal = getDist(newDist, state2.blocks[blockName].x|0, state2.blocks[blockName].y|0);
+
+          const improvement = scoreImprovement(baselineVal, afterVal, baselineDist.INF);
+
+          if (improvement > 0){
+            candidates.push({
+              type: 'obstacle',
+              id: obsKey,
+              dir: dir1,
+              benefit: `clear_for_${blockName}`,
+              improvement,
+              steps: 2,
+              fullPlan: [dir1, dir2]
+            });
+          }
+        }
+      }
+    }
+
+    candidates.sort((a,b) => b.improvement - a.improvement);
+    return candidates;
+  }
+
+  function buildDefaultOptions(state, wallSet){
+    const defaultOptions = [];
+
+    // Part A: Yellow advancement
+    const yellowDist = computeDistForBlock(state, wallSet, 'yellow', true);
     const y = state.blocks.yellow;
-    const cur = getDist(distObj, y.x|0, y.y|0);
+    const curDist = getDist(yellowDist, y.x|0, y.y|0);
 
-    // Case: yellow has path -> choose one-step that shortens it (and is legal)
-    if (cur < distObj.INF){
-      let best = null;
-      let bestD = cur;
-
+    if (curDist < yellowDist.INF){
       for (const dir of ['up','down','left','right']){
         const d = DIR_VEC[dir];
         const nx = (y.x|0) + d.dx;
         const ny = (y.y|0) + d.dy;
-        const nd = getDist(distObj, nx, ny);
-        if (nd >= bestD) continue;
-        const mv = {type:'block', id:'yellow', dir};
-        if (!isMoveLegal(state, mv, wallSet)) continue;
-        bestD = nd;
-        best = mv;
-      }
+        const newDist = getDist(yellowDist, nx, ny);
 
-      return { kind:'yellow_move', defaultMove: best, distBefore: cur, distAfter: best ? bestD : cur, obstacleOpenSet: [] };
-    }
-
-    // Case: yellow has no path -> store potential 1-step obstacle moves that open a path
-    const candidates = [];
-    for (const [ok,o] of Object.entries(state.obstacles || {})){
-      if (o.immovable) continue;
-      for (const dir of ['up','down','left','right']){
-        const mv = {type:'obstacle', id:ok, dir};
-        if (!isMoveLegal(state, mv, wallSet)) continue;
-
-        // apply virtual move
-        const t = deepCopy(state);
-        const d = DIR_VEC[dir];
-        t.obstacles[ok].x = (t.obstacles[ok].x|0) + d.dx;
-        t.obstacles[ok].y = (t.obstacles[ok].y|0) + d.dy;
-
-        const dist2 = computeDistForYellow(t, wallSet);
-        const cur2 = getDist(dist2, t.blocks.yellow.x|0, t.blocks.yellow.y|0);
-        if (cur2 < dist2.INF){
-          candidates.push({ ...mv, opensYellowDist: cur2 });
+        if (newDist < curDist){
+          const move = {type:'block', id:'yellow', dir};
+          if (isMoveLegal(state, move, wallSet)){
+            defaultOptions.push({
+              ...move,
+              benefit: 'yellow_advance',
+              improvement: curDist - newDist
+            });
+          }
         }
       }
     }
-    // sort: smaller resulting distance is better
-    candidates.sort((a,b)=> (a.opensYellowDist ?? 1e9) - (b.opensYellowDist ?? 1e9));
-    return { kind:'need_obstacle', defaultMove: null, obstacleOpenSet: candidates, distBefore: null, distAfter: null };
+
+    // Part B: Obstacle clearing for all blocks
+    for (const blockName of ['yellow', 'red', 'blue']){
+      const D_imm = computeDistForBlock(state, wallSet, blockName, false);
+      const D_all = computeDistForBlock(state, wallSet, blockName, true);
+
+      const b = state.blocks[blockName];
+      const di = getDist(D_imm, b.x|0, b.y|0);
+      const da = getDist(D_all, b.x|0, b.y|0);
+
+      if (da >= D_all.INF || da > di){
+        const obstacleMoves = findObstacleMovesForBlock(state, wallSet, blockName);
+        defaultOptions.push(...obstacleMoves);
+      }
+    }
+
+    defaultOptions.sort((a,b) => b.improvement - a.improvement);
+    return defaultOptions;
+  }
+
+  function filterNonOverlapping(options, peerVotes){
+    return options.filter(opt => {
+      for (const vote of peerVotes){
+        if (voteIsNone(vote)) continue;
+        if (opt.type === vote.type && opt.id === vote.id){
+          return false;
+        }
+      }
+      return true;
+    });
   }
 
   function voteIsNone(v){ return !v || v.type === 'none'; }
   function voteKey(v){ return `${v.type}:${v.id}:${v.dir}`; }
-  function votesConsistent(v2,v3){ return !voteIsNone(v2) && !voteIsNone(v3) && voteKey(v2) === voteKey(v3); }
+  function votesConsistent(v2,v3){ 
+    return !voteIsNone(v2) && !voteIsNone(v3) && voteKey(v2) === voteKey(v3); 
+  }
 
   function chooseFollowerMove(state){
     const wallSet = buildWallSetFromState(state);
-    const plan = defaultFollowerPlan(state, wallSet);
+    const defaultOptions = buildDefaultOptions(state, wallSet);
 
     const v2 = state.peerVotes?.p2 || {type:'none',id:'',dir:'stay'};
     const v3 = state.peerVotes?.p3 || {type:'none',id:'',dir:'stay'};
 
     const v2Legal = !voteIsNone(v2) && isMoveLegal(state, v2, wallSet);
     const v3Legal = !voteIsNone(v3) && isMoveLegal(state, v3, wallSet);
+    const consistent = votesConsistent(v2, v3);
 
-    // 1) When votes are consistent, follower copies that vote (if legal)
-    if (votesConsistent(v2,v3) && v2Legal){
-      return { chosen: v2, reason: 'votes_consistent_copy', plan, peer: {v2, v3, v2Legal, v3Legal} };
+    // Rule 1: Consistent on blue
+    if (consistent && v2Legal && v2.type === 'block' && v2.id === 'blue'){
+      return { 
+        chosen: v2, 
+        reason: 'consistent_blue_copy', 
+        defaultOptions, 
+        peer: {v2, v3, v2Legal, v3Legal, consistent} 
+      };
     }
 
-    // 2) If no other player votes are available nor legal, follower runs the default algorithm.
-    if (!v2Legal && !v3Legal){
-      if (plan.defaultMove && isMoveLegal(state, plan.defaultMove, wallSet)){
-        return { chosen: plan.defaultMove, reason: 'no_legal_peer_votes_default_yellow', plan, peer: {v2, v3, v2Legal, v3Legal} };
+    // Rule 2: Consistent on other
+    if (consistent && v2Legal){
+      const nonOverlap = filterNonOverlapping(defaultOptions, [v2]);
+      if (nonOverlap.length > 0){
+        return { 
+          chosen: nonOverlap[0], 
+          reason: 'consistent_other_use_default', 
+          defaultOptions, 
+          peer: {v2, v3, v2Legal, v3Legal, consistent} 
+        };
       }
-      if (plan.obstacleOpenSet && plan.obstacleOpenSet.length){
-        return { chosen: plan.obstacleOpenSet[0], reason: 'no_legal_peer_votes_default_obstacle_open', plan, peer: {v2, v3, v2Legal, v3Legal} };
-      }
-      return { chosen: null, reason: 'no_legal_moves', plan, peer: {v2, v3, v2Legal, v3Legal} };
+      return { 
+        chosen: v2, 
+        reason: 'consistent_other_no_defaults_copy', 
+        defaultOptions, 
+        peer: {v2, v3, v2Legal, v3Legal, consistent} 
+      };
     }
 
-    // 3) When votes are inconsistent:
-    //   - Follow the 2-block vote if available and legal
+    // Rule 3: Inconsistent
     const redVote = (v2Legal && v2.type==='block' && v2.id==='red') ? v2 :
                     (v3Legal && v3.type==='block' && v3.id==='red') ? v3 : null;
     if (redVote){
-      return { chosen: redVote, reason: 'inconsistent_follow_red', plan, peer: {v2, v3, v2Legal, v3Legal} };
+      return { 
+        chosen: redVote, 
+        reason: 'inconsistent_follow_red', 
+        defaultOptions, 
+        peer: {v2, v3, v2Legal, v3Legal, consistent} 
+      };
     }
 
-    //   - If other votes are on one-person object, vote the remaining possibility from default algorithm
-    // Interpretation: "one-person object" = obstacles.
-    const peersOnOnePerson = (v2Legal && v2.type==='obstacle') || (v3Legal && v3.type==='obstacle');
-    if (peersOnOnePerson){
-      if (plan.defaultMove && isMoveLegal(state, plan.defaultMove, wallSet)){
-        return { chosen: plan.defaultMove, reason: 'inconsistent_peers_on_obstacles_use_default_yellow', plan, peer: {v2, v3, v2Legal, v3Legal} };
-      }
-      if (plan.obstacleOpenSet && plan.obstacleOpenSet.length){
-        return { chosen: plan.obstacleOpenSet[0], reason: 'inconsistent_peers_on_obstacles_use_default_obstacle_open', plan, peer: {v2, v3, v2Legal, v3Legal} };
-      }
+    const nonOverlap = filterNonOverlapping(defaultOptions, [v2, v3]);
+    if (nonOverlap.length > 0){
+      return { 
+        chosen: nonOverlap[0], 
+        reason: 'inconsistent_use_default', 
+        defaultOptions, 
+        peer: {v2, v3, v2Legal, v3Legal, consistent} 
+      };
     }
 
-    //   - If no option is left, copy one of the vote
-    if (v2Legal) return { chosen: v2, reason: 'fallback_copy_v2', plan, peer: {v2, v3, v2Legal, v3Legal} };
-    if (v3Legal) return { chosen: v3, reason: 'fallback_copy_v3', plan, peer: {v2, v3, v2Legal, v3Legal} };
+    if (v2Legal){
+      return { 
+        chosen: v2, 
+        reason: 'no_defaults_copy_v2', 
+        defaultOptions, 
+        peer: {v2, v3, v2Legal, v3Legal, consistent} 
+      };
+    }
+    if (v3Legal){
+      return { 
+        chosen: v3, 
+        reason: 'no_defaults_copy_v3', 
+        defaultOptions, 
+        peer: {v2, v3, v2Legal, v3Legal, consistent} 
+      };
+    }
 
-    return { chosen: null, reason: 'no_legal_moves_after_fallbacks', plan, peer: {v2, v3, v2Legal, v3Legal} };
+    return { 
+      chosen: null, 
+      reason: 'no_legal_moves', 
+      defaultOptions, 
+      peer: {v2, v3, v2Legal, v3Legal, consistent} 
+    };
   }
 
   function runFollower(){
-    // ensure latest UI edits are captured
     applyPeerVoteUIToState();
     const res = chooseFollowerMove(S);
 
     const lines = [];
-    lines.push('Follower decision');
-    lines.push(`reason: ${res.reason}`);
+    lines.push('Follower decision (NEW ALGORITHM)');
+    lines.push(`Reason: ${res.reason}`);
     lines.push('');
+    
     lines.push('Peer votes:');
-    lines.push(`- p2: ${voteIsNone(res.peer.v2) ? '(no vote)' : voteKey(res.peer.v2)}  legal=${res.peer.v2Legal}`);
-    lines.push(`- p3: ${voteIsNone(res.peer.v3) ? '(no vote)' : voteKey(res.peer.v3)}  legal=${res.peer.v3Legal}`);
+    lines.push(`- P2: ${voteIsNone(res.peer.v2) ? '(no vote)' : voteKey(res.peer.v2)}  legal=${res.peer.v2Legal}`);
+    lines.push(`- P3: ${voteIsNone(res.peer.v3) ? '(no vote)' : voteKey(res.peer.v3)}  legal=${res.peer.v3Legal}`);
+    lines.push(`- Consistent: ${res.peer.consistent}`);
     lines.push('');
 
-    lines.push('Default plan (computed first):');
-    if (res.plan.kind === 'yellow_move'){
-      const mv = res.plan.defaultMove;
-      lines.push(`- Yellow distance: ${res.plan.distBefore} -> ${res.plan.distAfter}`);
-      lines.push(`- Default move: ${mv ? voteKey(mv) : '(none: no downhill legal move)'}`);
-    } else {
-      lines.push('- Yellow has no legal path.');
-      lines.push(`- Obstacle-opening candidates: ${res.plan.obstacleOpenSet.length}`);
-      if (res.plan.obstacleOpenSet.length){
-        const top = res.plan.obstacleOpenSet.slice(0,4).map(v=>`${voteKey(v)} (yellowDist=${v.opensYellowDist})`);
-        lines.push('  Top candidates:');
-        for (const t of top) lines.push('  - ' + t);
+    lines.push(`Default options computed: ${res.defaultOptions.length}`);
+    if (res.defaultOptions.length > 0){
+      lines.push('Top 5 defaults:');
+      for (let i=0; i<Math.min(5, res.defaultOptions.length); i++){
+        const opt = res.defaultOptions[i];
+        lines.push(`  ${i+1}. ${voteKey(opt)} - ${opt.benefit} (improvement=${opt.improvement}${opt.steps ? `, ${opt.steps}-step` : ''})`);
       }
     }
     lines.push('');
 
     lines.push('Chosen action:');
     lines.push(res.chosen ? `- ${voteKey(res.chosen)}` : '- (none)');
+    
     document.getElementById('followerOut').textContent = lines.join('\n');
     LAST_FOLLOWER_CHOICE = res.chosen || null;
     renderAll();
-    setStatus('Follower ran.');
+    setStatus('Follower ran (new algorithm).');
   }
 
   document.getElementById('btnRunFollower').onclick = runFollower;
 
-  // Initialize IDs for vote dropdowns
-  function refreshVoteIds(){
-    const blocks = ['blue','red','yellow'];
-    const obsKeys = sortedObstacleKeys();
-    // Update ID lists based on current type selections
-    const p2t = document.getElementById('p2_type').value;
-    const p3t = document.getElementById('p3_type').value;
-    if (p2t === 'block') setSelectOptions(document.getElementById('p2_id'), blocks, S.peerVotes?.p2?.id);
-    if (p2t === 'obstacle') setSelectOptions(document.getElementById('p2_id'), obsKeys, S.peerVotes?.p2?.id);
-    if (p3t === 'block') setSelectOptions(document.getElementById('p3_id'), blocks, S.peerVotes?.p3?.id);
-    if (p3t === 'obstacle') setSelectOptions(document.getElementById('p3_id'), obsKeys, S.peerVotes?.p3?.id);
-    refreshPeerVoteUI();
-  }
-
-  // Ensure initial state / UI
+  // Initialize
   ensurePeerVotes();
-  refreshVoteIds();
   syncInputsFromState();
   renderAll();
   setStatus('Ready.');
-
-
-  // --- Peer vote UI handlers (enable selecting non-"no vote") ---
-  function onPeerTypeChanged(){
-    ensurePeerVotes();
-    S.peerVotes.p2.type = document.getElementById('p2_type').value;
-    S.peerVotes.p3.type = document.getElementById('p3_type').value;
-    refreshPeerVoteUI();
-    applyPeerVoteUIToState();
-    document.getElementById('txtState').value = JSON.stringify(S, null, 2);
-  }
-
-  document.getElementById('p2_type').addEventListener('change', onPeerTypeChanged);
-  document.getElementById('p3_type').addEventListener('change', onPeerTypeChanged);
-  document.getElementById('p2_id').addEventListener('change', onPeerVoteChanged);
-  document.getElementById('p2_dir').addEventListener('change', onPeerVoteChanged);
-  document.getElementById('p3_id').addEventListener('change', onPeerVoteChanged);
-  document.getElementById('p3_dir').addEventListener('change', onPeerVoteChanged);
-
-
-  // --- Buttons wiring already set above ---
 </script>
 </body>
 </html>
