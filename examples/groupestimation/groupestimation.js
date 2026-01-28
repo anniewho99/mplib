@@ -1031,7 +1031,7 @@ let funList = {
 };
 
 // List the node names where we place listeners for any changes to the children of these nodes; set to '' if listening to changes for children of the root
-let listenerPaths = [ 'players', 'blocks', 'slots', 'obs', 'phase', 'moveBlock', 'level', 'localT' ];
+let listenerPaths = [ 'players', 'blocks', 'slots', 'obs', 'phase', 'moveBlock', 'level'];
 
 //  Initialize the Game Session with all Configs
 initializeMPLIB( sessionConfig , studyId , funList, listenerPaths, verbosity );
@@ -2758,16 +2758,16 @@ function drawBlock(block, isObstacle) {
                   local_t:Date.now() - phaseStarttime //local variable
               }, 'vote obs');
 
-              updateStateDirect(`localT/${playerId}`, {
-                inPlayer: playerId,
-                player: playerId,
-                obstacle: id,
-                block: null, 
-                direction: dir,
-                event: eventNumber,
-                level: currentLevel,
-                local_t:Date.now() - phaseStarttime //local variable
-            }, 'vote obs');
+            //   updateStateDirect(`localT/${playerId}`, {
+            //     inPlayer: playerId,
+            //     player: playerId,
+            //     obstacle: id,
+            //     block: null, 
+            //     direction: dir,
+            //     event: eventNumber,
+            //     level: currentLevel,
+            //     local_t:Date.now() - phaseStarttime //local variable
+            // }, 'vote obs');
           } else {
               updateStateDirect(`players/${playerId}`, {
                   block: id,
@@ -2779,16 +2779,16 @@ function drawBlock(block, isObstacle) {
                   local_t:Date.now() - phaseStarttime //local variable
               }, 'vote blocks');
 
-              updateStateDirect(`localT/${playerId}`, {
-                inPlayer: playerId,
-                player: playerId,
-                block: id,
-                obstacle: null,
-                direction: dir,
-                event: eventNumber,
-                level: currentLevel,
-                local_t:Date.now() - phaseStarttime //local variable
-            }, 'vote blocks');
+            //   updateStateDirect(`localT/${playerId}`, {
+            //     inPlayer: playerId,
+            //     player: playerId,
+            //     block: id,
+            //     obstacle: null,
+            //     direction: dir,
+            //     event: eventNumber,
+            //     level: currentLevel,
+            //     local_t:Date.now() - phaseStarttime //local variable
+            // }, 'vote blocks');
           }
       });
       
@@ -2815,8 +2815,7 @@ function addArrowToBlock(color, direction, playerId) {
 
 
   const arrow = document.createElement('div');
-  //arrow.classList.add('arrow');
-  arrow.classList.add('arrow', 'is-hidden');
+  arrow.classList.add('arrow');
   arrow.style.width = '50px';
   arrow.style.height = '50px';
   arrow.style.position = 'absolute';
@@ -2855,9 +2854,6 @@ function addArrowToBlock(color, direction, playerId) {
   // Re-layout all arrows of this direction in the block
   layoutDirectionalArrows(block, direction,isObstacle );
 
-  if (playerId === thisPlayerID) {
-    spawnFloatingArrowClone(arrow, block, color, direction);
-  }
 }
 
 
@@ -2915,63 +2911,6 @@ function layoutDirectionalArrows(block, direction, isObstacle) {
       arrow.dataset.leftPx = leftPx;
   });
 }
-
-function spawnFloatingArrowClone(arrow, block, color, direction) {
-  //const direction = arrow.dataset.direction;
-  if (!direction) return;
-
-  const arrowRect = arrow.getBoundingClientRect();
-
-  const blockRect = block.getBoundingClientRect();
-
-  const clone = arrow.cloneNode(true);
-  clone.classList.add('arrow-clone');   // IMPORTANT
-  clone.dataset.sourceColor = color;   
-  clone.dataset.sourcePlayerId = arrow.dataset.playerId;
-  clone.dataset.sourceDirection = direction;
-  clone.classList.remove('is-hidden');
-  clone.classList.add('is-visible');
-  clone.style.position = 'fixed'; // viewport coords, safest
-  clone.style.pointerEvents = 'none';
-  clone.style.left = `${arrowRect.left}px`;
-  clone.style.top = `${arrowRect.top}px`;
-  clone.style.margin = '0';
-  clone.style.zIndex = 2147483647;
-
-  if (direction === 'left' || direction === 'right') {
-    clone.style.left = `${arrowRect.left}px`;
-    clone.style.top = `${blockRect.top}px`;
-  }else{
-    clone.style.left = `${blockRect.left}px`;
-    clone.style.top = `${arrowRect.top}px`;
-
-  }
-
-
-  // IMPORTANT: reset transform from layout; we reapply direction cleanly
-  clone.style.transform = 'none';
-  clone.style.transition = 'opacity 150ms linear';
-
-  // Match direction visually (your existing mapping)
-  const rotationMap = {
-    down: 'rotate(90deg)',
-    left: 'rotate(180deg)',
-    up: 'rotate(270deg)',
-    right: 'rotate(0deg)'
-  };
-
-  clone.style.transform = rotationMap[direction] || 'none';
-  clone.style.transformOrigin = 'center center';
-
-  if (direction === 'left') {
-    clone.style.transform += ' scaleY(-1)';
-  }
-
-  document.body.appendChild(clone);
-
-}
-
-
 
 function animateSpriteOnce(arrowDiv, frameCount = 6, frameWidth = 40, frameHeight = 40, fps = 12) {
   let currentFrame = 0;
@@ -3171,30 +3110,30 @@ function receiveStateChange(pathNow, nodeName, newState, typeChange ) {
           console.log(`playerData.block = ${playerData.block}, playerData.obstacle = ${playerData.obstacle}, direction = ${playerData.direction}`);
           addArrowToBlock(playerData.obstacle, playerData.direction, playerId);
           let currentPlayerId = getCurrentPlayerId();
-          updateStateDirect(`localT/${currentPlayerId}`, {
-            inPlayer: currentPlayerId,
-            player: playerId,
-            obstacle: playerData.obstacle,
-            block: null, 
-            direction: playerData.direction,
-            event: eventNumber,
-            level: currentLevel,
-            local_t:Date.now() - phaseStarttime //local variable
-        }, 'vote obs');
+        //   updateStateDirect(`localT/${currentPlayerId}`, {
+        //     inPlayer: currentPlayerId,
+        //     player: playerId,
+        //     obstacle: playerData.obstacle,
+        //     block: null, 
+        //     direction: playerData.direction,
+        //     event: eventNumber,
+        //     level: currentLevel,
+        //     local_t:Date.now() - phaseStarttime //local variable
+        // }, 'vote obs');
       } else if (playerData.block && playerData.direction) {
           console.log(`playerData.block = ${playerData.block}, playerData.obstacle = ${playerData.obstacle}, direction = ${playerData.direction}`);
           addArrowToBlock(playerData.block, playerData.direction, playerId);
-          let currentPlayerId = getCurrentPlayerId();
-          updateStateDirect(`localT/${currentPlayerId}`, {
-            inPlayer: currentPlayerId,
-            player: playerId,
-            obstacle: null,
-            block: playerData.block, 
-            direction: playerData.direction,
-            event: eventNumber,
-            level: currentLevel,
-            local_t:Date.now() - phaseStarttime //local variable
-        }, 'vote block');
+        //   let currentPlayerId = getCurrentPlayerId();
+        //   updateStateDirect(`localT/${currentPlayerId}`, {
+        //     inPlayer: currentPlayerId,
+        //     player: playerId,
+        //     obstacle: null,
+        //     block: playerData.block, 
+        //     direction: playerData.direction,
+        //     event: eventNumber,
+        //     level: currentLevel,
+        //     local_t:Date.now() - phaseStarttime //local variable
+        // }, 'vote block');
       }
       if(playerId == "events"){
           eventNumber = newState;
@@ -3254,39 +3193,15 @@ function receiveStateChange(pathNow, nodeName, newState, typeChange ) {
         block.dataset.x = x;
         block.dataset.y = y;
       }
-      
-      spawnClonesForBlock(block);
 
       setTimeout(() => {
         const arrows = block.querySelectorAll('.arrow');
-        // if (payload.move === false) {
-        // arrows.forEach(a => a.remove());
-        // return;
-        // }
-
         if (payload.move === false) {
-          // remove BOTH and stop
-          removeClonesForBlock(block);
-          removeOriginalsForBlock(block);
-          return;
+        arrows.forEach(a => a.remove());
+        return;
         }
   
         arrows.forEach(a => { if (a.dataset.direction !== payload.direction) a.remove(); });
-
-        document.querySelectorAll(
-          `.arrow-clone[data-source-color="${block.dataset.color}"]`
-        ).forEach(c => {
-          if (c.dataset.sourceDirection !== payload.direction) {
-            c.remove();
-          }
-        });
-
-        removeClonesForBlock(block);
-
-        block.querySelectorAll('.arrow').forEach(a => {
-          a.classList.remove('is-hidden');
-          a.classList.add('is-visible');
-        });
   
         moveBlock(block, x, y, payload.direction);
       }, 1000);
@@ -3311,82 +3226,7 @@ function receiveStateChange(pathNow, nodeName, newState, typeChange ) {
             _lastLevelEndAt = currentLevelSnap.endAt;
             renderLevelFromAuthority(currentLevelSnap);
           }
-        }else if(pathNow === 'localT'){
-
         }
-}
-
-function spawnClonesForBlock(block) {
-  // removeAllClonesForThisPlayer();
-  block.querySelectorAll('.arrow').forEach(arrow => {
-    if (arrow.dataset.playerId === String(thisPlayerID)) {
-      arrow.classList.remove('is-hidden');
-      arrow.classList.add('is-visible');
-      const rect = arrow.getBoundingClientRect();
-      const direction = arrow.dataset.direction;
-      let clone = document.querySelector(
-        `.arrow-clone[data-source-player-id="${thisPlayerID}"][data-source-direction="${direction}"]`
-      );
-      clone.style.left = `${rect.left}px`;
-      clone.style.top  = `${rect.top}px`;
-    }else{
-      spawnAllClone(arrow, block.dataset.color);
-    }
-  });
-}
-
-function spawnAllClone(arrow, color) {
-  const direction = arrow.dataset.direction;
-  if (!direction) return;
-
-  const arrowRect = arrow.getBoundingClientRect();
-
-  const clone = arrow.cloneNode(true);
-  clone.classList.add('arrow-clone');   // IMPORTANT
-  clone.dataset.sourceColor = color;   
-  clone.dataset.sourcePlayerId = arrow.dataset.playerId;
-  clone.dataset.sourceDirection = direction;
-  clone.classList.remove('is-hidden');
-  clone.classList.add('is-visible');
-  clone.style.position = 'fixed'; // viewport coords, safest
-  clone.style.pointerEvents = 'none';
-  clone.style.left = `${arrowRect.left}px`;
-  clone.style.top = `${arrowRect.top}px`;
-  clone.style.margin = '0';
-  clone.style.zIndex = 2147483647;
-
-  // IMPORTANT: reset transform from layout; we reapply direction cleanly
-  clone.style.transform = 'none';
-  clone.style.transition = 'opacity 150ms linear';
-
-  // Match direction visually (your existing mapping)
-  const rotationMap = {
-    down: 'rotate(90deg)',
-    left: 'rotate(180deg)',
-    up: 'rotate(270deg)',
-    right: 'rotate(0deg)'
-  };
-
-  clone.style.transform = rotationMap[direction] || 'none';
-  clone.style.transformOrigin = 'center center';
-
-  if (direction === 'left') {
-    clone.style.transform += ' scaleY(-1)';
-  }
-
-  document.body.appendChild(clone);
-
-}
-
-function removeClonesForBlock(block) {
-  const color = block.dataset.color;
-  document
-    .querySelectorAll(`.arrow-clone[data-source-color="${color}"]`)
-    .forEach(c => c.remove());
-}
-
-function removeOriginalsForBlock(block) {
-  block.querySelectorAll('.arrow').forEach(a => a.remove());
 }
 
 
