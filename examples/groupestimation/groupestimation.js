@@ -956,14 +956,8 @@ function cleanupPracticeBoard() {
 
 //  Conatant Game Variables
 
-function getNumPlayersFromURL() {
-  const params = new URLSearchParams(window.location.search);
-  const num = parseInt(params.get("numPlayers"));
-  return isNaN(num) ? 5 : Math.max(2, Math.min(num, 5)); // default to 5, clamp between 2–5
-}
-
-let GameName = "noCommDataCDAB";
-let NumPlayers = 1;
+let GameName = "testReFactor";
+let NumPlayers = 2;
 let MinPlayers = NumPlayers;
 let MaxPlayers = NumPlayers;
 let MaxSessions = 0;
@@ -1031,7 +1025,7 @@ let funList = {
 };
 
 // List the node names where we place listeners for any changes to the children of these nodes; set to '' if listening to changes for children of the root
-let listenerPaths = [ 'players', 'blocks', 'slots', 'obs', 'phase', 'moveBlock', 'level'];
+let listenerPaths = [ 'players', 'blocks', 'slots', 'obs', 'phase', 'level', 'votes', 'moves'];
 
 //  Initialize the Game Session with all Configs
 initializeMPLIB( sessionConfig , studyId , funList, listenerPaths, verbosity );
@@ -1638,43 +1632,85 @@ let levelPlacements = cdab;
 //     }
 // },
 // };
-function loadLevel(levelNumber) {
-  const config = levelPlacements[levelNumber];
-  if (!config) {
-      console.warn("No config for level", levelNumber);
-      return;
-  }
+// function loadLevel(levelNumber) {
+//   const config = levelPlacements[levelNumber];
+//   if (!config) {
+//       console.warn("No config for level", levelNumber);
+//       return;
+//   }
 
-  GameState.blocks = config.blocks;
-  GameState.slots = config.slots;
-  GameState.obstacles = config.obstacles;
+//   GameState.blocks = config.blocks;
+//   GameState.slots = config.slots;
+//   GameState.obstacles = config.obstacles;
 
-  updateStateDirect('blocks', GameState.blocks, 'initalizeBlock');
-  updateStateDirect('slots', GameState.slots, 'initalizeSlots');
-  //updateStateDirect('obs', GameState.obstacles, 'initalizeObstacle');
+//   updateStateDirect('blocks', GameState.blocks, 'initalizeBlock');
+//   updateStateDirect('slots', GameState.slots, 'initalizeSlots');
+//   //updateStateDirect('obs', GameState.obstacles, 'initalizeObstacle');
 
-  drawPerimeterWalls();
+//   drawPerimeterWalls();
 
-  Object.values(GameState.slots).forEach(slot => {
-      drawSlot(slot);
-  });
+//   Object.values(GameState.slots).forEach(slot => {
+//       drawSlot(slot);
+//   });
       
-  Object.values(GameState.blocks).forEach(block => {
-      drawBlock(block, false);
-  });
+//   Object.values(GameState.blocks).forEach(block => {
+//       drawBlock(block, false);
+//   });
 
-  // Object.values(GameState.obstacles).forEach(obstacles => {
-  //     drawBlock(obstacles, true);
-  //  });
+//   // Object.values(GameState.obstacles).forEach(obstacles => {
+//   //     drawBlock(obstacles, true);
+//   //  });
 
-  if (GameState.obstacles && Object.keys(GameState.obstacles).length > 0) {
-      updateStateDirect('obs', GameState.obstacles, 'initializeObstacle');
+//   if (GameState.obstacles && Object.keys(GameState.obstacles).length > 0) {
+//       updateStateDirect('obs', GameState.obstacles, 'initializeObstacle');
   
-      Object.values(GameState.obstacles).forEach(obstacle => {
-          drawBlock(obstacle, true);
-      });
-  }
-  //startLevelTimer(levelNumber);
+//       Object.values(GameState.obstacles).forEach(obstacle => {
+//           drawBlock(obstacle, true);
+//       });
+//   }
+//   //startLevelTimer(levelNumber);
+// }
+function initializeLevel(levelNumber) {
+  const config = levelPlacements[levelNumber];
+  if (!config) return;
+  
+  // Clear previous state
+  GameState.blocks = {};
+  GameState.obstacles = {};
+  GameState.slots = config.slots;
+  
+  // Initialize blocks with location property
+  Object.entries(config.blocks).forEach(([id, blockConfig]) => {
+    GameState.blocks[id] = {
+      location: { x: blockConfig.x, y: blockConfig.y },
+      color: blockConfig.color,
+      minVotes: blockConfig.minVotes,
+      locked: false
+    };
+  });
+  
+  // Initialize obstacles
+  Object.entries(config.obstacles || {}).forEach(([id, obsConfig]) => {
+    GameState.obstacles[id] = {
+      location: { x: obsConfig.x, y: obsConfig.y },
+      immovable: obsConfig.immovable || false
+    };
+  });
+  
+  // Write to Firebase
+  updateStateDirect('blocks', GameState.blocks, 'initialize blocks');
+  updateStateDirect('obs', GameState.obstacles, 'initialize obstacles');
+  updateStateDirect('slots', GameState.slots, 'initialize slots');
+  
+  // Render
+  drawPerimeterWalls();
+  Object.values(GameState.slots).forEach(slot => drawSlot(slot));
+  Object.entries(GameState.blocks).forEach(([id, block]) => {
+    drawBlock({ ...block, x: block.location.x, y: block.location.y, color: id }, false);
+  });
+  Object.entries(GameState.obstacles).forEach(([id, obs]) => {
+    drawBlock({ ...obs, x: obs.location.x, y: obs.location.y, id }, true);
+  });
 }
 
 function getTeammates() {
@@ -2281,91 +2317,91 @@ function isInsidePlayable(x, y) {
   return x >= min && x <= maxX && y >= min && y <= maxY;
 }
 
-function finalizeVotes() {
-  // 1) clear player selections for the next event
-  getCurrentPlayerIds().forEach(pid => {
-    updateStateDirect(`players/${pid}`, { block: null, direction: null, obstacle: null }, 'start new event');
-  });
+// function finalizeVotes() {
+//   // 1) clear player selections for the next event
+//   getCurrentPlayerIds().forEach(pid => {
+//     updateStateDirect(`players/${pid}`, { block: null, direction: null, obstacle: null }, 'start new event');
+//   });
 
-  const container = document.getElementById('image-container');
-  const blocks = container.querySelectorAll('.block');
-  const futurePlans = [];
+//   const container = document.getElementById('image-container');
+//   const blocks = container.querySelectorAll('.block');
+//   const futurePlans = [];
 
-  // 2) compute future plans
-  blocks.forEach(block => {
-    const voteCounts = { up: 0, down: 0, left: 0, right: 0 };
-    const arrows = block.querySelectorAll('.arrow');
-    arrows.forEach(arrow => { voteCounts[arrow.dataset.direction]++; });
+//   // 2) compute future plans
+//   blocks.forEach(block => {
+//     const voteCounts = { up: 0, down: 0, left: 0, right: 0 };
+//     const arrows = block.querySelectorAll('.arrow');
+//     arrows.forEach(arrow => { voteCounts[arrow.dataset.direction]++; });
 
-    const id = block.dataset.color;
-    const minRequired = getMinRequiredVotes(id);
-    const majorityDirection = getMajorityDirection(voteCounts, minRequired);
+//     const id = block.dataset.color;
+//     const minRequired = getMinRequiredVotes(id);
+//     const majorityDirection = getMajorityDirection(voteCounts, minRequired);
 
-    // current coords (guard for NaN)
-    let x = Number.parseInt(block.dataset.x, 10);
-    let y = Number.parseInt(block.dataset.y, 10);
+//     // current coords (guard for NaN)
+//     let x = Number.parseInt(block.dataset.x, 10);
+//     let y = Number.parseInt(block.dataset.y, 10);
 
-    let targetX = x, targetY = y;
-    if (majorityDirection === 'up')    targetY -= 1;
-    if (majorityDirection === 'down')  targetY += 1;
-    if (majorityDirection === 'left')  targetX -= 1;
-    if (majorityDirection === 'right') targetX += 1;
+//     let targetX = x, targetY = y;
+//     if (majorityDirection === 'up')    targetY -= 1;
+//     if (majorityDirection === 'down')  targetY += 1;
+//     if (majorityDirection === 'left')  targetX -= 1;
+//     if (majorityDirection === 'right') targetX += 1;
 
-    const size = block.dataset.obstacle === 'true' ? 2 : 3;
-    const willMove = !!majorityDirection && isInsidePlayable(targetX, targetY);
+//     const size = block.dataset.obstacle === 'true' ? 2 : 3;
+//     const willMove = !!majorityDirection && isInsidePlayable(targetX, targetY);
 
-    futurePlans.push({
-      id,
-      block,
-      direction: majorityDirection || null,
-      willMove,
-      size,
-      currentX: x,
-      currentY: y,
-      nextX: willMove ? targetX : x,   // <- always have coords
-      nextY: willMove ? targetY : y,   // <-
-      futureCoords: getOccupiedCells(willMove ? targetX : x, willMove ? targetY : y, size)
-    });
-  });
+//     futurePlans.push({
+//       id,
+//       block,
+//       direction: majorityDirection || null,
+//       willMove,
+//       size,
+//       currentX: x,
+//       currentY: y,
+//       nextX: willMove ? targetX : x,   // <- always have coords
+//       nextY: willMove ? targetY : y,   // <-
+//       futureCoords: getOccupiedCells(willMove ? targetX : x, willMove ? targetY : y, size)
+//     });
+//   });
 
-  // 3) resolve collisions
-  for (let i = 0; i < futurePlans.length; i++) {
-    for (let j = i + 1; j < futurePlans.length; j++) {
-      const a = futurePlans[i], b = futurePlans[j];
-      const overlap = a.futureCoords.some(pa => b.futureCoords.some(pb => pa.x === pb.x && pa.y === pb.y));
-      if (overlap) { a.willMove = false; a.nextX = a.currentX; a.nextY = a.currentY;
-                     b.willMove = false; b.nextX = b.currentX; b.nextY = b.currentY; }
-    }
-  }
+//   // 3) resolve collisions
+//   for (let i = 0; i < futurePlans.length; i++) {
+//     for (let j = i + 1; j < futurePlans.length; j++) {
+//       const a = futurePlans[i], b = futurePlans[j];
+//       const overlap = a.futureCoords.some(pa => b.futureCoords.some(pb => pa.x === pb.x && pa.y === pb.y));
+//       if (overlap) { a.willMove = false; a.nextX = a.currentX; a.nextY = a.currentY;
+//                      b.willMove = false; b.nextX = b.currentX; b.nextY = b.currentY; }
+//     }
+//   }
 
-  // 4) write every block's authoritative payload WITH location
-  const nowVersion = Date.now();
+//   // 4) write every block's authoritative payload WITH location
+//   const nowVersion = Date.now();
 
-  futurePlans.forEach(plan => {
-    // Ensure we always have valid coordinates
-    const x = plan.nextX;
-    const y = plan.nextY;
+//   futurePlans.forEach(plan => {
+//     // Ensure we always have valid coordinates
+//     const x = plan.nextX;
+//     const y = plan.nextY;
   
-    const payload = {
-      location: { x, y },
-      direction: plan.willMove ? plan.direction : null,
-      move: !!plan.willMove,
-      version: nowVersion
-    };
+//     const payload = {
+//       location: { x, y },
+//       direction: plan.willMove ? plan.direction : null,
+//       move: !!plan.willMove,
+//       version: nowVersion
+//     };
   
-    // Dynamic label for logging clarity
-    updateStateDirect(
-      `moveBlock/${plan.id}`,
-      payload,
-      plan.willMove ? 'movable block' : 'immovable block'
-    );
-    console.log(`Pushing moveBlock for ${plan.id}:`, payload.location.x, payload.location.y, payload.move);
-  });
+//     // Dynamic label for logging clarity
+//     updateStateDirect(
+//       `moveBlock/${plan.id}`,
+//       payload,
+//       plan.willMove ? 'movable block' : 'immovable block'
+//     );
+//     console.log(`Pushing moveBlock for ${plan.id}:`, payload.location.x, payload.location.y, payload.move);
+//   });
   
 
-  // 5) NOW advance the event counter (after moves are written)
-  updateStateDirect('players/events', eventNumber + 1, 'update event number');
-}
+//   // 5) NOW advance the event counter (after moves are written)
+//   updateStateDirect('players/events', eventNumber + 1, 'update event number');
+// }
 
 
 
@@ -2433,129 +2469,229 @@ function getMinRequiredVotes(color) {
 }
 
 
-function moveBlock(block, x, y, direction) {
-  // console.log(`moveBlock called for ${block.dataset.color}, direction: ${x}, ${y}}`);
+// function moveBlock(block, x, y, direction) {
+//   // console.log(`moveBlock called for ${block.dataset.color}, direction: ${x}, ${y}}`);
 
-  const color = block.dataset.color;
+//   const color = block.dataset.color;
 
-  // Skip slot locking logic if it's an obstacle
-  const isObstacle = block.dataset.obstacle === "true";
+//   // Skip slot locking logic if it's an obstacle
+//   const isObstacle = block.dataset.obstacle === "true";
 
-  // Don't move if already locked (only applies to non-obstacles)
-  if (!isObstacle && lockedBlocks[color]) return;
+//   // Don't move if already locked (only applies to non-obstacles)
+//   if (!isObstacle && lockedBlocks[color]) return;
 
-  // block.dataset.x = x;
-  // block.dataset.y = y;
-  const arrows = block.querySelectorAll('.arrow');
-  arrows.forEach(arrow => {
-      const direction = arrow.dataset.direction;
+//   // block.dataset.x = x;
+//   // block.dataset.y = y;
+//   const arrows = block.querySelectorAll('.arrow');
+//   arrows.forEach(arrow => {
+//       const direction = arrow.dataset.direction;
   
-      const offsetMap = {
-          up:    { dx: 0, dy: -1 },
-          down:  { dx: 0, dy: 1 },
-          left:  { dx: -1, dy: 0 },
-          right: { dx: 1, dy: 0 }
-      };
-      const offset = offsetMap[direction];
-      if (!offset) return;
+//       const offsetMap = {
+//           up:    { dx: 0, dy: -1 },
+//           down:  { dx: 0, dy: 1 },
+//           left:  { dx: -1, dy: 0 },
+//           right: { dx: 1, dy: 0 }
+//       };
+//       const offset = offsetMap[direction];
+//       if (!offset) return;
   
-      const arrowRect = arrow.getBoundingClientRect();
+//       const arrowRect = arrow.getBoundingClientRect();
   
-      // Create floating clone
-      const clone = arrow.cloneNode(true);
-      clone.style.position = 'absolute';
-      clone.style.pointerEvents = 'none';
-      clone.style.left = `${arrowRect.left}px`;
-      clone.style.top = `${arrowRect.top}px`;
-      clone.style.margin = '0';
-      clone.style.transform = 'none';
-      clone.style.transition = 'top 0.5s ease, left 0.5s ease';
-      document.body.appendChild(clone);
-      // Map direction to rotation
-      const rotationMap = {
-          down: 'rotate(90deg)',
-          left: 'rotate(180deg)',
-          up: 'rotate(270deg)',
-          right: 'rotate(0deg)'
-      };
+//       // Create floating clone
+//       const clone = arrow.cloneNode(true);
+//       clone.style.position = 'absolute';
+//       clone.style.pointerEvents = 'none';
+//       clone.style.left = `${arrowRect.left}px`;
+//       clone.style.top = `${arrowRect.top}px`;
+//       clone.style.margin = '0';
+//       clone.style.transform = 'none';
+//       clone.style.transition = 'top 0.5s ease, left 0.5s ease';
+//       document.body.appendChild(clone);
+//       // Map direction to rotation
+//       const rotationMap = {
+//           down: 'rotate(90deg)',
+//           left: 'rotate(180deg)',
+//           up: 'rotate(270deg)',
+//           right: 'rotate(0deg)'
+//       };
 
-      // Apply rotation to match the direction
-      clone.style.transform = rotationMap[direction];
-      clone.style.transformOrigin = 'center center';
-      if (direction === 'left') {
-          clone.style.transform += ' scaleY(-1)';
-      }
+//       // Apply rotation to match the direction
+//       clone.style.transform = rotationMap[direction];
+//       clone.style.transformOrigin = 'center center';
+//       if (direction === 'left') {
+//           clone.style.transform += ' scaleY(-1)';
+//       }
 
   
-      // Animate clone
-      requestAnimationFrame(() => {
-          clone.style.left = `${arrowRect.left + offset.dx * CELL_WIDTH}px`;
-          clone.style.top = `${arrowRect.top + offset.dy * CELL_HEIGHT}px`;
-      });
+//       // Animate clone
+//       requestAnimationFrame(() => {
+//           clone.style.left = `${arrowRect.left + offset.dx * CELL_WIDTH}px`;
+//           clone.style.top = `${arrowRect.top + offset.dy * CELL_HEIGHT}px`;
+//       });
   
-      // Animate sprite
-      animateSpriteOnce(clone, 6, 50, 50, 12);
+//       // Animate sprite
+//       animateSpriteOnce(clone, 6, 50, 50, 12);
   
-      // Clean up
-      setTimeout(() => clone.remove(), 500);
-  });
+//       // Clean up
+//       setTimeout(() => clone.remove(), 500);
+//   });
   
-  // Remove original static arrows
-  block.querySelectorAll('.arrow').forEach(a => a.remove());
+//   // Remove original static arrows
+//   block.querySelectorAll('.arrow').forEach(a => a.remove());
   
-  const ANIMATION_DURATION = 500; // Match arrow timing
+//   const ANIMATION_DURATION = 500; // Match arrow timing
 
 
-  block.style.transition = `top ${ANIMATION_DURATION}ms ease, left ${ANIMATION_DURATION}ms ease, transform 0.2s`;
-  block.style.left = (x * CELL_WIDTH) + 'px';
-  block.style.top = (y * CELL_HEIGHT) + 'px';
+//   block.style.transition = `top ${ANIMATION_DURATION}ms ease, left ${ANIMATION_DURATION}ms ease, transform 0.2s`;
+//   block.style.left = (x * CELL_WIDTH) + 'px';
+//   block.style.top = (y * CELL_HEIGHT) + 'px';
 
-  // Only check slot match if it's not an obstacle
-  if (!isObstacle) {
-      setTimeout(() => {
-          for (let slotColor in GameState.slots) {
-              const slot = GameState.slots[slotColor];
-              if (slot && slot.x === x && slot.y === y) {
-                  console.log(`Block ${color} reached slot at (${x}, ${y}). Locking.`);
+//   // Only check slot match if it's not an obstacle
+//   if (!isObstacle) {
+//       setTimeout(() => {
+//           for (let slotColor in GameState.slots) {
+//               const slot = GameState.slots[slotColor];
+//               if (slot && slot.x === x && slot.y === y) {
+//                   console.log(`Block ${color} reached slot at (${x}, ${y}). Locking.`);
 
-                  lockedBlocks[color] = true;
+//                   lockedBlocks[color] = true;
 
-                  const arrows = block.querySelectorAll('.direction-button');
-                  arrows.forEach(btn => btn.remove());
+//                   const arrows = block.querySelectorAll('.direction-button');
+//                   arrows.forEach(btn => btn.remove());
 
-                  block.style.backgroundImage = "url('./images/slot.png')"; // or a tinted version
-                  block.style.backgroundSize = 'cover';
-                  block.style.boxShadow = '0 0 6px gold';
-                  block.style.border = '2px solid gold';
+//                   block.style.backgroundImage = "url('./images/slot.png')"; // or a tinted version
+//                   block.style.backgroundSize = 'cover';
+//                   block.style.boxShadow = '0 0 6px gold';
+//                   block.style.border = '2px solid gold';
 
-                  block.style.transition = 'opacity 0.5s';
-                  block.style.opacity = '0';
+//                   block.style.transition = 'opacity 0.5s';
+//                   block.style.opacity = '0';
 
-                  setTimeout(() => {
-                      block.remove(); // Remove from DOM
-                      delete GameState.blocks[color]; // Remove from state
+//                   setTimeout(() => {
+//                       block.remove(); // Remove from DOM
+//                       delete GameState.blocks[color]; // Remove from state
 
-                      if (Object.keys(lockedBlocks).length === 3) {
-                          console.log("All blocks locked — advancing level...");
-                          //currentLevel++;
-                          lockedBlocks = {};  
-                          completedLevel = true;
+//                       if (Object.keys(lockedBlocks).length === 3) {
+//                           console.log("All blocks locked — advancing level...");
+//                           //currentLevel++;
+//                           lockedBlocks = {};  
+//                           completedLevel = true;
 
-                          //stopLevelTimer();
-                          clearImageContainer();
-                          if (countdownInterval) { clearInterval(countdownInterval); countdownInterval = null; }
-                          updateStateTransaction('level', 'toSurvey', { reason: 'cleared' });
+//                           //stopLevelTimer();
+//                           clearImageContainer();
+//                           if (countdownInterval) { clearInterval(countdownInterval); countdownInterval = null; }
+//                           updateStateTransaction('level', 'toSurvey', { reason: 'cleared' });
                       
-                      }
-                  }, 500);
-                  // delete GameState.slots[slotColor];
-                  break;
-              }
-          }
-   }, 500); 
+//                       }
+//                   }, 500);
+//                   // delete GameState.slots[slotColor];
+//                   break;
+//               }
+//           }
+//    }, 500); 
+//   }
+  
+
+// }
+
+
+function animateEntityMove(entityId, moveData) {
+  const { location, direction, moved } = moveData;
+  
+  const block = document.querySelector(`.block[data-color="${entityId}"]`);
+  if (!block) return;
+  
+  // Update dataset
+  block.dataset.x = location.x;
+  block.dataset.y = location.y;
+  
+  if (!moved) {
+    // Just remove arrows
+    block.querySelectorAll('.arrow').forEach(a => a.remove());
+    return;
   }
   
+  // Animate arrows flying
+  const arrows = block.querySelectorAll(`.arrow[data-direction="${direction}"]`);
+  arrows.forEach(arrow => {
+    const arrowRect = arrow.getBoundingClientRect();
+    const clone = arrow.cloneNode(true);
+    
+    clone.style.position = 'absolute';
+    clone.style.left = `${arrowRect.left}px`;
+    clone.style.top = `${arrowRect.top}px`;
+    clone.style.transition = 'top 0.5s ease, left 0.5s ease';
+    
+    document.body.appendChild(clone);
+    
+    const offsetMap = {
+      up: [0, -1],
+      down: [0, 1],
+      left: [-1, 0],
+      right: [1, 0]
+    };
+    const [dx, dy] = offsetMap[direction];
+    
+    requestAnimationFrame(() => {
+      clone.style.left = `${arrowRect.left + dx * CELL_WIDTH}px`;
+      clone.style.top = `${arrowRect.top + dy * CELL_HEIGHT}px`;
+    });
+    
+    setTimeout(() => clone.remove(), 500);
+  });
+  
+  // Remove original arrows
+  block.querySelectorAll('.arrow').forEach(a => a.remove());
+  
+  // Animate block
+  block.style.transition = 'top 0.5s ease, left 0.5s ease';
+  block.style.left = `${location.x * CELL_WIDTH}px`;
+  block.style.top = `${location.y * CELL_HEIGHT}px`;
+  
+  // Check for slot match after animation
+  setTimeout(() => {
+    checkSlotMatch(entityId, location);
+  }, 500);
+}
 
+
+function checkSlotMatch(blockId, location) {
+  const block = document.querySelector(`.block[data-color="${blockId}"]`);
+  if (!block || block.dataset.obstacle === "true") return;
+  
+  for (let slotId in GameState.slots) {
+    const slot = GameState.slots[slotId];
+    if (slot && slot.x === location.x && slot.y === location.y) {
+      console.log(`Block ${blockId} reached slot at (${location.x}, ${location.y})`);
+      
+      // Mark as locked
+      updateStateDirect(`blocks/${blockId}/locked`, true, 'lock block');
+      
+      // Animate out
+      block.style.transition = 'opacity 0.5s';
+      block.style.opacity = '0';
+      
+      setTimeout(() => {
+        block.remove();
+        delete GameState.blocks[blockId];
+        
+        // Check if all blocks locked
+        const allLocked = Object.values(GameState.blocks).every(b => b.locked);
+        if (allLocked) {
+          console.log("All blocks locked!");
+          completedLevel = true;
+          clearImageContainer();
+          if (countdownInterval) {
+            clearInterval(countdownInterval);
+            countdownInterval = null;
+          }
+          updateStateTransaction('level', 'toSurvey', { reason: 'cleared' });
+        }
+      }, 500);
+      
+      break;
+    }
+  }
 }
 
 function drawSlot(slot) {
@@ -2747,49 +2883,7 @@ function drawBlock(block, isObstacle) {
 
       arrow.addEventListener('click', () => {
           const playerId = getCurrentPlayerId();
-          if (isObstacle) {
-              updateStateDirect(`players/${playerId}`, {
-                  obstacle: id,
-                  block: null, 
-                  direction: dir,
-                  event: eventNumber,
-                  level: currentLevel,
-                  condition: assigendCondition,
-                  local_t:Date.now() - phaseStarttime //local variable
-              }, 'vote obs');
-
-            //   updateStateDirect(`localT/${playerId}`, {
-            //     inPlayer: playerId,
-            //     player: playerId,
-            //     obstacle: id,
-            //     block: null, 
-            //     direction: dir,
-            //     event: eventNumber,
-            //     level: currentLevel,
-            //     local_t:Date.now() - phaseStarttime //local variable
-            // }, 'vote obs');
-          } else {
-              updateStateDirect(`players/${playerId}`, {
-                  block: id,
-                  obstacle: null,
-                  direction: dir,
-                  event: eventNumber,
-                  level: currentLevel,
-                  condition: assigendCondition,
-                  local_t:Date.now() - phaseStarttime //local variable
-              }, 'vote blocks');
-
-            //   updateStateDirect(`localT/${playerId}`, {
-            //     inPlayer: playerId,
-            //     player: playerId,
-            //     block: id,
-            //     obstacle: null,
-            //     direction: dir,
-            //     event: eventNumber,
-            //     level: currentLevel,
-            //     local_t:Date.now() - phaseStarttime //local variable
-            // }, 'vote blocks');
-          }
+          castVote(id, dir, isObstacle);
       });
       
 
@@ -2799,21 +2893,210 @@ function drawBlock(block, isObstacle) {
   container.appendChild(div);
 }
 
+function castVote(targetId, direction, isObstacle) {
+  const playerId = getCurrentPlayerId();
+  const currentEvent = eventNumber;
+  
+  const voteData = {
+    targetId,
+    direction,
+    isObstacle,
+    timestamp: Date.now(),
+    level: currentLevel,
+    condition: assigendCondition
+  };
+  
+  // Write to centralized votes location
+  updateStateDirect(
+    `votes/${currentEvent}/${playerId}`, 
+    voteData, 
+    'player vote'
+  );
+}
 
-function addArrowToBlock(color, direction, playerId) {
-  const container = document.getElementById('image-container');
-  const block = container.querySelector(`.block[data-color="${color}"]`);
+function computeMovesFromVotes(blocksState, obstaclesState, votesForEvent) {
+  const moves = {};
+  
+  // Collect all entities (blocks + movable obstacles)
+  const entities = {};
+  
+  // Add blocks
+  Object.entries(blocksState || {}).forEach(([id, block]) => {
+    if (!block.locked) {
+      entities[id] = {
+        id,
+        location: block.location,
+        color: block.color,
+        minVotes: block.minVotes || 1,
+        size: 3,
+        isObstacle: false
+      };
+    }
+  });
+  
+  // Add movable obstacles
+  Object.entries(obstaclesState || {}).forEach(([id, obs]) => {
+    if (!obs.immovable) {
+      entities[id] = {
+        id,
+        location: obs.location,
+        minVotes: 1,
+        size: 2,
+        isObstacle: true
+      };
+    }
+  });
+  
+  // Count votes for each entity+direction
+  const voteCounts = {}; // { entityId: { up: 2, down: 1, ... } }
+  
+  Object.values(votesForEvent || {}).forEach(vote => {
+    if (!voteCounts[vote.targetId]) {
+      voteCounts[vote.targetId] = { up: 0, down: 0, left: 0, right: 0 };
+    }
+    voteCounts[vote.targetId][vote.direction]++;
+  });
+  
+  // Compute intended moves
+  const plans = [];
+  
+  Object.values(entities).forEach(entity => {
+    const votes = voteCounts[entity.id] || { up: 0, down: 0, left: 0, right: 0 };
+    const majorityDir = getMajorityDirection(votes, entity.minVotes);
+    
+    const currentLoc = entity.location;
+    let nextLoc = { ...currentLoc };
+    
+    if (majorityDir) {
+      const offsets = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
+      const [dx, dy] = offsets[majorityDir];
+      nextLoc = { x: currentLoc.x + dx, y: currentLoc.y + dy };
+    }
+    
+    // Check bounds
+    const inBounds = isInsidePlayable(nextLoc.x, nextLoc.y);
+    const willMove = majorityDir && inBounds;
+    
+    plans.push({
+      id: entity.id,
+      currentLoc,
+      nextLoc: willMove ? nextLoc : currentLoc,
+      direction: majorityDir,
+      willMove,
+      size: entity.size,
+      isObstacle: entity.isObstacle,
+      cells: getOccupiedCells(
+        willMove ? nextLoc.x : currentLoc.x,
+        willMove ? nextLoc.y : currentLoc.y,
+        entity.size
+      )
+    });
+  });
+  
+  // Collision detection
+  for (let i = 0; i < plans.length; i++) {
+    for (let j = i + 1; j < plans.length; j++) {
+      const a = plans[i];
+      const b = plans[j];
+      
+      const overlap = a.cells.some(cellA =>
+        b.cells.some(cellB => cellA.x === cellB.x && cellA.y === cellB.y)
+      );
+      
+      if (overlap) {
+        a.willMove = false;
+        a.nextLoc = a.currentLoc;
+        b.willMove = false;
+        b.nextLoc = b.currentLoc;
+      }
+    }
+  }
+  
+  // Build moves result
+  plans.forEach(plan => {
+    moves[plan.id] = {
+      location: plan.nextLoc,
+      direction: plan.willMove ? plan.direction : null,
+      moved: plan.willMove,
+      version: Date.now()
+    };
+  });
+  
+  return moves;
+}
+
+
+// function addArrowToBlock(color, direction, playerId) {
+//   const container = document.getElementById('image-container');
+//   const block = container.querySelector(`.block[data-color="${color}"]`);
+//   if (!block) return;
+
+//   // Remove this player's previous arrow from any block
+//   removeArrowFromPlayer(playerId);
+//   console.log(`[addArrowToBlock] Adding arrow for player ${playerId} to color ${color}`);
+
+//   // Get the arrival index to determine the correct image
+//   const arrivalIndex = playerColorMap[playerId]?.color; // assumes 1-based index
+//   const imgSrc = `./images/player${arrivalIndex}_arrow.png`;
+
+
+//   const arrow = document.createElement('div');
+//   arrow.classList.add('arrow');
+//   arrow.style.width = '50px';
+//   arrow.style.height = '50px';
+//   arrow.style.position = 'absolute';
+//   arrow.style.pointerEvents = 'none';
+//   arrow.style.zIndex = '10000';
+//   arrow.style.transformOrigin = 'center center';
+//   arrow.style.backgroundImage = `url(${imgSrc}) `;
+//   arrow.style.backgroundRepeat = 'no-repeat';
+//   arrow.style.backgroundSize = `${6 * 50}px 50px`;
+//   arrow.style.imageRendering = 'pixelated';
+
+
+//   // Rotate based on direction
+//   const rotationMap = {
+//       up: 'rotate(90deg)',
+//       right: 'rotate(180deg)',
+//       down: 'rotate(270deg)',
+//       left: 'rotate(0deg)'
+//   };
+//   const visualPosition = {
+//       up: 'down',
+//       down: 'up',
+//       left: 'right',
+//       right: 'left'
+//   };
+
+//   arrow.dataset.rotation = rotationMap[visualPosition[direction]] || 'rotate(0deg)';
+//   arrow.dataset.playerId = playerId;
+//   arrow.dataset.direction = direction;
+//   arrow.style.backgroundPosition = '0px 0px';
+//   //animateSpriteLoop(arrow, 6, 50, 50, 6);
+
+//   block.appendChild(arrow);
+//   const isObstacle = block.dataset.obstacle === "true";
+
+//   // Re-layout all arrows of this direction in the block
+//   layoutDirectionalArrows(block, direction,isObstacle );
+
+// }
+function renderVoteArrow(playerId, voteData) {
+  if (!voteData) return;
+  
+  const { targetId, direction } = voteData;
+  
+  // Remove old arrow from this player
+  document.querySelectorAll(`.arrow[data-player-id="${playerId}"]`).forEach(el => el.remove());
+  
+  // Find target block/obstacle
+  const block = document.querySelector(`.block[data-color="${targetId}"]`);
   if (!block) return;
-
-  // Remove this player's previous arrow from any block
-  removeArrowFromPlayer(playerId);
-  console.log(`[addArrowToBlock] Adding arrow for player ${playerId} to color ${color}`);
-
-  // Get the arrival index to determine the correct image
-  const arrivalIndex = playerColorMap[playerId]?.color; // assumes 1-based index
+  
+  // Add new arrow
+  const arrivalIndex = playerColorMap[playerId]?.color;
   const imgSrc = `./images/player${arrivalIndex}_arrow.png`;
-
-
+  
   const arrow = document.createElement('div');
   arrow.classList.add('arrow');
   arrow.style.width = '50px';
@@ -2821,41 +3104,28 @@ function addArrowToBlock(color, direction, playerId) {
   arrow.style.position = 'absolute';
   arrow.style.pointerEvents = 'none';
   arrow.style.zIndex = '10000';
-  arrow.style.transformOrigin = 'center center';
-  arrow.style.backgroundImage = `url(${imgSrc}) `;
+  arrow.style.backgroundImage = `url(${imgSrc})`;
   arrow.style.backgroundRepeat = 'no-repeat';
   arrow.style.backgroundSize = `${6 * 50}px 50px`;
   arrow.style.imageRendering = 'pixelated';
-
-
-  // Rotate based on direction
-  const rotationMap = {
-      up: 'rotate(90deg)',
-      right: 'rotate(180deg)',
-      down: 'rotate(270deg)',
-      left: 'rotate(0deg)'
-  };
-  const visualPosition = {
-      up: 'down',
-      down: 'up',
-      left: 'right',
-      right: 'left'
-  };
-
-  arrow.dataset.rotation = rotationMap[visualPosition[direction]] || 'rotate(0deg)';
+  
   arrow.dataset.playerId = playerId;
   arrow.dataset.direction = direction;
-  arrow.style.backgroundPosition = '0px 0px';
-  //animateSpriteLoop(arrow, 6, 50, 50, 6);
-
+  
+  const rotationMap = {
+    up: 'rotate(90deg)',
+    right: 'rotate(180deg)',
+    down: 'rotate(270deg)',
+    left: 'rotate(0deg)'
+  };
+  arrow.style.transform = rotationMap[direction] || 'rotate(0deg)';
+  
   block.appendChild(arrow);
+  
+  // Layout arrows
   const isObstacle = block.dataset.obstacle === "true";
-
-  // Re-layout all arrows of this direction in the block
-  layoutDirectionalArrows(block, direction,isObstacle );
-
+  layoutDirectionalArrows(block, direction, isObstacle);
 }
-
 
 function layoutDirectionalArrows(block, direction, isObstacle) {
   const arrows = Array.from(block.querySelectorAll(`.arrow[data-direction="${direction}"]`));
@@ -3038,8 +3308,6 @@ function newGame() {
   _createThisPlayerAvatar();
 
 
-  //loadLevel(currentLevel);
-
   (async () => {
       try {
         // Claim or create the controller lease atomically.
@@ -3104,55 +3372,49 @@ function receiveStateChange(pathNow, nodeName, newState, typeChange ) {
               _createOtherPlayerAvatar();
           }
       }        
-  
-      // 2. Draw the new arrow if both block and direction are selected
-      if (playerData.obstacle && playerData.direction) {
-          console.log(`playerData.block = ${playerData.block}, playerData.obstacle = ${playerData.obstacle}, direction = ${playerData.direction}`);
-          addArrowToBlock(playerData.obstacle, playerData.direction, playerId);
-          let currentPlayerId = getCurrentPlayerId();
-        //   updateStateDirect(`localT/${currentPlayerId}`, {
-        //     inPlayer: currentPlayerId,
-        //     player: playerId,
-        //     obstacle: playerData.obstacle,
-        //     block: null, 
-        //     direction: playerData.direction,
-        //     event: eventNumber,
-        //     level: currentLevel,
-        //     local_t:Date.now() - phaseStarttime //local variable
-        // }, 'vote obs');
-      } else if (playerData.block && playerData.direction) {
-          console.log(`playerData.block = ${playerData.block}, playerData.obstacle = ${playerData.obstacle}, direction = ${playerData.direction}`);
-          addArrowToBlock(playerData.block, playerData.direction, playerId);
-        //   let currentPlayerId = getCurrentPlayerId();
-        //   updateStateDirect(`localT/${currentPlayerId}`, {
-        //     inPlayer: currentPlayerId,
-        //     player: playerId,
-        //     obstacle: null,
-        //     block: playerData.block, 
-        //     direction: playerData.direction,
-        //     event: eventNumber,
-        //     level: currentLevel,
-        //     local_t:Date.now() - phaseStarttime //local variable
-        // }, 'vote block');
-      }
-      if(playerId == "events"){
-          eventNumber = newState;
-          console.log("the current event number is ", eventNumber, currentLevel);
-          let current = eventNumber - currentLevelSnap.startAt;
-          updateTimerDisplay(current);
-      }
       
 
+  } else if (pathNow.startsWith('votes/')) {
+
+    const parts = pathNow.split('/');
+    console.log("pathNow is", pathNow);
+    const eventNum = parseInt(parts[1]);
+    const playerId = nodeName;
+    console.log("current event number is",eventNum);
+    console.log("Event number local is", eventNumber);
+    
+    if (eventNum === eventNumber) {
+      // Render this player's vote arrow
+      renderVoteArrow(playerId, newState);
+    }
+    return;
+  } else if (pathNow.startsWith('moves/')) {
+    const parts = pathNow.split('/');
+    const eventNum = parseInt(parts[1]);
+    const entityId = nodeName;
+    
+    if (eventNum === eventNumber - 1) {
+      // This is the move we should animate
+      const moveData = newState;
+      animateEntityMove(entityId, moveData);
+    }
+    return;
   } else if(pathNow == "blocks" && (typeChange == 'onChildAdded' ||typeChange == 'onChildChanged')){
       console.log("Block update received:", nodeName, newState);
-      // let arrivalIndex = getCurrentPlayerArrivalIndex();
-
-
+      const blockId = nodeName;
+      const blockData = newState;
+      
+      // Update local state
+      GameState.blocks[blockId] = blockData;
+      
   }else if(pathNow == "slots" && (typeChange == 'onChildAdded' ||typeChange == 'onChildChanged')){
       // console.log("Slots update received:", nodeName, newState);
 
   }else if(pathNow == "obs" && (typeChange == 'onChildAdded' ||typeChange == 'onChildChanged')){
-      // console.log("received obstacle update");
+      const obsId = nodeName;
+      const obsData = newState;
+      
+      GameState.obstacles[obsId] = obsData;
 
   } else if (pathNow === 'phase') {
       // Update snapshot for any child under /phase
@@ -3170,43 +3432,44 @@ function receiveStateChange(pathNow, nodeName, newState, typeChange ) {
       // console.log('[PHASE SNAP]', JSON.stringify(currentPhaseSnap));
       // console.log('[COUNTDOWN ALIVE?]', Boolean(countdownInterval), lastRenderKey);
     
-    }else if (pathNow === 'moveBlock' &&
-              (typeChange === 'onChildAdded' || typeChange === 'onChildChanged')) {
+    // }else if (pathNow === 'moveBlock' &&
+    //           (typeChange === 'onChildAdded' || typeChange === 'onChildChanged')) {
 
-      const color = nodeName;
-      const payload = newState;
-      if (!payload) return;
+    //   const color = nodeName;
+    //   const payload = newState;
+    //   if (!payload) return;
 
-      console.log("plan for this is", payload)
-      // Ignore stale repeats
-      const v = Number(payload.version || 0);
-      if (v) {
-      if (lastMoveVersion[color] && v <= lastMoveVersion[color]) return;
-      lastMoveVersion[color] = v;
-      }
+    //   console.log("plan for this is", payload)
+    //   // Ignore stale repeats
+    //   const v = Number(payload.version || 0);
+    //   if (v) {
+    //   if (lastMoveVersion[color] && v <= lastMoveVersion[color]) return;
+    //   lastMoveVersion[color] = v;
+    //   }
 
-      const block = document.querySelector(`.block[data-color="${color}"]`);
-      if (!block) return;
+    //   const block = document.querySelector(`.block[data-color="${color}"]`);
+    //   if (!block) return;
       
-      const { x, y } = payload.location || {};
-      if (Number.isFinite(x) && Number.isFinite(y)) {
-        block.dataset.x = x;
-        block.dataset.y = y;
-      }
+    //   const { x, y } = payload.location || {};
+    //   if (Number.isFinite(x) && Number.isFinite(y)) {
+    //     block.dataset.x = x;
+    //     block.dataset.y = y;
+    //   }
 
-      setTimeout(() => {
-        const arrows = block.querySelectorAll('.arrow');
-        if (payload.move === false) {
-        arrows.forEach(a => a.remove());
-        return;
-        }
+    //   setTimeout(() => {
+    //     const arrows = block.querySelectorAll('.arrow');
+    //     if (payload.move === false) {
+    //     arrows.forEach(a => a.remove());
+    //     return;
+    //     }
   
-        arrows.forEach(a => { if (a.dataset.direction !== payload.direction) a.remove(); });
+    //     arrows.forEach(a => { if (a.dataset.direction !== payload.direction) a.remove(); });
   
-        moveBlock(block, x, y, payload.direction);
-      }, 1000);
+    //     moveBlock(block, x, y, payload.direction);
+    //   }, 1000);
 
-      } else if (pathNow === 'level') {
+    //   } 
+  }else if (pathNow === 'level') {
           currentLevelSnap = currentLevelSnap || {};
           if (nodeName === 'index')       currentLevelSnap.index = newState;
           if (nodeName === 'state')       currentLevelSnap.state = newState;
@@ -3219,6 +3482,17 @@ function receiveStateChange(pathNow, nodeName, newState, typeChange ) {
           console.log(currentLevelSnap);
           const stateChanged = currentLevelSnap.state !== _lastLevelState;
           const endAtChanged = currentLevelSnap.endAt !== _lastLevelEndAt;
+
+          if (nodeName === 'eventNumber') {
+            eventNumber = newState;  // Update global eventNumber
+            currentLevelSnap.eventNumber = newState;
+            
+            // Update UI timer
+            if (currentLevelSnap.startAt !== undefined) {
+              const current = Math.max(0, Math.min(eventNumber - currentLevelSnap.startAt, MAX_EVENTS_PER_LEVEL));
+              updateTimerDisplay(current);
+            }
+          }
         
           // Only render when state flips, or (while in play) endAt updates
           if (stateChanged || (currentLevelSnap.state === 'play' && endAtChanged)) {
@@ -3251,7 +3525,7 @@ if (L.state === 'play') {
      if (screen) screen.style.display = 'none';
     _lastLevelRenderKey = key;
     clearImageContainer();
-    loadLevel(L.index);
+    initializeLevel(L.index);
 
     console.log('level rendered for', L.index);
     startLevelTimerUIFromAuthority(L.startAt, L.endAt);
@@ -3272,19 +3546,6 @@ const MAX_EVENTS_PER_LEVEL = 40;
 // NEW: one heartbeat, started once
 let leaseHeartbeatId = null;
 
-// function startLeaseHeartbeat() {
-// if (leaseHeartbeatId) return;
-// leaseHeartbeatId = setInterval(() => {
-//   if (txBackoffMs) return;
-//   const p = currentPhaseSnap;
-//   if (canIBeController(p)) {
-//     renewLease();        // writes lease if I'm allowed
-//     maybeAdvancePhase(); // writes phase transitions when endTime passes
-//   } else {
-//     iAmController = false;
-//   }
-// }, PHASE_TICK_MS);
-// }
 
 function startLeaseHeartbeat() {
   if (leaseHeartbeatId) return;
@@ -3327,35 +3588,46 @@ async function maybeAdvancePhase() {
   const p = currentPhaseSnap;
   if (!p || !iAmController) return;
 
-  // const now = Date.now();
-  // if (now < (p.endTime || 0)) return;
-
   try {
     const expectVersion = Number(p.version || 0);
 
     if (p.current === 'voting') {
       console.log('[ADVANCE] voting → moving', { expectVersion });
 
+      // 1. Advance phase to "moving"
       const res = await updateStateTransaction('phase', 'advance', {
         expectVersion,
         nextPhase: 'moving',
         durationMs: 3200
       });
 
-      console.log("res is", res);
       if (res) {
-        finalizeVotes();
-      } else {
-        console.log('[ADVANCE] rejected, NOT finalizing votes');
+        // 2. Get current votes
+        const currentEvent = eventNumber;
+        
+        // 3. Compute moves (this writes to /moves/{eventNumber})
+        await computeAndWriteMoves(currentEvent);
+        
+        // 4. Increment event counter
+        await updateStateTransaction('level', 'incrementEvent', {});
+        
+        // 5. Clear votes for next round
+        await updateStateDirect(`votes/${currentEvent}`, null, 'clear votes');
       }
+      
     } else if (p.current === 'moving') {
       console.log('[ADVANCE] moving → voting', { expectVersion });
-      if(eventNumber > currentLevelSnap.endAt){
-        if (countdownInterval) { clearInterval(countdownInterval); countdownInterval = null; }
-        updateStateTransaction('level', 'toSurvey', { reason: 'time' });
-        console.log("toSurvey is called");
+      
+      // Check if level should end
+      if (eventNumber >= currentLevelSnap.endAt) {
+        if (countdownInterval) {
+          clearInterval(countdownInterval);
+          countdownInterval = null;
+        }
+        await updateStateTransaction('level', 'toSurvey', { reason: 'time' });
         return;
       }
+      
       await updateStateTransaction('phase', 'advance', {
         expectVersion,
         nextPhase: 'voting',
@@ -3363,18 +3635,17 @@ async function maybeAdvancePhase() {
       });
     }
 
-    // success → clear backoff
     if (txBackoffMs) {
       console.log('[ADVANCE OK] clearing backoff');
       txBackoffMs = 0;
     }
 
   } catch (e) {
-    // failure → back off so we don't spin and freeze the page
     txBackoffMs = Math.min((txBackoffMs || 500) * 2, 8000);
     console.warn('[ADVANCE ERROR] backing off', txBackoffMs, 'ms', e);
   }
 }
+
 
 // ---- Helpers ----
 function n(x, d = 0) { const v = Number(x); return Number.isFinite(v) ? v : d; }
@@ -3456,19 +3727,30 @@ if (path === 'phase') {
 
   if (action === 'seed') {
     if (!state) {
-      const startAt = eventNumber;
+      //const startAt = eventNumber;
       return {
         isAllowed: true,
         newState: {
           index: 0,
           state: 'play',
-          startAt,
-          endAt: startAt + MAX_EVENTS_PER_LEVEL,
+          startAt: 0,
+          endAt: MAX_EVENTS_PER_LEVEL,
           reason: null,
           controllerId: null,
           leaseUntil: 0,
           surveyDone: {}
         }
+      };
+    }
+    return { isAllowed: false, newState: null };
+  }
+
+  if (action === 'incrementEvent') {
+    if (stateName === 'play') {
+      const eventNum = Number(L.eventNumber || 0);
+      return {
+        isAllowed: true,
+        newState: { ...L, eventNumber: eventNum + 1 }
       };
     }
     return { isAllowed: false, newState: null };
@@ -3535,6 +3817,25 @@ if (path === 'phase') {
   }
 
   return { isAllowed: false, newState: null };
+}else if (path === 'moves') {
+  if (action === 'compute') {
+    const { blocksState, obstaclesState, votesForEvent } = args || {};
+    
+    // Only controller can compute moves
+    const phaseState = args.phaseState || {};
+    const me = getCurrentPlayerId();
+    if (phaseState.controllerId !== me) {
+      return { isAllowed: false, newState: null };
+    }
+    
+    const computedMoves = computeMovesFromVotes(blocksState, obstaclesState, votesForEvent);
+    
+    return {
+      isAllowed: true,
+      newState: computedMoves
+    };
+  }
+  return { isAllowed: false, newState: null };
 }
 
   if (!isAllowed) {
@@ -3547,7 +3848,31 @@ if (path === 'phase') {
 
 }
 
-
+async function computeAndWriteMoves(eventNum) {
+  // This function reads current state and writes moves
+  // It should ONLY be called by the controller
+  
+  // In a real implementation, you'd need to read from Firebase
+  // For now, we'll use the local state (this is a limitation)
+  
+  const votesForEvent = {}; // Read from `votes/${eventNum}`
+  
+  // Compute moves
+  const moves = computeMovesFromVotes(
+    GameState.blocks,
+    GameState.obstacles,
+    votesForEvent
+  );
+  
+  // Write each move
+  for (const [entityId, moveData] of Object.entries(moves)) {
+    await updateStateDirect(
+      `moves/${eventNum}/${entityId}`,
+      moveData,
+      'computed move'
+    );
+  }
+}
 
 // Function triggered when this client closes the window and the player needs to be removed from the state 
 function removePlayerState( playerId ) {
