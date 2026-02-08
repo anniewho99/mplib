@@ -45,7 +45,8 @@ import {
   getWaitRoomInfo
 } from "/mplib/src/mplib.js";
 
-
+import { executeLeaderAgent } from "./leaderAgent.js";
+import { executeFollowerAgent } from "./followerAgent.js";
 /*
   Game Configuration
   ------------------
@@ -67,7 +68,7 @@ let practiceCompleted = false;
 let playerName = generateRandomName();
 const instructionSteps = [
   {
-      text: `Welcome! In this game, your goal is to work with two other players to move all the blocks into the slots as quickly as possible across four levels.\n
+      text: `Welcome! In this game, your goal is to work with two other players, one other human player and a robot player, to move all the blocks into the slots as quickly as possible across four levels.\n
       Below is a video showing what the game looks like.\n
       We'll explain everything step by step.\n
       \n Note: To ensure data quality, participants should only take part once. If this game looks familiar or you believe you have completed a similar version before, please exit the study. Unfortunately, repeated participation cannot be compensated.`,
@@ -225,6 +226,25 @@ const instructionSteps = [
           </div>
              <div id="practiceTimer" style="text-align:center; font-size:18px; margin-top:10px; color:black;"></div>`
     },   
+    {
+      text: `
+        These are your teammates. One has a pink avatar, and the other is a robot player.
+      `,
+      demo: `
+        <div style="
+          display: flex; 
+          align-items: center; 
+          justify-content: center; 
+          gap: 40px;
+          height: 80px; 
+          margin: auto;">
+          <img src="./images/player2.png" alt="Player 2" 
+               style="width: 80px; height: 80px; image-rendering: pixelated;">
+          <img src="./images/robot.png" alt="Robot Player" 
+               style="width: 80px; height: 80px; image-rendering: pixelated;">
+        </div>
+      `
+  },
   {
           text: `
             Great job finishing the practice session! You will now be paired with two other participants to finish four levels together.\n
@@ -1064,7 +1084,7 @@ let assigendCondition;
 //   return allowed.has(cond) ? cond : null;
 // }
 
-assigendCondition ='cdab';
+assigendCondition ='bcda';
 
 console.log('assigned condition is', assigendCondition);
 
@@ -1399,7 +1419,7 @@ const dabc = {
 
 // applyCondition(forced);
 
-let levelPlacements = cdab;
+let levelPlacements = bcda;
 //cdab
 // const levelPlacements = {
 //   0: {
@@ -2144,6 +2164,138 @@ joinButton.addEventListener('click', function () {
   joinSession();
 });
 
+const urlParams = new URLSearchParams(window.location.search);
+const robotParam = urlParams.get('robot');
+
+const ROBOT_CONFIG = {
+  enabled: true,              // Set to false to disable robot
+  type: robotParam === 'follower' ? 'follower' : 'leader',            // 'leader' or 'follower'
+  name: 'RoboPlayer'         // Robot's display name
+};
+
+// function shouldCreateRobot() {
+//   // Only create robot if:
+//   // 1. Robot is enabled
+//   // 2. We have exactly 2 human players
+//   // 3. This browser is player 1 (host)
+//   if (!ROBOT_CONFIG.enabled) return false;
+  
+//   const myArrival = getCurrentPlayerArrivalIndex();
+//   const numPlayers = getNumberCurrentPlayers();
+  
+//   // Player 1's browser creates the robot when player 2 joins
+//   return (myArrival === 1 && numPlayers === 2);
+// }
+
+function isRobotPlayer(playerId) {
+  return playerId && playerId.startsWith('robot_');
+}
+
+let robotPlayerId = `robot`;
+
+function createRobotPlayer() {
+  console.log(' Creating robot player...');
+  
+  // Generate a robot player ID
+  const robotId = `robot`;
+  robotPlayerId = robotId;
+  
+  // // Add robot to playerColorMap
+  // playerColorMap[robotId] = {
+  //     color: 3,  // Robot always gets color 3
+  //     name: ROBOT_CONFIG.name
+  // };
+  
+  // Write robot data to Firebase
+  updateStateDirect(`players/${robotId}`, {
+      name: ROBOT_CONFIG.name,
+      isRobot: true
+  }, 'create robot player');
+  
+  console.log(' Robot player created:', robotId);
+  
+  return robotId;
+}
+
+// Global variable to track robot timeout
+let robotActionTimeout = null;
+
+// Schedule the robot to vote
+function scheduleRobotAction() {
+    // Clear any existing timeout
+    if (robotActionTimeout) {
+        clearTimeout(robotActionTimeout);
+        robotActionTimeout = null;
+    }
+    
+    // Only schedule if robot exists and this browser created it
+    if (!ROBOT_CONFIG.enabled || !robotPlayerId) {
+        console.log(' Robot not enabled or not created, skipping');
+        return;
+    }
+    
+    // Only the browser that created the robot should run its logic
+    const myArrival = getCurrentPlayerArrivalIndex();
+    if (myArrival !== 1) {
+        console.log(' Not player 1, not running robot logic');
+        return;
+    }
+    
+    console.log(' Scheduling robot action...');
+    
+    // Delay based on agent type
+    const delay = ROBOT_CONFIG.type === 'leader' ? 50 : 4200;
+    
+    robotActionTimeout = setTimeout(() => {
+        executeRobotAction();
+    }, delay);
+}
+
+// Execute the robot's voting logic
+function executeRobotAction() {
+    console.log(' Executing robot action, type:', ROBOT_CONFIG.type);
+    
+    if (!robotPlayerId) {
+        console.error(' No robot player ID!');
+        return;
+    }
+    
+    // Create a castVote function specifically for the robot
+    const robotCastVote = (targetId, direction, isObstacle) => {
+        console.log(' Robot voting:', { targetId, direction, isObstacle });
+        
+        const currentEvent = currentPhaseSnap?.eventNumber || 0;
+        console.log(' Robot Casting vote for event:', currentEvent);
+        
+        const voteData = {
+          targetId,
+          direction,
+          isObstacle,
+          timestamp: Date.now(),
+          level: currentLevel,
+          condition: assigendCondition
+        };
+        
+        // Write to centralized votes location
+        updateStateDirect(
+          `votes/${currentEvent}/${robotPlayerId}`, 
+          voteData, 
+          'player vote'
+        );
+    };
+    
+    // Run the appropriate agent algorithm
+    if (ROBOT_CONFIG.type === 'leader') {
+        console.log(' Running LEADER agent');
+        console.log('currentGameState', GameState);
+        executeLeaderAgent(GameState, robotCastVote);
+    } else if (ROBOT_CONFIG.type === 'follower') {
+        console.log(' Running FOLLOWER agent');
+        executeFollowerAgent(GameState, robotCastVote, getAllPlayerIdsWithRobot, isRobotPlayer);
+    } else {
+        console.error('Unknown robot type:', ROBOT_CONFIG.type);
+    }
+}
 
 /*
   Game Logic and UI
@@ -2168,6 +2320,8 @@ let lastphase = false;
 
 let phaseStarttime;
 
+let lastRobotScheduledKey = '';  
+
 function renderPhase(p) {
 const msg = document.getElementById('turnMessage');
 if (!msg) return; // DOM may have been rebuilt
@@ -2190,10 +2344,16 @@ if(lastphase != phase){
 // Toggle inputs strictly from phase
 if (phase === 'voting') { showDirectionButtons(); } else { hideDirectionButtons(); }
 
+
 // Avoid stacking intervals: derive a render key from authoritative state
 const key = `${phase}|${endTime}`;
 if (lastRenderKey === key && countdownInterval) return;  // already rendering this state
 lastRenderKey = key;
+
+if (phase === 'voting' && lastRobotScheduledKey !== key) {
+  lastRobotScheduledKey = key;
+  scheduleRobotAction();
+}
 
 if (countdownInterval) { clearInterval(countdownInterval); countdownInterval = null; }
 
@@ -2247,15 +2407,24 @@ function assignAvatarColors() {
       color: 1,
       name: playerName
   };
-  const allPlayerIds = getAllPlayerIds().sort(); // This should return array of 3 IDs, including local
+  const allPlayerIds = getAllPlayerIdsWithRobot().sort(); 
+  const robotId = allPlayerIds.find(id => isRobotPlayer(id));
+  const humanIds = allPlayerIds.filter(id => !isRobotPlayer(id) && id !== playerId);
 
   let index = 2;
-  allPlayerIds.forEach((id, i) => {
+  humanIds.forEach((id, i) => {
       if (id !== playerId) {
           playerColorMap[id] = { name: "", color: index };
           index++;
       }
   });
+
+  if (robotId) {
+    playerColorMap[robotId] = { 
+        name: ROBOT_CONFIG.name || "RoboPlayer", 
+        color: 3  
+    };
+}
   _createThisPlayerAvatar(); 
 }
 
@@ -2806,8 +2975,10 @@ function renderVoteArrow(playerId, voteData) {
   if (!block) return;
   
   // Add new arrow
-  const arrivalIndex = playerColorMap[playerId]?.color;
-  const imgSrc = `./images/player${arrivalIndex}_arrow.png`;
+  const colorIndex = playerColorMap[playerId]?.color;
+  const imgSrc = (colorIndex === 3)
+        ? `./images/robot_arrow.png`
+        : `./images/player${colorIndex}_arrow.png`;
   
   const arrow = document.createElement('div');
   arrow.classList.add('arrow');
@@ -2941,7 +3112,7 @@ function _setPlayerAvatarCSS() {
   // Get element responsible for player avatar colors
   let root = document.querySelector(":root");
   console.log("Root", root);
-  let allPlayerIDs = getCurrentPlayerIds();
+  let allPlayerIDs = getAllPlayerIdsWithRobot();
   allPlayerIDs.forEach((player) => root.style.setProperty(
       "--" + player + "-avatar-backgroundcolor", 'lightgray'
   ));
@@ -2978,12 +3149,25 @@ function _createThisPlayerAvatar() {
 }
 
 
+function getAllPlayerIdsWithRobot() {
+  const humanIds = getCurrentPlayerIds();
+  
+  // If robot exists, add it to the list
+  if (ROBOT_CONFIG.enabled) {
+      console.log("robot id is", humanIds);
+      console.log("robot id is", humanIds);
+      return [...humanIds, robotPlayerId];
+  }
+  console.log("robot id is not here", robotPlayerId);
+  return humanIds;
+}
 
 function _createOtherPlayerAvatar() {
   let otherPlayerContainer = document.getElementById('other-player-content');
 
   const thisPlayerID = getCurrentPlayerId();
-  const allPlayerIDs = getCurrentPlayerIds();
+  const allPlayerIDs = getAllPlayerIdsWithRobot();
+  console.log("player ids are", allPlayerIDs);
 
   otherPlayerContainer.innerHTML = ''; // Clear any existing avatars
 
@@ -2999,7 +3183,9 @@ function _createOtherPlayerAvatar() {
               3: 6
           }[allPlayerIDs.length] || 12;
 
-          const avatarSrc = `./images/player${arrivalIndex}.png`;
+          const avatarSrc = (arrivalIndex === 3) 
+          ? `./images/robot.png` 
+          : `./images/player${arrivalIndex}.png`;
 
           otherPlayerContainer.innerHTML += `
               <div class="col-${columnSize}" id="${playerId}-container">
@@ -3025,6 +3211,9 @@ function newGame() {
   // Initialize a game
   //let whoStarts;
   practiceTimerInterval = null;
+  if((getCurrentPlayerArrivalIndex() == 1) && (ROBOT_CONFIG.enabled)){
+    createRobotPlayer();
+  }
   assignAvatarColors();
   _setPlayerAvatarCSS();
   _createThisPlayerAvatar();
@@ -3080,18 +3269,19 @@ function receiveStateChange(pathNow, nodeName, newState, typeChange ) {
       const playerData = newState; // newState contains { selectedBlock, selectedDirection }
 
       if (playerData.name) {
+          const isRobot = playerData.isRobot === true || playerId.startsWith('robot');
           playerColorMap[playerId] = {
-              color: playerColorMap[playerId]?.color ?? null,
-              name: playerData.name
-          };
+            color: playerColorMap[playerId]?.color ?? (isRobot ? 3 : null), // Robot gets color 4
+            name: playerData.name
+        };
       
-          console.log("Player data received:");
-          console.log(playerColorMap);
+        console.log("Player data received:", playerId, isRobot ? "🤖 (ROBOT)" : "👤 (HUMAN)");
+        console.log(playerColorMap);
       
           // Check if all players have names
           const allHaveNames = Object.values(playerColorMap)
               .filter(p => p && typeof p.name === 'string')
-              .length === NumPlayers;
+              .length === 3;
       
           if (allHaveNames) {
               _createOtherPlayerAvatar();

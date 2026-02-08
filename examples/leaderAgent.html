@@ -110,7 +110,7 @@
 
 <script>
   // --- Constants (match your existing visual setup) ---
-  const GRID = 18;          // board cells: 0..17
+  const GRID = 20;          // board cells: 0..17
   const BLOCK_SIZE = 3;
   const OBS_SIZE = 2;
   const CELL = 40;
@@ -128,13 +128,17 @@
   };
 
   const INITIAL = {
-    blocks: { blue:{x:9,y:9}, red:{x:7,y:0}, yellow:{x:0,y:9} },
-    slots:  { slot0:{x:2,y:5}, slot1:{x:15,y:5} },
+    blocks: { blue:{x:12,y:10}, red:{x:9,y:1}, yellow:{x:2,y:10} },
+    slots:  { slot0:{x:3,y:4}, slot1:{x:15,y:4} },
     obstacles: {
-      obs0:{x:8,y:4,id:'obs0', immovable:true},
-      obs1:{x:8,y:6,id:'obs1', immovable:true},
-      obs2:{x:5,y:4,id:'obs2', immovable:false},
-      obs3:{x:11,y:4,id:'obs3', immovable:false},
+      obs0: { x: 6, y: 6, id: 'obs0', immovable: true  },
+        obs1: { x: 8, y: 4, id: 'obs1', immovable: true},
+        obs2: { x: 12, y: 5, id: 'obs2', immovable: true  },
+        obs3: { x: 10, y: 7, id: 'obs3', immovable: true},
+        obs4: { x: 14, y: 7, id: 'obs4', immovable: false },
+        obs5: { x: 3, y: 1, id: 'obs5', immovable: false},
+        obs6: { x: 3, y: 7, id: 'obs6', immovable: false },
+        obs7: { x: 10, y: 10, id: 'obs7', immovable: false }
     }
   };
 

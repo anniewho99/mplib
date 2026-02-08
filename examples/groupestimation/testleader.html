@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Leader Agent Tester</title>
+    <style>
+        body {
+            font-family: monospace;
+            padding: 20px;
+            background: #1e1e1e;
+            color: #d4d4d4;
+        }
+        .test-case {
+            background: #2d2d2d;
+            border: 1px solid #404040;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+        }
+        button {
+            background: #0e639c;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin: 5px;
+            cursor: pointer;
+            border-radius: 3px;
+        }
+        button:hover {
+            background: #1177bb;
+        }
+        pre {
+            background: #1e1e1e;
+            padding: 10px;
+            border-radius: 3px;
+            overflow-x: auto;
+        }
+        .output {
+            margin-top: 10px;
+            border-top: 1px solid #404040;
+            padding-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Leader Agent Test Harness</h1>
+    
+    <div class="test-case">
+        <h2>Test Case 1: bcda Level 0</h2>
+        <button onclick="runTest1()">Run Test</button>
+        <div id="output1" class="output"></div>
+    </div>
+
+    <div class="test-case">
+        <h2>Test Case 2: Your HTML Example</h2>
+        <button onclick="runTest2()">Run Test</button>
+        <div id="output2" class="output"></div>
+    </div>
+
+    <div class="test-case">
+        <h2>Custom Test</h2>
+        <p>Edit the GameState below and click Run:</p>
+        <textarea id="customState" style="width: 100%; height: 200px; font-family: monospace; background: #1e1e1e; color: #d4d4d4; border: 1px solid #404040; padding: 5px;">
+{
+  "blocks": {
+    "blue": { "location": { "x": 12, "y": 10 }, "color": "blue", "minVotes": 3, "locked": false },
+    "red": { "location": { "x": 9, "y": 1 }, "color": "red", "minVotes": 2, "locked": false },
+    "yellow": { "location": { "x": 2, "y": 10 }, "color": "yellow", "minVotes": 1, "locked": false }
+  },
+  "slots": {
+    "slot0": { "x": 3, "y": 4 },
+    "slot1": { "x": 15, "y": 4 }
+  },
+  "obstacles": {
+    "obs0": { "location": { "x": 6, "y": 6 }, "immovable": true },
+    "obs1": { "location": { "x": 8, "y": 4 }, "immovable": true },
+    "obs2": { "location": { "x": 12, "y": 5 }, "immovable": true },
+    "obs3": { "location": { "x": 10, "y": 7 }, "immovable": true },
+    "obs4": { "location": { "x": 14, "y": 7 }, "immovable": false },
+    "obs5": { "location": { "x": 3, "y": 1 }, "immovable": false },
+    "obs6": { "location": { "x": 3, "y": 7 }, "immovable": false },
+    "obs7": { "location": { "x": 10, "y": 10 }, "immovable": false }
+  }
+}
+        </textarea>
+        <button onclick="runCustomTest()">Run Custom Test</button>
+        <div id="outputCustom" class="output"></div>
+    </div>
+
+<script type="module">
+// Import the leader agent
+import { executeLeaderAgent } from './leaderAgent.js';
+
+// Make it available globally
+window.testLeaderAgent = function(gameState) {
+    console.log('Testing with GameState:', gameState);
+    
+    let result = null;
+    const mockCastVote = (targetId, direction, isObstacle) => {
+        result = { targetId, direction, isObstacle };
+        console.log('Vote cast:', result);
+    };
+    
+    executeLeaderAgent(gameState, mockCastVote);
+    
+    return result;
+};
+
+console.log('Test harness loaded! Use window.testLeaderAgent(gameState)');
+</script>
+
+<script>
+// Test Case 1: bcda Level 0
+function runTest1() {
+    const gameState = {
+        blocks: {
+            blue: { location: { x: 12, y: 10 }, color: "blue", minVotes: 3, locked: false },
+            red: { location: { x: 9, y: 1 }, color: "red", minVotes: 2, locked: false },
+            yellow: { location: { x: 2, y: 10 }, color: "yellow", minVotes: 1, locked: false }
+        },
+        slots: {
+            slot0: { x: 3, y: 4 },
+            slot1: { x: 15, y: 4 }
+        },
+        obstacles: {
+            obs0: { location: { x: 6, y: 6 }, immovable: true },
+            obs1: { location: { x: 8, y: 4 }, immovable: true },
+            obs2: { location: { x: 12, y: 5 }, immovable: true },
+            obs3: { location: { x: 10, y: 7 }, immovable: true },
+            obs4: { location: { x: 14, y: 7 }, immovable: true },  // TRUE in bcda
+            obs5: { location: { x: 3, y: 1 }, immovable: false },
+            obs6: { location: { x: 3, y: 7 }, immovable: false },
+            obs7: { location: { x: 10, y: 10 }, immovable: false }
+        }
+    };
+    
+    const result = window.testLeaderAgent(gameState);
+    document.getElementById('output1').innerHTML = `
+        <pre>Result: ${JSON.stringify(result, null, 2)}</pre>
+        <p>Check console for detailed logs</p>
+    `;
+}
+
+// Test Case 2: HTML example with obs4 = false
+function runTest2() {
+    const gameState = {
+        blocks: {
+            blue: { location: { x: 12, y: 10 }, color: "blue", minVotes: 3, locked: false },
+            red: { location: { x: 9, y: 1 }, color: "red", minVotes: 2, locked: false },
+            yellow: { location: { x: 2, y: 10 }, color: "yellow", minVotes: 1, locked: false }
+        },
+        slots: {
+            slot0: { x: 3, y: 4 },
+            slot1: { x: 15, y: 4 }
+        },
+        obstacles: {
+            obs0: { location: { x: 6, y: 6 }, immovable: true },
+            obs1: { location: { x: 8, y: 4 }, immovable: true },
+            obs2: { location: { x: 12, y: 5 }, immovable: true },
+            obs3: { location: { x: 10, y: 7 }, immovable: true },
+            obs4: { location: { x: 13, y: 7 }, immovable: false },  // FALSE like HTML
+            obs5: { location: { x: 3, y: 1 }, immovable: false },
+            obs6: { location: { x: 1, y: 7 }, immovable: false },
+            obs7: { location: { x: 10, y: 10 }, immovable: false }
+        }
+    };
+    
+    const result = window.testLeaderAgent(gameState);
+    document.getElementById('output2').innerHTML = `
+        <pre>Result: ${JSON.stringify(result, null, 2)}</pre>
+        <p>Check console for detailed logs</p>
+    `;
+}
+
+// Custom test
+function runCustomTest() {
+    try {
+        const gameState = JSON.parse(document.getElementById('customState').value);
+        const result = window.testLeaderAgent(gameState);
+        document.getElementById('outputCustom').innerHTML = `
+            <pre>Result: ${JSON.stringify(result, null, 2)}</pre>
+            <p>Check console for detailed logs</p>
+        `;
+    } catch (e) {
+        document.getElementById('outputCustom').innerHTML = `
+            <pre style="color: #f48771;">Error: ${e.message}</pre>
+        `;
+    }
+}
+</script>
+
+<p style="color: #888; margin-top: 40px;">
+    <strong>Instructions:</strong><br>
+    1. Make sure leaderAgent.js is in the same folder as this HTML file<br>
+    2. Open this file in a browser (may need a local server for ES6 modules)<br>
+    3. Click the test buttons to see results<br>
+    4. Check the browser console (F12) for detailed logs<br>
+    5. Edit the custom test JSON to try different scenarios
+</p>
+
+</body>
+</html>
