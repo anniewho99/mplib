@@ -1050,7 +1050,9 @@ let localCountdown = 0;
 
 let currentLevel = 0;
 
-let eventNumber = 1;
+let eventNumber = 0;
+
+let currentVoteCache = {}; 
 
 let completedLevel = false;
 
@@ -1161,7 +1163,7 @@ const abcd = {
 const cdab = {
   0: {
       blocks: {
-        blue: { x: 16, y: 9, color: 'blue', minVotes: 3 },
+        //blue: { x: 16, y: 9, color: 'blue', minVotes: 3 },
         red: { x: 6, y: 1, color: 'red', minVotes: 2},
         yellow: { x: 6, y: 9, color: 'yellow', minVotes: 1 }
     },
@@ -1179,7 +1181,7 @@ const cdab = {
   },
   1:{
         blocks: {
-          blue: { x: 9, y: 4, color: 'blue', minVotes: 3 },
+          //blue: { x: 9, y: 4, color: 'blue', minVotes: 3 },
           red: { x: 7, y: 1, color: 'red', minVotes: 2 },
           yellow: { x: 11, y: 1, color: 'yellow', minVotes: 1 }
       },
@@ -1198,7 +1200,7 @@ const cdab = {
   }, 
   2: {
           blocks: {
-              blue: { x: 10, y: 10, color: 'blue', minVotes: 3 },
+              //blue: { x: 10, y: 10, color: 'blue', minVotes: 3 },
               red: { x: 8, y: 1, color: 'red', minVotes: 2},
               yellow: { x: 1, y: 10, color: 'yellow', minVotes: 1 }
           },
@@ -1215,7 +1217,7 @@ const cdab = {
     },
   3: {
     blocks: {
-        blue: { x: 12, y: 10, color: 'blue', minVotes: 3 },
+        //blue: { x: 12, y: 10, color: 'blue', minVotes: 3 },
         red: { x: 9, y: 1, color: 'red', minVotes: 2},
         yellow: { x: 2, y: 10, color: 'yellow', minVotes: 1 }
     },
@@ -1632,44 +1634,7 @@ let levelPlacements = cdab;
 //     }
 // },
 // };
-// function loadLevel(levelNumber) {
-//   const config = levelPlacements[levelNumber];
-//   if (!config) {
-//       console.warn("No config for level", levelNumber);
-//       return;
-//   }
 
-//   GameState.blocks = config.blocks;
-//   GameState.slots = config.slots;
-//   GameState.obstacles = config.obstacles;
-
-//   updateStateDirect('blocks', GameState.blocks, 'initalizeBlock');
-//   updateStateDirect('slots', GameState.slots, 'initalizeSlots');
-//   //updateStateDirect('obs', GameState.obstacles, 'initalizeObstacle');
-
-//   drawPerimeterWalls();
-
-//   Object.values(GameState.slots).forEach(slot => {
-//       drawSlot(slot);
-//   });
-      
-//   Object.values(GameState.blocks).forEach(block => {
-//       drawBlock(block, false);
-//   });
-
-//   // Object.values(GameState.obstacles).forEach(obstacles => {
-//   //     drawBlock(obstacles, true);
-//   //  });
-
-//   if (GameState.obstacles && Object.keys(GameState.obstacles).length > 0) {
-//       updateStateDirect('obs', GameState.obstacles, 'initializeObstacle');
-  
-//       Object.values(GameState.obstacles).forEach(obstacle => {
-//           drawBlock(obstacle, true);
-//       });
-//   }
-//   //startLevelTimer(levelNumber);
-// }
 function initializeLevel(levelNumber) {
   const config = levelPlacements[levelNumber];
   if (!config) return;
@@ -2317,94 +2282,6 @@ function isInsidePlayable(x, y) {
   return x >= min && x <= maxX && y >= min && y <= maxY;
 }
 
-// function finalizeVotes() {
-//   // 1) clear player selections for the next event
-//   getCurrentPlayerIds().forEach(pid => {
-//     updateStateDirect(`players/${pid}`, { block: null, direction: null, obstacle: null }, 'start new event');
-//   });
-
-//   const container = document.getElementById('image-container');
-//   const blocks = container.querySelectorAll('.block');
-//   const futurePlans = [];
-
-//   // 2) compute future plans
-//   blocks.forEach(block => {
-//     const voteCounts = { up: 0, down: 0, left: 0, right: 0 };
-//     const arrows = block.querySelectorAll('.arrow');
-//     arrows.forEach(arrow => { voteCounts[arrow.dataset.direction]++; });
-
-//     const id = block.dataset.color;
-//     const minRequired = getMinRequiredVotes(id);
-//     const majorityDirection = getMajorityDirection(voteCounts, minRequired);
-
-//     // current coords (guard for NaN)
-//     let x = Number.parseInt(block.dataset.x, 10);
-//     let y = Number.parseInt(block.dataset.y, 10);
-
-//     let targetX = x, targetY = y;
-//     if (majorityDirection === 'up')    targetY -= 1;
-//     if (majorityDirection === 'down')  targetY += 1;
-//     if (majorityDirection === 'left')  targetX -= 1;
-//     if (majorityDirection === 'right') targetX += 1;
-
-//     const size = block.dataset.obstacle === 'true' ? 2 : 3;
-//     const willMove = !!majorityDirection && isInsidePlayable(targetX, targetY);
-
-//     futurePlans.push({
-//       id,
-//       block,
-//       direction: majorityDirection || null,
-//       willMove,
-//       size,
-//       currentX: x,
-//       currentY: y,
-//       nextX: willMove ? targetX : x,   // <- always have coords
-//       nextY: willMove ? targetY : y,   // <-
-//       futureCoords: getOccupiedCells(willMove ? targetX : x, willMove ? targetY : y, size)
-//     });
-//   });
-
-//   // 3) resolve collisions
-//   for (let i = 0; i < futurePlans.length; i++) {
-//     for (let j = i + 1; j < futurePlans.length; j++) {
-//       const a = futurePlans[i], b = futurePlans[j];
-//       const overlap = a.futureCoords.some(pa => b.futureCoords.some(pb => pa.x === pb.x && pa.y === pb.y));
-//       if (overlap) { a.willMove = false; a.nextX = a.currentX; a.nextY = a.currentY;
-//                      b.willMove = false; b.nextX = b.currentX; b.nextY = b.currentY; }
-//     }
-//   }
-
-//   // 4) write every block's authoritative payload WITH location
-//   const nowVersion = Date.now();
-
-//   futurePlans.forEach(plan => {
-//     // Ensure we always have valid coordinates
-//     const x = plan.nextX;
-//     const y = plan.nextY;
-  
-//     const payload = {
-//       location: { x, y },
-//       direction: plan.willMove ? plan.direction : null,
-//       move: !!plan.willMove,
-//       version: nowVersion
-//     };
-  
-//     // Dynamic label for logging clarity
-//     updateStateDirect(
-//       `moveBlock/${plan.id}`,
-//       payload,
-//       plan.willMove ? 'movable block' : 'immovable block'
-//     );
-//     console.log(`Pushing moveBlock for ${plan.id}:`, payload.location.x, payload.location.y, payload.move);
-//   });
-  
-
-//   // 5) NOW advance the event counter (after moves are written)
-//   updateStateDirect('players/events', eventNumber + 1, 'update event number');
-// }
-
-
-
 function getOccupiedCells(startX, startY, size) {
   const cells = [];
   for (let dx = 0; dx < size; dx++) {
@@ -2468,139 +2345,22 @@ function getMinRequiredVotes(color) {
   return minVotesMap[color] || 1; // default to 1 if undefined
 }
 
-
-// function moveBlock(block, x, y, direction) {
-//   // console.log(`moveBlock called for ${block.dataset.color}, direction: ${x}, ${y}}`);
-
-//   const color = block.dataset.color;
-
-//   // Skip slot locking logic if it's an obstacle
-//   const isObstacle = block.dataset.obstacle === "true";
-
-//   // Don't move if already locked (only applies to non-obstacles)
-//   if (!isObstacle && lockedBlocks[color]) return;
-
-//   // block.dataset.x = x;
-//   // block.dataset.y = y;
-//   const arrows = block.querySelectorAll('.arrow');
-//   arrows.forEach(arrow => {
-//       const direction = arrow.dataset.direction;
-  
-//       const offsetMap = {
-//           up:    { dx: 0, dy: -1 },
-//           down:  { dx: 0, dy: 1 },
-//           left:  { dx: -1, dy: 0 },
-//           right: { dx: 1, dy: 0 }
-//       };
-//       const offset = offsetMap[direction];
-//       if (!offset) return;
-  
-//       const arrowRect = arrow.getBoundingClientRect();
-  
-//       // Create floating clone
-//       const clone = arrow.cloneNode(true);
-//       clone.style.position = 'absolute';
-//       clone.style.pointerEvents = 'none';
-//       clone.style.left = `${arrowRect.left}px`;
-//       clone.style.top = `${arrowRect.top}px`;
-//       clone.style.margin = '0';
-//       clone.style.transform = 'none';
-//       clone.style.transition = 'top 0.5s ease, left 0.5s ease';
-//       document.body.appendChild(clone);
-//       // Map direction to rotation
-//       const rotationMap = {
-//           down: 'rotate(90deg)',
-//           left: 'rotate(180deg)',
-//           up: 'rotate(270deg)',
-//           right: 'rotate(0deg)'
-//       };
-
-//       // Apply rotation to match the direction
-//       clone.style.transform = rotationMap[direction];
-//       clone.style.transformOrigin = 'center center';
-//       if (direction === 'left') {
-//           clone.style.transform += ' scaleY(-1)';
-//       }
-
-  
-//       // Animate clone
-//       requestAnimationFrame(() => {
-//           clone.style.left = `${arrowRect.left + offset.dx * CELL_WIDTH}px`;
-//           clone.style.top = `${arrowRect.top + offset.dy * CELL_HEIGHT}px`;
-//       });
-  
-//       // Animate sprite
-//       animateSpriteOnce(clone, 6, 50, 50, 12);
-  
-//       // Clean up
-//       setTimeout(() => clone.remove(), 500);
-//   });
-  
-//   // Remove original static arrows
-//   block.querySelectorAll('.arrow').forEach(a => a.remove());
-  
-//   const ANIMATION_DURATION = 500; // Match arrow timing
-
-
-//   block.style.transition = `top ${ANIMATION_DURATION}ms ease, left ${ANIMATION_DURATION}ms ease, transform 0.2s`;
-//   block.style.left = (x * CELL_WIDTH) + 'px';
-//   block.style.top = (y * CELL_HEIGHT) + 'px';
-
-//   // Only check slot match if it's not an obstacle
-//   if (!isObstacle) {
-//       setTimeout(() => {
-//           for (let slotColor in GameState.slots) {
-//               const slot = GameState.slots[slotColor];
-//               if (slot && slot.x === x && slot.y === y) {
-//                   console.log(`Block ${color} reached slot at (${x}, ${y}). Locking.`);
-
-//                   lockedBlocks[color] = true;
-
-//                   const arrows = block.querySelectorAll('.direction-button');
-//                   arrows.forEach(btn => btn.remove());
-
-//                   block.style.backgroundImage = "url('./images/slot.png')"; // or a tinted version
-//                   block.style.backgroundSize = 'cover';
-//                   block.style.boxShadow = '0 0 6px gold';
-//                   block.style.border = '2px solid gold';
-
-//                   block.style.transition = 'opacity 0.5s';
-//                   block.style.opacity = '0';
-
-//                   setTimeout(() => {
-//                       block.remove(); // Remove from DOM
-//                       delete GameState.blocks[color]; // Remove from state
-
-//                       if (Object.keys(lockedBlocks).length === 3) {
-//                           console.log("All blocks locked — advancing level...");
-//                           //currentLevel++;
-//                           lockedBlocks = {};  
-//                           completedLevel = true;
-
-//                           //stopLevelTimer();
-//                           clearImageContainer();
-//                           if (countdownInterval) { clearInterval(countdownInterval); countdownInterval = null; }
-//                           updateStateTransaction('level', 'toSurvey', { reason: 'cleared' });
-                      
-//                       }
-//                   }, 500);
-//                   // delete GameState.slots[slotColor];
-//                   break;
-//               }
-//           }
-//    }, 500); 
-//   }
-  
-
-// }
-
-
 function animateEntityMove(entityId, moveData) {
   const { location, direction, moved } = moveData;
   
   const block = document.querySelector(`.block[data-color="${entityId}"]`);
   if (!block) return;
-  
+
+  const isObstacle = block.dataset.obstacle === "true";
+  if (isObstacle) {
+    if (GameState.obstacles[entityId]) {
+      GameState.obstacles[entityId].location = location;
+    }
+  } else {
+    if (GameState.blocks[entityId]) {
+      GameState.blocks[entityId].location = location;
+    }
+  }
   // Update dataset
   block.dataset.x = location.x;
   block.dataset.y = location.y;
@@ -2616,10 +2376,13 @@ function animateEntityMove(entityId, moveData) {
   arrows.forEach(arrow => {
     const arrowRect = arrow.getBoundingClientRect();
     const clone = arrow.cloneNode(true);
+    clone.style.pointerEvents = 'none';
     
     clone.style.position = 'absolute';
     clone.style.left = `${arrowRect.left}px`;
     clone.style.top = `${arrowRect.top}px`;
+    clone.style.margin = '0';
+    clone.style.transform = 'none';
     clone.style.transition = 'top 0.5s ease, left 0.5s ease';
     
     document.body.appendChild(clone);
@@ -2631,12 +2394,25 @@ function animateEntityMove(entityId, moveData) {
       right: [1, 0]
     };
     const [dx, dy] = offsetMap[direction];
-    
+
+    const rotationMap = {
+      down: 'rotate(90deg)',
+      left: 'rotate(180deg)',
+      up: 'rotate(270deg)',
+      right: 'rotate(0deg)'
+  };
+
+    clone.style.transform = rotationMap[direction];
+    clone.style.transformOrigin = 'center center';
+    if (direction === 'left') {
+        clone.style.transform += ' scaleY(-1)';
+    }
+
     requestAnimationFrame(() => {
       clone.style.left = `${arrowRect.left + dx * CELL_WIDTH}px`;
       clone.style.top = `${arrowRect.top + dy * CELL_HEIGHT}px`;
     });
-    
+    animateSpriteOnce(clone, 6, 50, 50, 12);
     setTimeout(() => clone.remove(), 500);
   });
   
@@ -2882,7 +2658,6 @@ function drawBlock(block, isObstacle) {
       
 
       arrow.addEventListener('click', () => {
-          const playerId = getCurrentPlayerId();
           castVote(id, dir, isObstacle);
       });
       
@@ -2895,7 +2670,7 @@ function drawBlock(block, isObstacle) {
 
 function castVote(targetId, direction, isObstacle) {
   const playerId = getCurrentPlayerId();
-  const currentEvent = eventNumber;
+  const currentEvent = eventNumber;  
   
   const voteData = {
     targetId,
@@ -2947,21 +2722,11 @@ function computeMovesFromVotes(blocksState, obstaclesState, votesForEvent) {
     }
   });
   
-  // Count votes for each entity+direction
-  const voteCounts = {}; // { entityId: { up: 2, down: 1, ... } }
-  
-  Object.values(votesForEvent || {}).forEach(vote => {
-    if (!voteCounts[vote.targetId]) {
-      voteCounts[vote.targetId] = { up: 0, down: 0, left: 0, right: 0 };
-    }
-    voteCounts[vote.targetId][vote.direction]++;
-  });
-  
   // Compute intended moves
   const plans = [];
   
   Object.values(entities).forEach(entity => {
-    const votes = voteCounts[entity.id] || { up: 0, down: 0, left: 0, right: 0 };
+    const votes = votesForEvent[entity.id] || { up: 0, down: 0, left: 0, right: 0 };
     const majorityDir = getMajorityDirection(votes, entity.minVotes);
     
     const currentLoc = entity.location;
@@ -3025,62 +2790,6 @@ function computeMovesFromVotes(blocksState, obstaclesState, votesForEvent) {
   return moves;
 }
 
-
-// function addArrowToBlock(color, direction, playerId) {
-//   const container = document.getElementById('image-container');
-//   const block = container.querySelector(`.block[data-color="${color}"]`);
-//   if (!block) return;
-
-//   // Remove this player's previous arrow from any block
-//   removeArrowFromPlayer(playerId);
-//   console.log(`[addArrowToBlock] Adding arrow for player ${playerId} to color ${color}`);
-
-//   // Get the arrival index to determine the correct image
-//   const arrivalIndex = playerColorMap[playerId]?.color; // assumes 1-based index
-//   const imgSrc = `./images/player${arrivalIndex}_arrow.png`;
-
-
-//   const arrow = document.createElement('div');
-//   arrow.classList.add('arrow');
-//   arrow.style.width = '50px';
-//   arrow.style.height = '50px';
-//   arrow.style.position = 'absolute';
-//   arrow.style.pointerEvents = 'none';
-//   arrow.style.zIndex = '10000';
-//   arrow.style.transformOrigin = 'center center';
-//   arrow.style.backgroundImage = `url(${imgSrc}) `;
-//   arrow.style.backgroundRepeat = 'no-repeat';
-//   arrow.style.backgroundSize = `${6 * 50}px 50px`;
-//   arrow.style.imageRendering = 'pixelated';
-
-
-//   // Rotate based on direction
-//   const rotationMap = {
-//       up: 'rotate(90deg)',
-//       right: 'rotate(180deg)',
-//       down: 'rotate(270deg)',
-//       left: 'rotate(0deg)'
-//   };
-//   const visualPosition = {
-//       up: 'down',
-//       down: 'up',
-//       left: 'right',
-//       right: 'left'
-//   };
-
-//   arrow.dataset.rotation = rotationMap[visualPosition[direction]] || 'rotate(0deg)';
-//   arrow.dataset.playerId = playerId;
-//   arrow.dataset.direction = direction;
-//   arrow.style.backgroundPosition = '0px 0px';
-//   //animateSpriteLoop(arrow, 6, 50, 50, 6);
-
-//   block.appendChild(arrow);
-//   const isObstacle = block.dataset.obstacle === "true";
-
-//   // Re-layout all arrows of this direction in the block
-//   layoutDirectionalArrows(block, direction,isObstacle );
-
-// }
 function renderVoteArrow(playerId, voteData) {
   if (!voteData) return;
   
@@ -3118,8 +2827,18 @@ function renderVoteArrow(playerId, voteData) {
     down: 'rotate(270deg)',
     left: 'rotate(0deg)'
   };
-  arrow.style.transform = rotationMap[direction] || 'rotate(0deg)';
-  
+
+  const visualPosition = {
+    up: 'down',
+    down: 'up',
+    left: 'right',
+    right: 'left'
+};
+  //arrow.style.transform = rotationMap[direction] || 'rotate(0deg)';
+  arrow.dataset.rotation = rotationMap[visualPosition[direction]] || 'rotate(0deg)';
+  arrow.dataset.playerId = playerId;
+  arrow.dataset.direction = direction;
+  arrow.style.backgroundPosition = '0px 0px';
   block.appendChild(arrow);
   
   // Layout arrows
@@ -3374,32 +3093,50 @@ function receiveStateChange(pathNow, nodeName, newState, typeChange ) {
       }        
       
 
-  } else if (pathNow.startsWith('votes/')) {
-
-    const parts = pathNow.split('/');
-    console.log("pathNow is", pathNow);
-    const eventNum = parseInt(parts[1]);
-    const playerId = nodeName;
+  } else if (pathNow.startsWith('votes')) {
+    
+    const eventNum = parseInt(nodeName); 
+    const votesForEvent = newState;        
     console.log("current event number is",eventNum);
     console.log("Event number local is", eventNumber);
+    console.log("currentVote is", votesForEvent);
+    
+  if (eventNum === eventNumber) {
+    // CORRECT - Clear and rebuild from complete data
+    currentVoteCache = {};
+    
+    Object.entries(votesForEvent || {}).forEach(([playerId, voteData]) => {
+        const targetId = voteData.targetId;
+        const direction = voteData.direction;
+        
+        if (!currentVoteCache[targetId]) {
+            currentVoteCache[targetId] = { up: 0, down: 0, left: 0, right: 0 };
+        }
+        currentVoteCache[targetId][direction]++;
+        
+        renderVoteArrow(playerId, voteData);
+    });
+    
+    console.log('📊 Vote cache:', currentVoteCache);
+}
+  return;
+  } if (pathNow === 'moves') {
+    const eventNum = parseInt(nodeName);  // nodeName is the event number!
+    const movesForEvent = newState;        // newState has ALL moves for this event
+    
+    console.log("Moves received for event", eventNum);
+    console.log("Current event is", eventNumber);
+    console.log("move is ", movesForEvent);
     
     if (eventNum === eventNumber) {
-      // Render this player's vote arrow
-      renderVoteArrow(playerId, newState);
+        // Iterate through all entity moves for this event
+        Object.entries(movesForEvent || {}).forEach(([entityId, moveData]) => {
+            console.log("Animating move for entity", entityId, moveData);
+            animateEntityMove(entityId, moveData);
+        });
     }
     return;
-  } else if (pathNow.startsWith('moves/')) {
-    const parts = pathNow.split('/');
-    const eventNum = parseInt(parts[1]);
-    const entityId = nodeName;
-    
-    if (eventNum === eventNumber - 1) {
-      // This is the move we should animate
-      const moveData = newState;
-      animateEntityMove(entityId, moveData);
-    }
-    return;
-  } else if(pathNow == "blocks" && (typeChange == 'onChildAdded' ||typeChange == 'onChildChanged')){
+}else if(pathNow == "blocks" && (typeChange == 'onChildAdded' ||typeChange == 'onChildChanged')){
       console.log("Block update received:", nodeName, newState);
       const blockId = nodeName;
       const blockData = newState;
@@ -3427,48 +3164,6 @@ function receiveStateChange(pathNow, nodeName, newState, typeChange ) {
     
       // Render (this replaces the old endTime countdown block)
       renderPhase(currentPhaseSnap);
-    
-      // // Optional debug logs
-      // console.log('[PHASE SNAP]', JSON.stringify(currentPhaseSnap));
-      // console.log('[COUNTDOWN ALIVE?]', Boolean(countdownInterval), lastRenderKey);
-    
-    // }else if (pathNow === 'moveBlock' &&
-    //           (typeChange === 'onChildAdded' || typeChange === 'onChildChanged')) {
-
-    //   const color = nodeName;
-    //   const payload = newState;
-    //   if (!payload) return;
-
-    //   console.log("plan for this is", payload)
-    //   // Ignore stale repeats
-    //   const v = Number(payload.version || 0);
-    //   if (v) {
-    //   if (lastMoveVersion[color] && v <= lastMoveVersion[color]) return;
-    //   lastMoveVersion[color] = v;
-    //   }
-
-    //   const block = document.querySelector(`.block[data-color="${color}"]`);
-    //   if (!block) return;
-      
-    //   const { x, y } = payload.location || {};
-    //   if (Number.isFinite(x) && Number.isFinite(y)) {
-    //     block.dataset.x = x;
-    //     block.dataset.y = y;
-    //   }
-
-    //   setTimeout(() => {
-    //     const arrows = block.querySelectorAll('.arrow');
-    //     if (payload.move === false) {
-    //     arrows.forEach(a => a.remove());
-    //     return;
-    //     }
-  
-    //     arrows.forEach(a => { if (a.dataset.direction !== payload.direction) a.remove(); });
-  
-    //     moveBlock(block, x, y, payload.direction);
-    //   }, 1000);
-
-    //   } 
   }else if (pathNow === 'level') {
           currentLevelSnap = currentLevelSnap || {};
           if (nodeName === 'index')       currentLevelSnap.index = newState;
@@ -3610,6 +3305,8 @@ async function maybeAdvancePhase() {
         
         // 4. Increment event counter
         await updateStateTransaction('level', 'incrementEvent', {});
+        currentVoteCache = {};
+        console.log('Cleared vote cache');
         
         // 5. Clear votes for next round
         await updateStateDirect(`votes/${currentEvent}`, null, 'clear votes');
@@ -3855,13 +3552,13 @@ async function computeAndWriteMoves(eventNum) {
   // In a real implementation, you'd need to read from Firebase
   // For now, we'll use the local state (this is a limitation)
   
-  const votesForEvent = {}; // Read from `votes/${eventNum}`
+  const votes = currentVoteCache;  // Read from `votes/${eventNum}`
   
   // Compute moves
   const moves = computeMovesFromVotes(
     GameState.blocks,
     GameState.obstacles,
-    votesForEvent
+    votes
   );
   
   // Write each move
@@ -3872,6 +3569,7 @@ async function computeAndWriteMoves(eventNum) {
       'computed move'
     );
   }
+  console.log("computing moves");
 }
 
 // Function triggered when this client closes the window and the player needs to be removed from the state 
