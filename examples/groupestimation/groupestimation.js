@@ -257,7 +257,7 @@ const instructionSteps = [
   }
 ];
 
-let currentStep = 9;
+let currentStep = 0;
 
 const params = new URLSearchParams(window.location.search);
 if (params.has("skipinstruction")) {
@@ -1045,12 +1045,12 @@ Initialize all game variables that will be used. This includes:
 //  Game Global Variables
 let thisPlayerID = getCurrentPlayerId();
 let allPlayerIDs;
-let currentPhase = null;
-let localCountdown = 0;
+// let currentPhase = null;
+// let localCountdown = 0;
 
 let currentLevel = 0;
 
-let eventNumber = 0;
+//let eventNumber = 0;
 
 let currentVoteCache = {}; 
 
@@ -1058,25 +1058,25 @@ let completedLevel = false;
 
 let assigendCondition;
 
-function getForcedConditionFromURL() {
-  const cond = new URLSearchParams(window.location.search).get('cond');
-  const allowed = new Set(['abcd', 'cdab', 'bcda', 'dabc']);
-  return allowed.has(cond) ? cond : null;
-}
+// function getForcedConditionFromURL() {
+//   const cond = new URLSearchParams(window.location.search).get('cond');
+//   const allowed = new Set(['abcd', 'cdab', 'bcda', 'dabc']);
+//   return allowed.has(cond) ? cond : null;
+// }
 
 assigendCondition ='cdab';
 
 console.log('assigned condition is', assigendCondition);
 
-function applyCondition(cond) {
-  assigendCondition = cond;
-  console.log('assigned condition is', assigendCondition);
-  if (cond === 'abcd') levelPlacements = abcd;
-  else if (cond === 'cdab') levelPlacements = cdab;
-  else if (cond === 'bcda') levelPlacements = bcda;
-  else if (cond === 'dabc') levelPlacements = dabc;
-  else levelPlacements = null;
-}
+// function applyCondition(cond) {
+//   assigendCondition = cond;
+//   console.log('assigned condition is', assigendCondition);
+//   if (cond === 'abcd') levelPlacements = abcd;
+//   else if (cond === 'cdab') levelPlacements = cdab;
+//   else if (cond === 'bcda') levelPlacements = bcda;
+//   else if (cond === 'dabc') levelPlacements = dabc;
+//   else levelPlacements = null;
+// }
 
 //const forced = getForcedConditionFromURL();
 
@@ -2080,7 +2080,8 @@ function drawPerimeterWalls() {
 
 // --- Event-driven version ---
 function startLevelTimerUIFromAuthority(startAt) {
-  const current = Math.max(0, Math.min(eventNumber - startAt, MAX_EVENTS_PER_LEVEL));
+  const currentEvent = currentPhaseSnap?.eventNumber || currentLevelSnap?.eventNumber || 0;
+  const current = Math.max(0, Math.min(currentEvent - startAt, MAX_EVENTS_PER_LEVEL));
 
   updateTimerDisplay(current);
 }
@@ -2670,7 +2671,9 @@ function drawBlock(block, isObstacle) {
 
 function castVote(targetId, direction, isObstacle) {
   const playerId = getCurrentPlayerId();
-  const currentEvent = eventNumber;  
+  const currentEvent = currentLevelSnap?.eventNumber || 0;
+
+  console.log(' Casting vote for event:', currentEvent);
   
   const voteData = {
     targetId,
@@ -3030,7 +3033,9 @@ function newGame() {
   (async () => {
       try {
         // Claim or create the controller lease atomically.
-        await updateStateTransaction('phase', 'lease', {});
+        await updateStateTransaction('phase', 'lease', {
+          currentEvent: 0  //  Initialize with event 0
+      });
     
         // OPTIONAL: If the phase node was just created (version 0, no current),
         // advance transactionally into the first voting round.
@@ -3043,7 +3048,8 @@ function newGame() {
             await updateStateTransaction('phase', 'advance', {
               expectVersion: v,
               nextPhase: 'voting',
-              durationMs: votingDuration * 1000
+              durationMs: votingDuration * 1000,
+              eventNumber: 0 
             });
           }
         }, 200);
@@ -3097,11 +3103,12 @@ function receiveStateChange(pathNow, nodeName, newState, typeChange ) {
     
     const eventNum = parseInt(nodeName); 
     const votesForEvent = newState;        
-    console.log("current event number is",eventNum);
-    console.log("Event number local is", eventNumber);
+    console.log("current event number is", eventNum);
+    const currentEvent = currentPhaseSnap?.eventNumber || 0; 
+    console.log("Event number online is", currentEvent);
     console.log("currentVote is", votesForEvent);
     
-  if (eventNum === eventNumber) {
+  if (eventNum === currentEvent) {
     // CORRECT - Clear and rebuild from complete data
     currentVoteCache = {};
     
@@ -3117,18 +3124,17 @@ function receiveStateChange(pathNow, nodeName, newState, typeChange ) {
         renderVoteArrow(playerId, voteData);
     });
     
-    console.log('📊 Vote cache:', currentVoteCache);
-}
+    console.log(' Vote cache:', currentVoteCache);
+  }
   return;
   } if (pathNow === 'moves') {
     const eventNum = parseInt(nodeName);  // nodeName is the event number!
     const movesForEvent = newState;        // newState has ALL moves for this event
     
     console.log("Moves received for event", eventNum);
-    console.log("Current event is", eventNumber);
     console.log("move is ", movesForEvent);
     
-    if (eventNum === eventNumber) {
+    if (currentPhaseSnap?.current === 'moving') {
         // Iterate through all entity moves for this event
         Object.entries(movesForEvent || {}).forEach(([entityId, moveData]) => {
             console.log("Animating move for entity", entityId, moveData);
@@ -3179,12 +3185,13 @@ function receiveStateChange(pathNow, nodeName, newState, typeChange ) {
           const endAtChanged = currentLevelSnap.endAt !== _lastLevelEndAt;
 
           if (nodeName === 'eventNumber') {
-            eventNumber = newState;  // Update global eventNumber
+            //eventNumber = newState;  // Update global eventNumber
             currentLevelSnap.eventNumber = newState;
+            currentPhaseSnap.eventNumber = newState; 
             
             // Update UI timer
             if (currentLevelSnap.startAt !== undefined) {
-              const current = Math.max(0, Math.min(eventNumber - currentLevelSnap.startAt, MAX_EVENTS_PER_LEVEL));
+              const current = Math.max(0, Math.min(currentLevelSnap.eventNumber - currentLevelSnap.startAt, MAX_EVENTS_PER_LEVEL));
               updateTimerDisplay(current);
             }
           }
@@ -3263,7 +3270,11 @@ function canIBeController(p) {
 
 async function renewLease() {
   try {
-    await updateStateTransaction('phase', 'lease', {});
+
+    const currentEvent = currentLevelSnap?.eventNumber || 0;
+    await updateStateTransaction('phase', 'lease', {
+      currentEvent  
+  })
     iAmController = true;
     // success → clear any prior backoff
     if (txBackoffMs) {
@@ -3288,17 +3299,19 @@ async function maybeAdvancePhase() {
 
     if (p.current === 'voting') {
       console.log('[ADVANCE] voting → moving', { expectVersion });
-
+      const currentEvent = currentLevelSnap?.eventNumber || 0;
       // 1. Advance phase to "moving"
       const res = await updateStateTransaction('phase', 'advance', {
         expectVersion,
         nextPhase: 'moving',
-        durationMs: 3200
+        durationMs: 3200,
+        eventNumber: currentEvent 
       });
 
       if (res) {
         // 2. Get current votes
-        const currentEvent = eventNumber;
+        const currentEvent = currentLevelSnap?.eventNumber || 0;
+        console.log('Using authoritative event number:', currentEvent);
         
         // 3. Compute moves (this writes to /moves/{eventNumber})
         await computeAndWriteMoves(currentEvent);
@@ -3316,7 +3329,8 @@ async function maybeAdvancePhase() {
       console.log('[ADVANCE] moving → voting', { expectVersion });
       
       // Check if level should end
-      if (eventNumber >= currentLevelSnap.endAt) {
+      const currentEvent = currentLevelSnap?.eventNumber || 0; 
+      if (currentEvent >= currentLevelSnap.endAt) {
         if (countdownInterval) {
           clearInterval(countdownInterval);
           countdownInterval = null;
@@ -3328,7 +3342,8 @@ async function maybeAdvancePhase() {
       await updateStateTransaction('phase', 'advance', {
         expectVersion,
         nextPhase: 'voting',
-        durationMs: votingDuration * 1000
+        durationMs: votingDuration * 1000,
+        eventNumber: currentEvent
       });
     }
 
@@ -3364,6 +3379,7 @@ if (path === 'phase') {
   const version     = n(p.version, 0);
 
   if (action === 'lease') {
+    const { currentEvent } = args || {}; 
     // Allow if: phase missing, or lease expired/expiring (with drift), or I already hold it.
     const leaseOk = !state || (now > (leaseUntil - PHASE_DRIFT_MS)) || (controller === me);
     if (leaseOk) {
@@ -3372,14 +3388,15 @@ if (path === 'phase') {
         endTime:      endTime  || (now + votingDuration * 1000),
         controllerId: me,
         leaseUntil:   now + PHASE_LEASE_MS,
-        version      // DO NOT bump version on lease
+        version,      // DO NOT bump version on lease
+        eventNumber: currentEvent !== undefined ? currentEvent : (state?.eventNumber || 0)
       };
       isAllowed = true;
     }
   }
 
   if (action === 'advance') {
-    const { expectVersion, nextPhase, durationMs } = args || {};
+    const { expectVersion, nextPhase, durationMs, eventNumber: passedEventNum} = args || {};
     const expV       = n(expectVersion, version);
     const holderOk   = (controller === me);
     // be forgiving: permit nudge if lease only just expired within drift
@@ -3396,7 +3413,8 @@ if (path === 'phase') {
         endTime:      now + n(durationMs, 1500),
         controllerId: controller || me,
         leaseUntil:   now + PHASE_LEASE_MS,   // renew lease on advance
-        version:      version + 1             // ONLY bump on advance
+        version:      version + 1,             // ONLY bump on advance
+        eventNumber: passedEventNum !== undefined ? passedEventNum : (state?.eventNumber || 0)
       };
       isAllowed = true;
     }
@@ -3495,7 +3513,7 @@ if (path === 'phase') {
       if (nextIndex >= 4) {
         return { isAllowed: true, newState: { ...L, index: 4, state: 'ended' } };
       } else {
-        const t0 = eventNumber;
+        const t0 = L.eventNumber || 0;;
         return {
           isAllowed: true,
           newState: {
