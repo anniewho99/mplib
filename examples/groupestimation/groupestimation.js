@@ -68,7 +68,7 @@ let practiceCompleted = false;
 let playerName = generateRandomName();
 const instructionSteps = [
   {
-      text: `Welcome! In this game, your goal is to work with two other players, one other human player and a robot player, to move all the blocks into the slots as quickly as possible across four levels.\n
+      text: `Welcome! In this game, your goal is to work with one other participant and one robot to move all the blocks into the slots as quickly as possible across four levels.\n
       Below is a video showing what the game looks like.\n
       We'll explain everything step by step.\n
       \n Note: To ensure data quality, participants should only take part once. If this game looks familiar or you believe you have completed a similar version before, please exit the study. Unfortunately, repeated participation cannot be compensated.`,
@@ -247,7 +247,7 @@ const instructionSteps = [
   },
   {
           text: `
-            Great job finishing the practice session! You will now be paired with two other participants to finish four levels together.\n
+            Great job finishing the practice session! You will now be paired with one other participant and one robot to finish four levels together.\n
             Here's a quick recap before you join the real game:\n
             • Use arrow buttons to choose a direction you want to push a block or obstacle.\n
             • Some blocks need teamwork — look for the "2" or "3" labels to know how many players are required.\n
@@ -277,7 +277,7 @@ const instructionSteps = [
   }
 ];
 
-let currentStep = 0;
+let currentStep = 9;
 
 const params = new URLSearchParams(window.location.search);
 if (params.has("skipinstruction")) {
@@ -1724,10 +1724,12 @@ function showFinishScreenWithQuestions(teammates) {
 
     const block = document.createElement("div");
     block.className = "teammate-block";
+    const isRobot = color === 3; // Robot always has color 3
+    const avatarSrc = isRobot ? './images/robot.png' : `./images/player${color}.png`; 
     block.innerHTML = `
     <div style="border: 2px solid #999; border-radius: 12px; padding: 15px; margin-bottom: 20px;">
       <div style="text-align: center; margin-bottom: 10px;">
-      <img src="./images/player${color}.png" class="avatar-icon" alt="Player Icon" style="width: 50px; height: 50px; display: block; margin: 0 auto;">
+      <img src="${avatarSrc}" class="avatar-icon" alt="Player Icon" style="width: 50px; height: 50px; display: block; margin: 0 auto;">
       <div><strong>${name}</strong></div>
       </div>
   
@@ -2164,14 +2166,19 @@ joinButton.addEventListener('click', function () {
   joinSession();
 });
 
+
+// Robot configuration - can be overridden by URL parameters
+// Example: ?robot=leader or ?robot=follower or ?robot=none
 const urlParams = new URLSearchParams(window.location.search);
-const robotParam = urlParams.get('robot');
+const robotParam = urlParams.get('robot'); // 'leader', 'follower', or 'none'
 
 const ROBOT_CONFIG = {
-  enabled: true,              // Set to false to disable robot
-  type: robotParam === 'follower' ? 'follower' : 'leader',            // 'leader' or 'follower'
-  name: 'RoboPlayer'         // Robot's display name
+  enabled: robotParam !== 'none',                           // Disable with ?robot=none
+  type: robotParam === 'follower' ? 'follower' : 'leader',  // Default to leader, use ?robot=follower for follower
+  name: 'roboPlayer'
 };
+
+console.log('🤖 Robot Config:', ROBOT_CONFIG, '(from URL param:', robotParam || 'default (leader)', ')');
 
 // function shouldCreateRobot() {
 //   // Only create robot if:
@@ -2188,7 +2195,7 @@ const ROBOT_CONFIG = {
 // }
 
 function isRobotPlayer(playerId) {
-  return playerId && playerId.startsWith('robot_');
+  return playerId && playerId.startsWith('robo');
 }
 
 let robotPlayerId = `robot`;
@@ -3483,6 +3490,12 @@ async function renewLease() {
 async function maybeAdvancePhase() {
   const p = currentPhaseSnap;
   if (!p || !iAmController) return;
+  
+  // Don't advance phase if level is in survey or ended state
+  if (currentLevelSnap?.state === 'survey' || currentLevelSnap?.state === 'ended') {
+    console.log('[PHASE SKIP] Level is in survey/ended state, not advancing phase');
+    return;
+  }
 
   try {
     const expectVersion = Number(p.version || 0);
@@ -3518,17 +3531,21 @@ async function maybeAdvancePhase() {
     } else if (p.current === 'moving') {
       console.log('[ADVANCE] moving → voting', { expectVersion });
       
-      // Check if level should end
+      // Check if level should end BEFORE advancing phase
       const currentEvent = currentLevelSnap?.eventNumber || 0; 
       if (currentEvent >= currentLevelSnap.endAt) {
+        console.log('[LEVEL END] Time limit reached, going to survey');
         if (countdownInterval) {
           clearInterval(countdownInterval);
           countdownInterval = null;
         }
+        // Don't return early - let the transaction complete
         await updateStateTransaction('level', 'toSurvey', { reason: 'time' });
+        // Phase will stay in 'moving' but that's OK since we're going to survey
         return;
       }
       
+      // Normal case: advance back to voting for next round
       await updateStateTransaction('phase', 'advance', {
         expectVersion,
         nextPhase: 'voting',
