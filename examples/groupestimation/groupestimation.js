@@ -976,7 +976,7 @@ function cleanupPracticeBoard() {
 
 //  Conatant Game Variables
 
-let GameName = "testReFactor";
+let GameName = "leaderRobot";
 let NumPlayers = 2;
 let MinPlayers = NumPlayers;
 let MaxPlayers = NumPlayers;
