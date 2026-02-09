@@ -733,7 +733,7 @@ function addPracticeArrowToBlock(block, dir, whichPerson) {
   }else if(whichPerson == 2){
       arrow.style.backgroundImage = `url(./images/player2_arrow.png) `;
   }else if(whichPerson == 3){
-      arrow.style.backgroundImage = `url(./images/player3_arrow.png) `;
+      arrow.style.backgroundImage = `url(./images/robot_arrow.png) `;
   }
   arrow.style.backgroundRepeat = 'no-repeat';
   arrow.style.backgroundSize = `${6 * 50}px 50px`;
@@ -1913,7 +1913,7 @@ function submitPostTrial() {
   container.innerHTML = `<p> Thank you! Your responses have been recorded.<br>Redirecting to Prolific...</p>`;
 
   setTimeout(() => {
-      window.location.href = 'https://app.prolific.com/submissions/complete?cc=CK62NO8K'; // Replace with your code
+      window.location.href = 'https://app.prolific.com/submissions/complete?cc=C71S2AXW'; // Replace with your code
       endSession();
   }, 3000);
 }
@@ -2349,7 +2349,12 @@ if(lastphase != phase){
 }
 
 // Toggle inputs strictly from phase
-if (phase === 'voting') { showDirectionButtons(); } else { hideDirectionButtons(); }
+if (phase === 'voting') { 
+  showDirectionButtons(); } 
+  else { 
+    hideDirectionButtons();
+    removeAllCloneArrows();
+  }
 
 
 // Avoid stacking intervals: derive a render key from authoritative state
@@ -2397,6 +2402,11 @@ function seedLevelIfNeeded() {
   updateStateTransaction('level', 'seed', {  });
 }  
 
+function removeAllCloneArrows() {
+  document.querySelectorAll('.arrow-clone').forEach(clone => {
+    clone.remove();
+  });
+}
 
 let playerColorMap = {}; 
 
@@ -3025,7 +3035,59 @@ function renderVoteArrow(playerId, voteData) {
   // Layout arrows
   const isObstacle = block.dataset.obstacle === "true";
   layoutDirectionalArrows(block, direction, isObstacle);
+
 }
+
+function spawnFloatingArrowClone(arrow, block, color, direction) {
+  //const direction = arrow.dataset.direction;
+  if (!direction) return;
+  const playerId = arrow.dataset.playerId;
+  if (!playerId) return;
+
+  // Remove any existing clone from this player first
+  document.querySelectorAll(`.arrow-clone[data-source-player-id="${playerId}"]`).forEach(clone => {
+    clone.remove();
+  });
+
+
+  const arrowRect = arrow.getBoundingClientRect();
+
+  const clone = arrow.cloneNode(true);
+  clone.classList.add('arrow-clone');   // IMPORTANT
+  clone.dataset.sourceColor = color;   
+  clone.dataset.sourcePlayerId = arrow.dataset.playerId;
+  clone.dataset.sourceDirection = direction;
+  clone.style.position = 'fixed'; // viewport coords, safest
+  clone.style.pointerEvents = 'none';
+  clone.style.left = `${arrowRect.left}px`;
+  clone.style.top = `${arrowRect.top}px`;
+  clone.style.margin = '0';
+  clone.style.zIndex = 2147483647;
+
+  // IMPORTANT: reset transform from layout; we reapply direction cleanly
+  clone.style.transform = 'none';
+  clone.style.transition = 'opacity 150ms linear';
+
+  // Match direction visually (your existing mapping)
+  const rotationMap = {
+    down: 'rotate(90deg)',
+    left: 'rotate(180deg)',
+    up: 'rotate(270deg)',
+    right: 'rotate(0deg)'
+  };
+
+  clone.style.transform = rotationMap[direction] || 'none';
+  clone.style.transformOrigin = 'center center';
+
+  if (direction === 'left') {
+    clone.style.transform += ' scaleY(-1)';
+  }
+
+  document.body.appendChild(clone);
+
+}
+
+
 
 function layoutDirectionalArrows(block, direction, isObstacle) {
   const arrows = Array.from(block.querySelectorAll(`.arrow[data-direction="${direction}"]`));
@@ -3079,6 +3141,8 @@ function layoutDirectionalArrows(block, direction, isObstacle) {
       // Optional: Save px values for later animation use
       arrow.dataset.topPx = topPx;
       arrow.dataset.leftPx = leftPx;
+      const targetId = block.dataset.color;
+      spawnFloatingArrowClone(arrow, block, targetId, direction);
   });
 }
 
