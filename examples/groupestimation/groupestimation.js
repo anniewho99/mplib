@@ -2291,17 +2291,23 @@ function executeRobotAction() {
         );
     };
     
-    // Run the appropriate agent algorithm
-    if (ROBOT_CONFIG.type === 'leader') {
-        console.log(' Running LEADER agent');
-        console.log('currentGameState', GameState);
-        executeLeaderAgent(GameState, robotCastVote);
-    } else if (ROBOT_CONFIG.type === 'follower') {
-        console.log(' Running FOLLOWER agent');
-        executeFollowerAgent(GameState, robotCastVote, getAllPlayerIdsWithRobot, isRobotPlayer);
-    } else {
-        console.error('Unknown robot type:', ROBOT_CONFIG.type);
-    }
+    try {
+      if (ROBOT_CONFIG.type === 'leader') {
+          console.log('🤖 Running LEADER agent');
+          console.log('currentGameState', GameState);
+          executeLeaderAgent(GameState, robotCastVote);
+      } else if (ROBOT_CONFIG.type === 'follower') {
+          console.log('🤖 Running FOLLOWER agent');
+          executeFollowerAgent(GameState, robotCastVote, getAllPlayerIdsWithRobot, isRobotPlayer);
+      } else {
+          console.error('❌ Unknown robot type:', ROBOT_CONFIG.type);
+      }
+  } catch (error) {
+      console.error('❌ ROBOT CRASHED:', error);
+      console.error('Stack trace:', error.stack);
+      console.error('GameState at crash:', GameState);
+      // Robot stays alive - will try again next round
+  }
 }
 
 /*

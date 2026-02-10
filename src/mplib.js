@@ -511,16 +511,27 @@ export function joinSession() {
             onDisconnect(presenceRef).set("I disconnected!");
 
             // Set up a listener to handle disconnects
+            let disconnectTimer = null;
             connectedRef = ref(db, ".info/connected");
             onValue(connectedRef, (snap) => {
                 if (snap.val() === true) {
                     myconsolelog("Connected to firebase");
+                    // Cancel any pending disconnect timeout
+                    if (disconnectTimer) {
+                        clearTimeout(disconnectTimer);
+                        disconnectTimer = null;
+                        myconsolelog("Reconnected - cancelled disconnect timer");
+                    }
                 } else {
-                    myconsolelog("Disconnected from firebase");
-                    si.status = 'terminated';
-                    si.sessionErrorCode = 2;
-                    si.sessionErrorMsg = 'Session Disconnected';
-                    callback_sessionChange.endSession();
+                    myconsolelog("Disconnected from firebase - waiting 8 seconds before terminating session");
+                    // Give 8 seconds to reconnect before ending session
+                    disconnectTimer = setTimeout(() => {
+                        myconsolelog("Reconnection timeout - ending session");
+                        si.status = 'terminated';
+                        si.sessionErrorCode = 2;
+                        si.sessionErrorMsg = 'Session Disconnected';
+                        callback_sessionChange.endSession();
+                    }, 8000);  // 8 second grace period
                 }
             });
         }
