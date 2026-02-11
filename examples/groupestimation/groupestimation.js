@@ -2174,7 +2174,7 @@ const robotParam = urlParams.get('robot'); // 'leader', 'follower', or 'none'
 
 const ROBOT_CONFIG = {
   enabled: robotParam !== 'none',                           // Disable with ?robot=none
-  type: robotParam === 'follower' ? 'follower' : 'leader',  // Default to leader, use ?robot=follower for follower
+  type: 'follower',  // Default to leader, use ?robot=follower for follower
   name: 'roboPlayer'
 };
 
