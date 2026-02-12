@@ -976,7 +976,7 @@ function cleanupPracticeBoard() {
 
 //  Conatant Game Variables
 
-let GameName = "followerRobot";
+let GameName = "leaderRobot";
 let NumPlayers = 2;
 let MinPlayers = NumPlayers;
 let MaxPlayers = NumPlayers;
@@ -2174,7 +2174,7 @@ const robotParam = urlParams.get('robot'); // 'leader', 'follower', or 'none'
 
 const ROBOT_CONFIG = {
   enabled: robotParam !== 'none',                           // Disable with ?robot=none
-  type: 'follower',  // Default to leader, use ?robot=follower for follower
+  type: robotParam === 'follower' ? 'follower' : 'leader',  // Default to leader, use ?robot=follower for follower
   name: 'roboPlayer'
 };
 
@@ -2291,23 +2291,23 @@ function executeRobotAction() {
         );
     };
     
-    try {
-      if (ROBOT_CONFIG.type === 'leader') {
-          console.log('🤖 Running LEADER agent');
-          console.log('currentGameState', GameState);
-          executeLeaderAgent(GameState, robotCastVote);
-      } else if (ROBOT_CONFIG.type === 'follower') {
-          console.log('🤖 Running FOLLOWER agent');
-          executeFollowerAgent(GameState, robotCastVote, getAllPlayerIdsWithRobot, isRobotPlayer);
-      } else {
-          console.error('❌ Unknown robot type:', ROBOT_CONFIG.type);
-      }
-  } catch (error) {
-      console.error('❌ ROBOT CRASHED:', error);
-      console.error('Stack trace:', error.stack);
-      console.error('GameState at crash:', GameState);
-      // Robot stays alive - will try again next round
-  }
+   try {
+        if (ROBOT_CONFIG.type === 'leader') {
+            console.log('🤖 Running LEADER agent');
+            console.log('currentGameState', GameState);
+            executeLeaderAgent(GameState, robotCastVote);
+        } else if (ROBOT_CONFIG.type === 'follower') {
+            console.log('🤖 Running FOLLOWER agent');
+            executeFollowerAgent(GameState, robotCastVote, getAllPlayerIdsWithRobot, isRobotPlayer);
+        } else {
+            console.error('❌ Unknown robot type:', ROBOT_CONFIG.type);
+        }
+    } catch (error) {
+        console.error('❌ ROBOT CRASHED:', error);
+        console.error('Stack trace:', error.stack);
+        console.error('GameState at crash:', GameState);
+        // Robot stays alive - will try again next round
+    }
 }
 
 /*
