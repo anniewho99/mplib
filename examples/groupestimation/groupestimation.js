@@ -2242,9 +2242,9 @@ function scheduleRobotAction() {
     }
     
     // Only the browser that created the robot should run its logic
-    const myArrival = getCurrentPlayerArrivalIndex();
-    if (myArrival !== 1) {
-        console.log(' Not player 1, not running robot logic');
+    //const myArrival = getCurrentPlayerArrivalIndexStable();
+    if (!iAmController) {
+        console.log(' Not controller, not running robot logic');
         return;
     }
     
