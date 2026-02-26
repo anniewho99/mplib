@@ -976,7 +976,7 @@ function cleanupPracticeBoard() {
 
 //  Conatant Game Variables
 
-let GameName = "followerRVTwo";
+let GameName = "leaderVThree";
 let NumPlayers = 2;
 let MinPlayers = NumPlayers;
 let MaxPlayers = NumPlayers;
@@ -1084,7 +1084,7 @@ let assigendCondition;
 //   return allowed.has(cond) ? cond : null;
 // }
 
-assigendCondition ='abcd';
+assigendCondition ='bcda';
 
 console.log('assigned condition is', assigendCondition);
 
@@ -1419,7 +1419,7 @@ const dabc = {
 
 // applyCondition(forced);
 
-let levelPlacements = abcd;
+let levelPlacements = bcda;
 //cdab
 // const levelPlacements = {
 //   0: {
@@ -2174,7 +2174,7 @@ const robotParam = urlParams.get('robot'); // 'leader', 'follower', or 'none'
 
 const ROBOT_CONFIG = {
   enabled: robotParam !== 'none',                           // Disable with ?robot=none
-  type: 'follower',  // Default to leader, use ?robot=follower for follower
+  type: robotParam === 'follower' ? 'follower' : 'leader',  // Default to leader, use ?robot=follower for follower
   name: 'roboPlayer'
 };
 

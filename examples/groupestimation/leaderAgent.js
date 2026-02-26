@@ -1,8 +1,21 @@
 /**
  * leaderAgent.js
  * 
- * Leader agent algorithm - EXACT copy from leaderAgent.html
+ * Leader agent algorithm with probability-based action selection.
+ * Block numbering: yellow=1, red=2, blue=3
+ * Action is sampled from a distribution based on the lowest available (non-locked) block number.
  */
+
+// Probability table: P(action | lowest_available)
+// Rows: lowest_available (1, 2, 3)
+// Columns: block1 (yellow), block2 (red), block3 (blue), obstacle
+const PROB_TABLE = {
+    1: { yellow: 0.4101, red: 0.3183, blue: 0.0574, obstacle: 0.2142 },
+    2: { yellow: 0.0000, red: 0.8515, blue: 0.1131, obstacle: 0.0354 },
+    3: { yellow: 0.0000, red: 0.0000, blue: 0.9828, obstacle: 0.0172 },
+};
+
+const BLOCK_NUMBER = { yellow: 1, red: 2, blue: 3 };
 
 export function executeLeaderAgent(GameState, castVote) {
     console.log('🤖 Leader Agent: Running leader diagnostic...');
@@ -15,23 +28,20 @@ export function executeLeaderAgent(GameState, castVote) {
         const { type, id, dir } = result.chosen;
         const isObstacle = (type === 'obstacle');
         
-        // Cast the vote
         castVote(id, dir, isObstacle);
     } else {
         console.log('🤖 Leader: No valid move found');
     }
 }
 
-// COPIED DIRECTLY FROM leaderAgent.html
 function runLeaderDiagnostic(GameState) {
-    // Convert GameState to snapshot format matching HTML expectations
+    // Convert GameState to snapshot format
     const snapshot = {
         blocks: {},
         obstacles: {},
         slots: {}
     };
     
-    // Copy blocks
     for (const [name, block] of Object.entries(GameState.blocks || {})) {
         snapshot.blocks[name] = {
             x: block.location?.x ?? block.x,
@@ -40,7 +50,6 @@ function runLeaderDiagnostic(GameState) {
         };
     }
     
-    // Copy obstacles
     for (const [name, obs] of Object.entries(GameState.obstacles || {})) {
         snapshot.obstacles[name] = {
             x: obs.location?.x ?? obs.x,
@@ -50,7 +59,6 @@ function runLeaderDiagnostic(GameState) {
         };
     }
     
-    // Copy slots
     for (const [name, slot] of Object.entries(GameState.slots || {})) {
         snapshot.slots[name] = {
             x: slot.x,
@@ -60,8 +68,6 @@ function runLeaderDiagnostic(GameState) {
     
     console.log('🤖 Snapshot created:', snapshot);
 
-    // === EVERYTHING BELOW IS DIRECT COPY FROM HTML ===
-    
     const GRID = 20;          
     const BLOCK_SIZE = 3;
     const OBS_SIZE = 2;
@@ -85,7 +91,6 @@ function runLeaderDiagnostic(GameState) {
         }
     }
 
-    // ----- Helpers -----
     const inBoundsTL = (x,y,sz)=> (x>=0 && y>=0 && (x+sz)<=GRID && (y+sz)<=GRID);
 
     const rectOverlap = (ax,ay,asz, bx,by,bsz)=>
@@ -106,7 +111,7 @@ function runLeaderDiagnostic(GameState) {
 
     const slotsArr = Object.values(snapshot.slots || {});
 
-    // Lock blocks already in a slot (TL matches slot TL)
+    // Lock blocks already in a slot
     function isBlockInAnySlotTL(b){
         const bx = b.x|0, by = b.y|0;
         for (const sl of slotsArr){
@@ -120,7 +125,6 @@ function runLeaderDiagnostic(GameState) {
         }
     }
 
-    // TL lattice for 3x3 blocks
     const TL_W = GRID - BLOCK_SIZE + 1;
     const TL_H = GRID - BLOCK_SIZE + 1;
 
@@ -138,7 +142,6 @@ function runLeaderDiagnostic(GameState) {
         return true;
     }
 
-    // Multi-source BFS from slot TLs
     function bfs(includeMovables){
         const dist = Array.from({length: TL_H}, ()=>Array(TL_W).fill(INF));
         const qx = new Array(TL_W*TL_H);
@@ -179,37 +182,7 @@ function runLeaderDiagnostic(GameState) {
         return D[y][x];
     }
 
-    // ----- Determine whether any block is obstacle-blocked or detoured by movable obstacles -----
-    const affected = [];
-    const perBlock = [];
-
-    for (const [name,b] of Object.entries(snapshot.blocks || {})){
-        const bx = b.x|0, by = b.y|0;
-        const di = getDist(D_imm, bx, by);
-        const da = getDist(D_all, bx, by);
-
-        let status = "ok";
-        if (b.locked){
-            status = "in_slot_locked";
-        } else if (da>=INF && di<INF) {
-            status = "blocked_by_movable";
-        } else if (da>di) {
-            status = "detour_due_to_movable";
-        } else if (di>=INF && da>=INF) {
-            status = "unreachable_even_ignoring_movable";
-        }
-
-        const entry = { block:name, TL:{x:bx,y:by}, D_imm:di>=INF?null:di, D_all:da>=INF?null:da, status };
-
-        if (!b.locked && (status==="blocked_by_movable" || status==="detour_due_to_movable")){
-            affected.push(entry);
-        }
-        perBlock.push(entry);
-    }
-
-    const needsObstacleClearing = affected.length>0;
-
-    // ---------------- Obstacle move suggestion (bounded <= 2 moves) ----------------
+    // ----- Obstacle move helpers -----
     const DIRS_OBS = [
         {name:'up',dx:0,dy:-1},
         {name:'down',dx:0,dy:1},
@@ -227,12 +200,10 @@ function runLeaderDiagnostic(GameState) {
         if (!inBoundsTL(nx, ny, OBS_SIZE)) return {ok:false, reason:'Out of bounds'};
         if (footprintHitsWalls(nx, ny, OBS_SIZE)) return {ok:false, reason:'Hits wall'};
 
-        // collide with other obstacles
         for (const [k2,o2] of Object.entries(state.obstacles || {})){
             if (k2 === obsKey) continue;
             if (rectOverlap(nx,ny,OBS_SIZE, o2.x|0,o2.y|0,OBS_SIZE)) return {ok:false, reason:`Hits obstacle ${k2}`};
         }
-        // collide with blocks (ignore locked blocks)
         for (const [bn,b] of Object.entries(state.blocks || {})){
             if (b && b.locked) continue;
             if (rectOverlap(nx,ny,OBS_SIZE, b.x|0,b.y|0,BLOCK_SIZE)) return {ok:false, reason:`Hits block ${bn}`};
@@ -328,7 +299,6 @@ function runLeaderDiagnostic(GameState) {
 
         let best = null;
 
-        // 1-step
         for (const ok of movableKeys.map(o=>o.key)){
             for (const d1 of DIRS_OBS){
                 const c1 = isObstacleMoveLegal(snapshot, ok, d1);
@@ -340,7 +310,6 @@ function runLeaderDiagnostic(GameState) {
             }
         }
 
-        // 2-step (same obstacle, at most twice)
         for (const ok of movableKeys.map(o=>o.key)){
             for (const d1 of DIRS_OBS){
                 const c1 = isObstacleMoveLegal(snapshot, ok, d1);
@@ -360,25 +329,42 @@ function runLeaderDiagnostic(GameState) {
         return best;
     }
 
-    // ---------------- Block move selection helpers (only used when no obstacle to clear) ----------------
+    // Pick a random valid obstacle move (any movable obstacle, any direction, no collision)
+    function randomObstacleMove(){
+        const movableKeys = Object.keys(snapshot.obstacles || {}).filter(k => !snapshot.obstacles[k].immovable);
+        // Shuffle to avoid bias
+        for (let i = movableKeys.length - 1; i > 0; i--){
+            const j = Math.floor(Math.random() * (i + 1));
+            [movableKeys[i], movableKeys[j]] = [movableKeys[j], movableKeys[i]];
+        }
+        for (const ok of movableKeys){
+            const shuffledDirs = [...DIRS_OBS].sort(() => Math.random() - 0.5);
+            for (const d of shuffledDirs){
+                if (isObstacleMoveLegal(snapshot, ok, d).ok){
+                    return { obstacle: ok, dir: d.name };
+                }
+            }
+        }
+        return null;
+    }
+
+    // ----- Block move helpers -----
     const DIRS_BLOCK = [
         {name:"up", dx:0, dy:-1},
         {name:"down", dx:0, dy:1},
         {name:"left", dx:-1, dy:0},
         {name:"right", dx:1, dy:0},
     ];
-    
+
     function canPlaceBlockAt(x,y,selfName){
         if (!inBoundsTL(x,y,BLOCK_SIZE)) return false;
         if (footprintHitsWalls(x,y,BLOCK_SIZE)) return false;
-
         for (const o of immObs){
             if (rectOverlap(x,y,BLOCK_SIZE, o.x|0,o.y|0,OBS_SIZE)) return false;
         }
         for (const o of movObs){
             if (rectOverlap(x,y,BLOCK_SIZE, o.x|0,o.y|0,OBS_SIZE)) return false;
         }
-
         for (const [bn,b] of Object.entries(snapshot.blocks || {})){
             if (bn === selfName) continue;
             if (b && b.locked) continue;
@@ -393,7 +379,6 @@ function runLeaderDiagnostic(GameState) {
         for (const o of immObs){
             if (rectOverlap(x,y,BLOCK_SIZE, o.x|0,o.y|0,OBS_SIZE)) return false;
         }
-        // treat other blocks as obstacles (ignore locked blocks)
         for (const [bn,b] of Object.entries(snapshot.blocks || {})){
             if (bn === selfName) continue;
             if (b && b.locked) continue;
@@ -432,86 +417,135 @@ function runLeaderDiagnostic(GameState) {
         return dist;
     }
 
-    // ----- Compose output and decision -----
-    console.log('🤖 needsObstacleClearing:', needsObstacleClearing);
-    console.log('🤖 perBlock:', perBlock);
+    function chooseDownhillStepWithBlockGate(blockName){
+        const b = snapshot.blocks?.[blockName];
+        if (!b || b.locked) return {block:blockName, ok:false, reason:"locked/in slot"};
 
-    if (needsObstacleClearing){
-        console.log('🤖 Obstacle clearing needed');
-        const plan = suggestObstaclePlan(affected);
-        if (!plan || plan.score <= 0){
-            console.log('🤖 No beneficial obstacle move found');
-            return { chosen: null };
-        } else {
-            console.log('🤖 Obstacle plan:', plan);
-            return {
-                chosen: {
-                    type: 'obstacle',
-                    id: plan.obstacle,
-                    dir: plan.steps[0]
+        const x = b.x|0, y = b.y|0;
+
+        const di0 = getDist(D_imm, x, y);
+        const da0 = getDist(D_all, x, y);
+        const obstacleBlocked = (di0 < INF && (da0 >= INF || da0 > di0));
+        if (obstacleBlocked){
+            return {block:blockName, ok:false, reason:`obstacle-blocked`};
+        }
+
+        const D_imm_blocks = bfsImmWithBlocks(blockName);
+        const dib0 = getDist(D_imm_blocks, x, y);
+        const blockedByOtherBlocks =
+            (di0 < INF && dib0 >= INF) || (di0 < INF && dib0 > di0);
+
+        if (blockedByOtherBlocks){
+            return {block:blockName, ok:false, reason:`blocked by other blocks`};
+        }
+
+        for (const d of DIRS_BLOCK){
+            const nx = x + d.dx, ny = y + d.dy;
+            const d1 = getDist(D_all, nx, ny);
+            if (d1 >= da0) continue;
+            if (!canPlaceBlockAt(nx, ny, blockName)) continue;
+            return {block:blockName, ok:true, step:d.name, from:{x,y}, to:{x:nx,y:ny}, d0:da0, d1};
+        }
+        return {block:blockName, ok:false, reason:"no downhill legal move"};
+    }
+
+    // ----- Determine lowest_available -----
+    // yellow=1, red=2, blue=3
+    const blockAvailable = {
+        yellow: !!(snapshot.blocks?.yellow && !snapshot.blocks.yellow.locked),
+        red:    !!(snapshot.blocks?.red    && !snapshot.blocks.red.locked),
+        blue:   !!(snapshot.blocks?.blue   && !snapshot.blocks.blue.locked),
+    };
+
+    let lowestAvailable = null;
+    if (blockAvailable.yellow) lowestAvailable = 1;
+    else if (blockAvailable.red) lowestAvailable = 2;
+    else if (blockAvailable.blue) lowestAvailable = 3;
+
+    console.log('🤖 blockAvailable:', blockAvailable, '→ lowestAvailable:', lowestAvailable);
+
+    if (lowestAvailable === null){
+        console.log('🤖 No available blocks');
+        return { chosen: null };
+    }
+
+    // ----- Try actions based on probability distribution with fallback -----
+    // Action keys: 'yellow', 'red', 'blue', 'obstacle'
+    const probRow = PROB_TABLE[lowestAvailable];
+
+    // Build mutable probability pool (only include available blocks + obstacle)
+    let pool = {};
+    if (blockAvailable.yellow) pool.yellow  = probRow.yellow;
+    if (blockAvailable.red)    pool.red     = probRow.red;
+    if (blockAvailable.blue)   pool.blue    = probRow.blue;
+    pool.obstacle = probRow.obstacle;
+
+    function sampleFromPool(p){
+        const total = Object.values(p).reduce((a,b)=>a+b, 0);
+        if (total <= 0) return null;
+        let r = Math.random() * total;
+        for (const [key, w] of Object.entries(p)){
+            r -= w;
+            if (r <= 0) return key;
+        }
+        // fallback: last key
+        return Object.keys(p)[Object.keys(p).length - 1];
+    }
+
+    // Try actions, removing infeasible ones and re-sampling
+    while (Object.keys(pool).length > 0){
+        const action = sampleFromPool(pool);
+        if (!action) break;
+
+        console.log('🤖 Sampled action:', action);
+
+        if (action === 'obstacle'){
+            // First try purposeful obstacle clearing
+            const perBlock = [];
+            for (const [name,b] of Object.entries(snapshot.blocks || {})){
+                const bx = b.x|0, by = b.y|0;
+                const di = getDist(D_imm, bx, by);
+                const da = getDist(D_all, bx, by);
+                let status = "ok";
+                if (b.locked) status = "in_slot_locked";
+                else if (da>=INF && di<INF) status = "blocked_by_movable";
+                else if (da>di) status = "detour_due_to_movable";
+                else if (di>=INF && da>=INF) status = "unreachable_even_ignoring_movable";
+                if (!b.locked && (status==="blocked_by_movable" || status==="detour_due_to_movable")){
+                    perBlock.push({ block: name });
                 }
-            };
-        }
-    } else {
-        // Only consider block moves if there is no obstacle to clear.
-        console.log('🤖 No obstacle clearing needed, trying block moves');
-        
-        function chooseDownhillStepWithBlockGate(blockName){
-            const b = snapshot.blocks?.[blockName];
-            if (!b || b.locked) return {block:blockName, ok:false, reason:"locked/in slot"};
-
-            const x = b.x|0, y = b.y|0;
-
-            const di0 = getDist(D_imm, x, y);
-            const da0 = getDist(D_all, x, y);
-            const obstacleBlocked = (di0 < INF && (da0 >= INF || da0 > di0));
-            if (obstacleBlocked){
-                return {block:blockName, ok:false, reason:`obstacle-blocked (D_imm ${di0>=INF?'INF':di0} vs D_all ${da0>=INF?'INF':da0})`};
             }
 
-            const D_imm_blocks = bfsImmWithBlocks(blockName);
-            const dib0 = getDist(D_imm_blocks, x, y);
-            const blockedByOtherBlocks =
-                (di0 < INF && dib0 >= INF) || (di0 < INF && dib0 > di0);
-
-            if (blockedByOtherBlocks){
-                return {block:blockName, ok:false, reason:`blocked by other blocks (D_imm ${di0>=INF?'INF':di0} vs D_imm+blocks ${dib0>=INF?'INF':dib0})`};
-            }
-
-            // Now pick a downhill step under D_all that is currently legal.
-            for (const d of DIRS_BLOCK){
-                const nx = x + d.dx, ny = y + d.dy;
-                const d1 = getDist(D_all, nx, ny);
-                if (d1 >= da0) continue;
-                if (!canPlaceBlockAt(nx, ny, blockName)) continue;
-                return {block:blockName, ok:true, step:d.name, from:{x,y}, to:{x:nx,y:ny}, d0:da0, d1};
-            }
-            return {block:blockName, ok:false, reason:"no downhill legal move"};
-        }
-
-        const order = ["blue","red","yellow"];
-        let pick = null;
-
-        for (const bn of order){
-            const r = chooseDownhillStepWithBlockGate(bn);
-            if (r.ok && !pick){
-                pick = r;
-                break;
-            }
-        }
-
-        if (!pick){
-            console.log('🤖 No valid block move found');
-            return { chosen: null };
-        } else {
-            console.log('🤖 Block move chosen:', pick);
-            return {
-                chosen: {
-                    type: 'block',
-                    id: pick.block,
-                    dir: pick.step
+            if (perBlock.length > 0){
+                const plan = suggestObstaclePlan(perBlock);
+                if (plan && plan.score > 0){
+                    console.log('🤖 Obstacle plan (purposeful):', plan);
+                    return { chosen: { type: 'obstacle', id: plan.obstacle, dir: plan.steps[0] } };
                 }
-            };
+            }
+
+            // Fallback: random valid obstacle move
+            const rnd = randomObstacleMove();
+            if (rnd){
+                console.log('🤖 Obstacle move (random):', rnd);
+                return { chosen: { type: 'obstacle', id: rnd.obstacle, dir: rnd.dir } };
+            }
+
+            console.log('🤖 Obstacle action infeasible, removing from pool');
+            delete pool.obstacle;
+
+        } else {
+            // Block move
+            const r = chooseDownhillStepWithBlockGate(action);
+            if (r.ok){
+                console.log('🤖 Block move chosen:', r);
+                return { chosen: { type: 'block', id: r.block, dir: r.step } };
+            }
+            console.log(`🤖 Block ${action} infeasible (${r.reason}), removing from pool`);
+            delete pool[action];
         }
     }
+
+    console.log('🤖 No valid action found');
+    return { chosen: null };
 }
