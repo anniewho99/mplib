@@ -976,7 +976,7 @@ function cleanupPracticeBoard() {
 
 //  Conatant Game Variables
 
-let GameName = "followerRVTwo";
+let GameName = "testLeaderV4";
 let NumPlayers = 2;
 let MinPlayers = NumPlayers;
 let MaxPlayers = NumPlayers;
@@ -1073,6 +1073,10 @@ let currentLevel = 0;
 //let eventNumber = 0;
 
 let currentVoteCache = {}; 
+
+let previousVoteCache = {};
+
+let currentRawVoteCache = {};
 
 let completedLevel = false;
 
@@ -2174,7 +2178,7 @@ const robotParam = urlParams.get('robot'); // 'leader', 'follower', or 'none'
 
 const ROBOT_CONFIG = {
   enabled: robotParam !== 'none',                           // Disable with ?robot=none
-  type: 'follower',  // Default to leader, use ?robot=follower for follower
+  type: 'leader',  // Default to leader, use ?robot=follower for follower
   name: 'roboPlayer'
 };
 
@@ -2295,7 +2299,7 @@ function executeRobotAction() {
         if (ROBOT_CONFIG.type === 'leader') {
             console.log('🤖 Running LEADER agent');
             console.log('currentGameState', GameState);
-            executeLeaderAgent(GameState, robotCastVote);
+            executeLeaderAgent(GameState, robotCastVote, previousVoteCache, robotPlayerId);
         } else if (ROBOT_CONFIG.type === 'follower') {
             console.log('🤖 Running FOLLOWER agent');
             executeFollowerAgent(GameState, robotCastVote, getAllPlayerIdsWithRobot, isRobotPlayer);
@@ -3378,8 +3382,10 @@ function receiveStateChange(pathNow, nodeName, newState, typeChange ) {
   if (eventNum === currentEvent) {
     // CORRECT - Clear and rebuild from complete data
     currentVoteCache = {};
+    currentRawVoteCache = {}; 
     
     Object.entries(votesForEvent || {}).forEach(([playerId, voteData]) => {
+        currentRawVoteCache[playerId] = voteData;
         const targetId = voteData.targetId;
         const direction = voteData.direction;
         
@@ -3591,7 +3597,9 @@ async function maybeAdvancePhase() {
         
         // 4. Increment event counter
         await updateStateTransaction('level', 'incrementEvent', {});
+        previousVoteCache = { ...currentRawVoteCache }; // save raw votes before clearing
         currentVoteCache = {};
+        currentRawVoteCache = {};
         console.log('Cleared vote cache');
         
         // 5. Clear votes for next round
