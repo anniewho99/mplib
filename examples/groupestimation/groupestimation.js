@@ -1088,7 +1088,7 @@ let assigendCondition;
 //   return allowed.has(cond) ? cond : null;
 // }
 
-assigendCondition ='abcd';
+assigendCondition ='cdab';
 
 console.log('assigned condition is', assigendCondition);
 
@@ -1423,7 +1423,7 @@ const dabc = {
 
 // applyCondition(forced);
 
-let levelPlacements = abcd;
+let levelPlacements = cdab;
 //cdab
 // const levelPlacements = {
 //   0: {
