@@ -1187,7 +1187,7 @@ const abcd = {
 const cdab = {
   0: {
       blocks: {
-        //blue: { x: 16, y: 9, color: 'blue', minVotes: 3 },
+        blue: { x: 16, y: 9, color: 'blue', minVotes: 3 },
         red: { x: 6, y: 1, color: 'red', minVotes: 2},
         yellow: { x: 6, y: 9, color: 'yellow', minVotes: 1 }
     },
@@ -1205,7 +1205,7 @@ const cdab = {
   },
   1:{
         blocks: {
-          //blue: { x: 9, y: 4, color: 'blue', minVotes: 3 },
+          blue: { x: 9, y: 4, color: 'blue', minVotes: 3 },
           red: { x: 7, y: 1, color: 'red', minVotes: 2 },
           yellow: { x: 11, y: 1, color: 'yellow', minVotes: 1 }
       },
@@ -1224,7 +1224,7 @@ const cdab = {
   }, 
   2: {
           blocks: {
-              //blue: { x: 10, y: 10, color: 'blue', minVotes: 3 },
+              blue: { x: 10, y: 10, color: 'blue', minVotes: 3 },
               red: { x: 8, y: 1, color: 'red', minVotes: 2},
               yellow: { x: 1, y: 10, color: 'yellow', minVotes: 1 }
           },
@@ -1241,7 +1241,7 @@ const cdab = {
     },
   3: {
     blocks: {
-        //blue: { x: 12, y: 10, color: 'blue', minVotes: 3 },
+        blue: { x: 12, y: 10, color: 'blue', minVotes: 3 },
         red: { x: 9, y: 1, color: 'red', minVotes: 2},
         yellow: { x: 2, y: 10, color: 'yellow', minVotes: 1 }
     },
