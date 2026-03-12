@@ -93,12 +93,12 @@ const dirGlyph = { up:'↑', down:'↓', left:'←', right:'→' };
 // ======= INITIAL STATE =======
 //level 0
 const INITIAL = {
-  blocks: {  blue:{x: 6,y:1}, red:{x:6,y:5}, yellow:{x:6,y:9} },
+  blocks: {  blue:{x: 5,y:2}, red:{x:5,y:5}, yellow:{x:3,y:8} },
   slots: { slot0:{x:0,y:4}},
   obstacles: {
     obs0:{x:0,y:1,id:'obs0', immovable:true},
     obs1:{x:0,y:9,id:'obs1', immovable:true},
-    obs2:{x:3,y:1,id:'obs2', immovable:true},
+    obs2:{x:2,y:1,id:'obs2', immovable:true},
     obs3:{x:10,y:0,id:'obs3', immovable:true},
     obs4:{x:10,y:10,id:'obs4', immovable:true},
     obs5:{x:3,y:5,id:'obs5'},
@@ -202,68 +202,52 @@ const INITIAL = {
 
 // //level 0
 const DEFAULT_PLAN_TEXT = `
-Optimal rounds: 27
+Optimal rounds: 20
 Round 1:
-  - block yellow up -> (6,8)
+  - block yellow left -> (2,8)
 Round 2:
-  - block yellow left -> (5,8)
+  - block yellow up -> (2,7)
 Round 3:
-  - block yellow left -> (4,8)
-Round 4:
-  - block yellow left -> (3,8)
-Round 5:
-  - block yellow up -> (3,7)
-Round 6:
-  - block yellow up -> (3,6)
+  - block yellow up -> (2,6)
   - obs obs5 up -> (3,4)
-Round 7:
-  - block yellow up -> (3,5)
-  - obs obs5 up -> (3,3)
-Round 8:
-  - block yellow left -> (2,5)
-Round 9:
-  - block yellow left -> (1,5)
-Round 10:
-  - block yellow left -> (0,5)
-Round 11:
-  - block yellow up -> (0,4)
-  - obs obs5 down -> (3,4)
-Round 12:
-  - block red left -> (5,5)
+Round 4:
+  - block yellow left -> (1,6)
+Round 5:
+  - block yellow left -> (0,6)
+Round 6:
+  - block yellow up -> (0,5)
   - obs obs5 down -> (3,5)
-Round 13:
+Round 7:
+  - block yellow up -> (0,4)
+  - obs obs5 down -> (3,6)
+Round 8:
   - block red left -> (4,5)
-  - obs obs5 left -> (2,5)
-Round 14:
-  - block blue down -> (6,2)
-  - obs obs5 down -> (2,6)
-Round 15:
-  - block blue left -> (5,2)
+  - obs obs5 left -> (2,6)
+Round 9:
+  - block blue left -> (4,2)
   - obs obs5 down -> (2,7)
-Round 16:
+Round 10:
   - block red left -> (3,5)
   - obs obs5 down -> (2,8)
-Round 17:
+Round 11:
   - block red left -> (2,5)
-Round 18:
-  - block blue down -> (5,3)
-Round 19:
+Round 12:
   - block red left -> (1,5)
-Round 20:
-  - block blue down -> (5,4)
-Round 21:
-  - block blue left -> (4,4)
-Round 22:
+Round 13:
+  - block blue down -> (4,3)
+Round 14:
+  - block blue down -> (4,4)
+Round 15:
   - block red left -> (0,5)
-Round 23:
+Round 16:
   - block blue left -> (3,4)
-Round 24:
+Round 17:
   - block red up -> (0,4)
-Round 25:
+Round 18:
   - block blue left -> (2,4)
-Round 26:
+Round 19:
   - block blue left -> (1,4)
-Round 27:
+Round 20:
   - block blue left -> (0,4)
 `;
 

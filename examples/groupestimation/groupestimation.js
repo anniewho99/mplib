@@ -228,7 +228,7 @@ const instructionSteps = [
     },   
     {
       text: `
-        These are your teammates. One has a pink avatar, and the other is a robot player.
+        These are your teammates. One has a pink avatar, and the other has a blue avatar.
       `,
       demo: `
         <div style="
@@ -240,14 +240,14 @@ const instructionSteps = [
           margin: auto;">
           <img src="./images/player2.png" alt="Player 2" 
                style="width: 80px; height: 80px; image-rendering: pixelated;">
-          <img src="./images/robot.png" alt="Robot Player" 
+          <img src="./images/player3.png" alt="Robot Player" 
                style="width: 80px; height: 80px; image-rendering: pixelated;">
         </div>
       `
   },
   {
           text: `
-            Great job finishing the practice session! You will now be paired with one other participant and one robot to finish four levels together.\n
+            Great job finishing the practice session! You will now be paired with two other players to finish four levels together.\n
             Here's a quick recap before you join the real game:\n
             • Use arrow buttons to choose a direction you want to push a block or obstacle.\n
             • Some blocks need teamwork — look for the "2" or "3" labels to know how many players are required.\n
@@ -976,8 +976,8 @@ function cleanupPracticeBoard() {
 
 //  Conatant Game Variables
 
-let GameName = "testLeaderV4";
-let NumPlayers = 2;
+let GameName = "diffAllhuman";
+let NumPlayers = 3;
 let MinPlayers = NumPlayers;
 let MaxPlayers = NumPlayers;
 let MaxSessions = 0;
@@ -1421,9 +1421,83 @@ const dabc = {
 };
 
 
+const diff = {
+  0: {
+    blocks: {
+        blue: { x:15,y:8, color: 'blue', minVotes: 3 },
+        red: {x:5,y:9, color: 'red', minVotes: 2 },
+        yellow: { x:1,y:9, color: 'yellow', minVotes: 1 }
+    },
+    slots: {
+        slot0: { x:3,y:3 },
+        slot1: {x:14,y:3 }
+    },
+    obstacles: {
+      obs0:{x:5,y:6,id:'obs0', immovable:true},
+      obs1:{x:7,y:6,id:'obs1', immovable:true},
+      obs2:{x:10,y:7,id:'obs2', immovable:true},
+      obs3:{x:13,y:6,id:'obs3', immovable:true},
+      obs4:{x:1,y:6,id:'obs4'},
+      obs5:{x:17,y:4,id:'obs5'},
+    }
+},
+  1:  {
+    blocks: {
+        red: {x:4,y:5, color: 'red', minVotes: 2},
+        yellow: { x:1,y:9, color: 'yellow', minVotes: 1 }
+    },
+    slots: {
+        slot0: { x:6,y:0 }
+    },
+    obstacles: {
+      obs0:{x:5,y:3,id:'obs0', immovable:true},
+      obs1:{x:7,y:5,id:'obs1', immovable:true},
+      obs2:{x:10,y:5,id:'obs2', immovable:true},
+      obs3:{x:12,y:10,id:'obs3', immovable:true},
+      obs4:{x:2,y:2,id:'obs4'},
+      obs5:{x:2,y:5,id:'obs5'},
+    }
+},
+  2: {
+    blocks: {
+        red: { x:10,y:2, color: 'red', minVotes: 2},
+        purple: { x:2,y:2, color: 'purple', minVotes: 2 }
+    },
+    slots: {
+        slot0: { x:5,y:7}
+    },
+    obstacles: {
+      obs0:{x:4,y:5,id:'obs0', immovable:true},
+      obs1:{x:6,y:5,id:'obs1', immovable:true},
+      obs2:{x:8,y:5,id:'obs2', immovable:true},
+      obs3:{x:15,y:5,id:'obs3', immovable:true},
+      obs4:{x:1,y:5,id:'obs4'},
+      obs5:{x:10,y:5,id:'obs5'},
+    }
+ },
+  3:{
+    blocks: {
+        blue: { x: 6,y:2, color: 'blue', minVotes: 3 },
+        red: { x:6,y:5, color: 'red', minVotes: 2},
+        yellow: { x:4,y:8, color: 'yellow', minVotes: 1 }
+    },
+    slots: {
+        slot0: { x:1,y:4}
+    },
+    obstacles: {
+      obs0:{x:1,y:1,id:'obs0', immovable:true},
+      obs1:{x:1,y:9,id:'obs1', immovable:true},
+      obs2:{x:3,y:1,id:'obs2', immovable:true},
+      obs3:{x:11,y:0,id:'obs3', immovable:true},
+      obs4:{x:11,y:10,id:'obs4', immovable:true},
+      obs5:{x:4,y:5,id:'obs5'},
+    }
+},
+};
+
 // applyCondition(forced);
 
-let levelPlacements = bcda;
+let levelPlacements = diff;
 //cdab
 // const levelPlacements = {
 //   0: {
@@ -1728,7 +1802,7 @@ function showFinishScreenWithQuestions(teammates) {
 
     const block = document.createElement("div");
     block.className = "teammate-block";
-    const isRobot = color === 3; // Robot always has color 3
+    const isRobot = color === 6; // Robot always has color 3
     const avatarSrc = isRobot ? './images/robot.png' : `./images/player${color}.png`; 
     block.innerHTML = `
     <div style="border: 2px solid #999; border-radius: 12px; padding: 15px; margin-bottom: 20px;">
@@ -2174,7 +2248,8 @@ joinButton.addEventListener('click', function () {
 // Robot configuration - can be overridden by URL parameters
 // Example: ?robot=leader or ?robot=follower or ?robot=none
 const urlParams = new URLSearchParams(window.location.search);
-const robotParam = urlParams.get('robot'); // 'leader', 'follower', or 'none'
+//const robotParam = urlParams.get('robot'); // 'leader', 'follower', or 'none'
+const robotParam = 'none';
 
 const ROBOT_CONFIG = {
   enabled: robotParam !== 'none',                           // Disable with ?robot=none
@@ -2538,6 +2613,7 @@ function getMinRequiredVotes(color) {
       blue: 3,
       red: 2,
       yellow: 1,
+      purple: 2,
   };
   return minVotesMap[color] || 1; // default to 1 if undefined
 }
@@ -2765,7 +2841,8 @@ function drawBlock(block, isObstacle) {
       const minPlayersMap = {
           blue: 3,
           red: 2,
-          yellow: 1
+          yellow: 1,
+          purple: 2,
       };
       const minRequired = minPlayersMap[block.color] || 1;
   
@@ -3264,7 +3341,7 @@ function _createOtherPlayerAvatar() {
               3: 6
           }[allPlayerIDs.length] || 12;
 
-          const avatarSrc = (arrivalIndex === 3) 
+          const avatarSrc = (arrivalIndex === 4) 
           ? `./images/robot.png` 
           : `./images/player${arrivalIndex}.png`;
 
