@@ -976,7 +976,7 @@ function cleanupPracticeBoard() {
 
 //  Conatant Game Variables
 
-let GameName = "diffAllhuman";
+let GameName = "diffv3";
 let NumPlayers = 3;
 let MinPlayers = NumPlayers;
 let MaxPlayers = NumPlayers;
@@ -1444,19 +1444,19 @@ const diff = {
 },
   1:  {
     blocks: {
-        red: {x:4,y:5, color: 'red', minVotes: 2},
-        yellow: { x:1,y:9, color: 'yellow', minVotes: 1 }
+        red: {x:5,y:6, color: 'red', minVotes: 2},
+        yellow: { x:2,y:10, color: 'yellow', minVotes: 1 }
     },
     slots: {
-        slot0: { x:6,y:0 }
+        slot0: { x:7,y:1}
     },
     obstacles: {
-      obs0:{x:5,y:3,id:'obs0', immovable:true},
-      obs1:{x:7,y:5,id:'obs1', immovable:true},
-      obs2:{x:10,y:5,id:'obs2', immovable:true},
-      obs3:{x:12,y:10,id:'obs3', immovable:true},
-      obs4:{x:2,y:2,id:'obs4'},
-      obs5:{x:2,y:5,id:'obs5'},
+      obs0:{x:6,y:4,id:'obs0', immovable:true},
+      obs1:{x:8,y:6,id:'obs1', immovable:true},
+      obs2:{x:11,y:6,id:'obs2', immovable:true},
+      obs3:{x:13,y:11,id:'obs3', immovable:true},
+      obs4:{x:3,y:3,id:'obs4'},
+      obs5:{x:3,y:6,id:'obs5'},
     }
 },
   2: {
