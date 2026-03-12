@@ -1424,21 +1424,22 @@ const dabc = {
 const diff = {
   0: {
     blocks: {
-        blue: { x:15,y:8, color: 'blue', minVotes: 3 },
-        red: {x:5,y:9, color: 'red', minVotes: 2 },
-        yellow: { x:1,y:9, color: 'yellow', minVotes: 1 }
+        blue: { x:9,y:4, color: 'blue', minVotes: 3 },
+        red: {x:8,y:10, color: 'red', minVotes: 2 },
     },
     slots: {
-        slot0: { x:3,y:3 },
-        slot1: {x:14,y:3 }
+        slot0: {x:1,y:3 },
+        slot1: {x:1, y:8 }
     },
     obstacles: {
-      obs0:{x:5,y:6,id:'obs0', immovable:true},
-      obs1:{x:7,y:6,id:'obs1', immovable:true},
-      obs2:{x:10,y:7,id:'obs2', immovable:true},
-      obs3:{x:13,y:6,id:'obs3', immovable:true},
-      obs4:{x:1,y:6,id:'obs4'},
-      obs5:{x:17,y:4,id:'obs5'},
+      obs0:{x:7,y:0,id:'obs0', immovable:true},
+      obs1:{x:8,y:7,id:'obs1', immovable:true},
+      obs2:{x:7,y:13,id:'obs2', immovable:true},
+      obs3:{x:4,y:3,id:'obs3'},
+      obs4:{x:4,y:6,id:'obs4'},
+      obs5:{x:4,y:8,id:'obs5'},
+      obs6:{x:4,y:11,id:'obs6'},
+      obs7:{x:2,y:13,id:'obs7'},
     }
 },
   1:  {
@@ -3080,7 +3081,7 @@ function renderVoteArrow(playerId, voteData) {
   
   // Add new arrow
   const colorIndex = playerColorMap[playerId]?.color;
-  const imgSrc = (colorIndex === 3)
+  const imgSrc = (colorIndex === 4)
         ? `./images/robot_arrow.png`
         : `./images/player${colorIndex}_arrow.png`;
   
