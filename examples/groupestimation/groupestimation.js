@@ -228,7 +228,7 @@ const instructionSteps = [
     },   
     {
       text: `
-        These are your teammates. One has a pink avatar, and the other has a blue avatar.
+        These are your teammates. One has a pink avatar, and the other is a robot player.
       `,
       demo: `
         <div style="
@@ -240,14 +240,14 @@ const instructionSteps = [
           margin: auto;">
           <img src="./images/player2.png" alt="Player 2" 
                style="width: 80px; height: 80px; image-rendering: pixelated;">
-          <img src="./images/player3.png" alt="Robot Player" 
+          <img src="./images/robot.png" alt="Robot Player" 
                style="width: 80px; height: 80px; image-rendering: pixelated;">
         </div>
       `
   },
   {
           text: `
-            Great job finishing the practice session! You will now be paired with two other players to finish four levels together.\n
+            Great job finishing the practice session!You will now be paired with one other participant and one robot to finish four levels together.\n
             Here's a quick recap before you join the real game:\n
             • Use arrow buttons to choose a direction you want to push a block or obstacle.\n
             • Some blocks need teamwork — look for the "2" or "3" labels to know how many players are required.\n
@@ -976,8 +976,8 @@ function cleanupPracticeBoard() {
 
 //  Conatant Game Variables
 
-let GameName = "diffv3";
-let NumPlayers = 3;
+let GameName = "leader0315";
+let NumPlayers = 2;
 let MinPlayers = NumPlayers;
 let MaxPlayers = NumPlayers;
 let MaxSessions = 0;
@@ -1088,7 +1088,7 @@ let assigendCondition;
 //   return allowed.has(cond) ? cond : null;
 // }
 
-assigendCondition ='bcda';
+assigendCondition ='cdab';
 
 console.log('assigned condition is', assigendCondition);
 
@@ -1498,7 +1498,7 @@ const diff = {
 
 // applyCondition(forced);
 
-let levelPlacements = diff;
+let levelPlacements = cdab;
 //cdab
 // const levelPlacements = {
 //   0: {
@@ -1803,7 +1803,7 @@ function showFinishScreenWithQuestions(teammates) {
 
     const block = document.createElement("div");
     block.className = "teammate-block";
-    const isRobot = color === 6; // Robot always has color 3
+    const isRobot = color === 3; // Robot always has color 3
     const avatarSrc = isRobot ? './images/robot.png' : `./images/player${color}.png`; 
     block.innerHTML = `
     <div style="border: 2px solid #999; border-radius: 12px; padding: 15px; margin-bottom: 20px;">
@@ -2249,8 +2249,8 @@ joinButton.addEventListener('click', function () {
 // Robot configuration - can be overridden by URL parameters
 // Example: ?robot=leader or ?robot=follower or ?robot=none
 const urlParams = new URLSearchParams(window.location.search);
-//const robotParam = urlParams.get('robot'); // 'leader', 'follower', or 'none'
-const robotParam = 'none';
+const robotParam = urlParams.get('robot'); // 'leader', 'follower', or 'none'
+//const robotParam = 'none';
 
 const ROBOT_CONFIG = {
   enabled: robotParam !== 'none',                           // Disable with ?robot=none
@@ -3081,7 +3081,7 @@ function renderVoteArrow(playerId, voteData) {
   
   // Add new arrow
   const colorIndex = playerColorMap[playerId]?.color;
-  const imgSrc = (colorIndex === 4)
+  const imgSrc = (colorIndex === 3)
         ? `./images/robot_arrow.png`
         : `./images/player${colorIndex}_arrow.png`;
   
@@ -3342,7 +3342,7 @@ function _createOtherPlayerAvatar() {
               3: 6
           }[allPlayerIDs.length] || 12;
 
-          const avatarSrc = (arrivalIndex === 4) 
+          const avatarSrc = (arrivalIndex === 3) 
           ? `./images/robot.png` 
           : `./images/player${arrivalIndex}.png`;
 
