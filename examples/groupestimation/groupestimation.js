@@ -247,7 +247,7 @@ const instructionSteps = [
   },
   {
           text: `
-            Great job finishing the practice session! You will now be paired with one other participant and one robot to finish four levels together.\n
+            Great job finishing the practice session!You will now be paired with one other participant and one robot to finish four levels together.\n
             Here's a quick recap before you join the real game:\n
             • Use arrow buttons to choose a direction you want to push a block or obstacle.\n
             • Some blocks need teamwork — look for the "2" or "3" labels to know how many players are required.\n
@@ -976,7 +976,7 @@ function cleanupPracticeBoard() {
 
 //  Conatant Game Variables
 
-let GameName = "leader0316";
+let GameName = "leader0317";
 let NumPlayers = 2;
 let MinPlayers = NumPlayers;
 let MaxPlayers = NumPlayers;
@@ -1074,6 +1074,10 @@ let currentLevel = 0;
 
 let currentVoteCache = {}; 
 
+let previousVoteCache = {};
+
+let currentRawVoteCache = {};
+
 let completedLevel = false;
 
 let assigendCondition;
@@ -1084,7 +1088,7 @@ let assigendCondition;
 //   return allowed.has(cond) ? cond : null;
 // }
 
-assigendCondition ='abcd';
+assigendCondition ='dabc';
 
 console.log('assigned condition is', assigendCondition);
 
@@ -1183,7 +1187,7 @@ const abcd = {
 const cdab = {
   0: {
       blocks: {
-        //blue: { x: 16, y: 9, color: 'blue', minVotes: 3 },
+        blue: { x: 16, y: 9, color: 'blue', minVotes: 3 },
         red: { x: 6, y: 1, color: 'red', minVotes: 2},
         yellow: { x: 6, y: 9, color: 'yellow', minVotes: 1 }
     },
@@ -1201,7 +1205,7 @@ const cdab = {
   },
   1:{
         blocks: {
-          //blue: { x: 9, y: 4, color: 'blue', minVotes: 3 },
+          blue: { x: 9, y: 4, color: 'blue', minVotes: 3 },
           red: { x: 7, y: 1, color: 'red', minVotes: 2 },
           yellow: { x: 11, y: 1, color: 'yellow', minVotes: 1 }
       },
@@ -1220,7 +1224,7 @@ const cdab = {
   }, 
   2: {
           blocks: {
-              //blue: { x: 10, y: 10, color: 'blue', minVotes: 3 },
+              blue: { x: 10, y: 10, color: 'blue', minVotes: 3 },
               red: { x: 8, y: 1, color: 'red', minVotes: 2},
               yellow: { x: 1, y: 10, color: 'yellow', minVotes: 1 }
           },
@@ -1237,7 +1241,7 @@ const cdab = {
     },
   3: {
     blocks: {
-        //blue: { x: 12, y: 10, color: 'blue', minVotes: 3 },
+        blue: { x: 12, y: 10, color: 'blue', minVotes: 3 },
         red: { x: 9, y: 1, color: 'red', minVotes: 2},
         yellow: { x: 2, y: 10, color: 'yellow', minVotes: 1 }
     },
@@ -1417,9 +1421,84 @@ const dabc = {
 };
 
 
+const diff = {
+  0: {
+    blocks: {
+        blue: { x:9,y:4, color: 'blue', minVotes: 3 },
+        red: {x:8,y:10, color: 'red', minVotes: 2 },
+    },
+    slots: {
+        slot0: {x:1,y:3 },
+        slot1: {x:1, y:8 }
+    },
+    obstacles: {
+      obs0:{x:7,y:0,id:'obs0', immovable:true},
+      obs1:{x:8,y:7,id:'obs1', immovable:true},
+      obs2:{x:7,y:13,id:'obs2', immovable:true},
+      obs3:{x:4,y:3,id:'obs3'},
+      obs4:{x:4,y:6,id:'obs4'},
+      obs5:{x:4,y:8,id:'obs5'},
+      obs6:{x:4,y:11,id:'obs6'},
+      obs7:{x:2,y:13,id:'obs7'},
+    }
+},
+  1:  {
+    blocks: {
+        red: {x:5,y:6, color: 'red', minVotes: 2},
+        yellow: { x:2,y:10, color: 'yellow', minVotes: 1 }
+    },
+    slots: {
+        slot0: { x:7,y:1}
+    },
+    obstacles: {
+      obs0:{x:6,y:4,id:'obs0', immovable:true},
+      obs1:{x:8,y:6,id:'obs1', immovable:true},
+      obs2:{x:11,y:6,id:'obs2', immovable:true},
+      obs3:{x:13,y:11,id:'obs3', immovable:true},
+      obs4:{x:3,y:3,id:'obs4'},
+      obs5:{x:3,y:6,id:'obs5'},
+    }
+},
+  2: {
+    blocks: {
+        red: { x:10,y:2, color: 'red', minVotes: 2},
+        purple: { x:2,y:2, color: 'purple', minVotes: 2 }
+    },
+    slots: {
+        slot0: { x:5,y:7}
+    },
+    obstacles: {
+      obs0:{x:4,y:5,id:'obs0', immovable:true},
+      obs1:{x:6,y:5,id:'obs1', immovable:true},
+      obs2:{x:8,y:5,id:'obs2', immovable:true},
+      obs3:{x:15,y:5,id:'obs3', immovable:true},
+      obs4:{x:1,y:5,id:'obs4'},
+      obs5:{x:10,y:5,id:'obs5'},
+    }
+ },
+  3:{
+    blocks: {
+        blue: { x: 6,y:2, color: 'blue', minVotes: 3 },
+        red: { x:6,y:5, color: 'red', minVotes: 2},
+        yellow: { x:4,y:8, color: 'yellow', minVotes: 1 }
+    },
+    slots: {
+        slot0: { x:1,y:4}
+    },
+    obstacles: {
+      obs0:{x:1,y:1,id:'obs0', immovable:true},
+      obs1:{x:1,y:9,id:'obs1', immovable:true},
+      obs2:{x:3,y:1,id:'obs2', immovable:true},
+      obs3:{x:11,y:0,id:'obs3', immovable:true},
+      obs4:{x:11,y:10,id:'obs4', immovable:true},
+      obs5:{x:4,y:5,id:'obs5'},
+    }
+},
+};
+
 // applyCondition(forced);
 
-let levelPlacements = abcd;
+let levelPlacements = dabc;
 //cdab
 // const levelPlacements = {
 //   0: {
@@ -2171,6 +2250,7 @@ joinButton.addEventListener('click', function () {
 // Example: ?robot=leader or ?robot=follower or ?robot=none
 const urlParams = new URLSearchParams(window.location.search);
 const robotParam = urlParams.get('robot'); // 'leader', 'follower', or 'none'
+//const robotParam = 'none';
 
 const ROBOT_CONFIG = {
   enabled: robotParam !== 'none',                           // Disable with ?robot=none
@@ -2295,7 +2375,7 @@ function executeRobotAction() {
         if (ROBOT_CONFIG.type === 'leader') {
             console.log('🤖 Running LEADER agent');
             console.log('currentGameState', GameState);
-            executeLeaderAgent(GameState, robotCastVote);
+            executeLeaderAgent(GameState, robotCastVote, previousVoteCache, robotPlayerId);
         } else if (ROBOT_CONFIG.type === 'follower') {
             console.log('🤖 Running FOLLOWER agent');
             executeFollowerAgent(GameState, robotCastVote, getAllPlayerIdsWithRobot, isRobotPlayer);
@@ -2534,6 +2614,7 @@ function getMinRequiredVotes(color) {
       blue: 3,
       red: 2,
       yellow: 1,
+      purple: 2,
   };
   return minVotesMap[color] || 1; // default to 1 if undefined
 }
@@ -2761,7 +2842,8 @@ function drawBlock(block, isObstacle) {
       const minPlayersMap = {
           blue: 3,
           red: 2,
-          yellow: 1
+          yellow: 1,
+          purple: 2,
       };
       const minRequired = minPlayersMap[block.color] || 1;
   
@@ -3378,8 +3460,10 @@ function receiveStateChange(pathNow, nodeName, newState, typeChange ) {
   if (eventNum === currentEvent) {
     // CORRECT - Clear and rebuild from complete data
     currentVoteCache = {};
+    currentRawVoteCache = {}; 
     
     Object.entries(votesForEvent || {}).forEach(([playerId, voteData]) => {
+        currentRawVoteCache[playerId] = voteData;
         const targetId = voteData.targetId;
         const direction = voteData.direction;
         
@@ -3591,7 +3675,9 @@ async function maybeAdvancePhase() {
         
         // 4. Increment event counter
         await updateStateTransaction('level', 'incrementEvent', {});
+        previousVoteCache = { ...currentRawVoteCache }; // save raw votes before clearing
         currentVoteCache = {};
+        currentRawVoteCache = {};
         console.log('Cleared vote cache');
         
         // 5. Clear votes for next round
