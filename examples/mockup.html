@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rush Hour Voting Prototype</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;600&display=swap');
+:root{--bg:#0f0f0f;--surface:#1a1a1a;--border:#2a2a2a;--text:#f0f0f0;--muted:#666;--target:#e63946;--obstacle:#457b9d;--exit:#2a9d8f;--timer:#f4a261;--p1:#e9c46a;--p2:#90be6d;--p3:#a8dadc;--cell:78px;--gap:4px}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:20px;gap:20px}
+h1{font-family:'Space Mono',monospace;font-size:13px;letter-spacing:3px;text-transform:uppercase;color:var(--muted)}
+.main{display:flex;gap:28px;align-items:flex-start}
+.grid-wrapper{position:relative}
+.grid{display:grid;grid-template-columns:repeat(6,var(--cell));grid-template-rows:repeat(6,var(--cell));gap:var(--gap);background:var(--surface);padding:var(--gap);border:1px solid var(--border);border-radius:8px;position:relative}
+.cell{width:var(--cell);height:var(--cell);background:#111;border-radius:4px;border:1px solid var(--border)}
+.exit-marker{position:absolute;right:-18px;top:calc(2*(var(--cell) + var(--gap)) + var(--gap));width:14px;height:var(--cell);background:var(--exit);border-radius:0 4px 4px 0;display:flex;align-items:center;justify-content:center;writing-mode:vertical-rl;font-size:9px;font-family:'Space Mono',monospace;letter-spacing:1px;color:white}
+.block{position:absolute;border-radius:6px;cursor:grab;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:1px;font-family:'Space Mono',monospace;color:white;user-select:none;transition:box-shadow .1s;z-index:10;border:2px solid rgba(255,255,255,.15)}
+.block:hover{box-shadow:0 0 0 2px rgba(255,255,255,.3)}
+.block.dragging{cursor:grabbing;opacity:.8;z-index:100}
+.block.selected{box-shadow:0 0 0 3px white}
+.block.animating{transition:left .35s ease,top .35s ease}
+.block.highlight{box-shadow:0 0 0 3px white,0 0 16px rgba(255,255,255,.4)}
+.block.target{background:var(--target)}
+.block.obstacle{background:var(--obstacle)}
+.b-arrow{font-size:26px;line-height:1}
+.b-votes{font-size:10px;font-weight:700;opacity:.85}
+.b-label{font-size:8px;letter-spacing:1px;opacity:.7}
+.vote-dots{position:absolute;top:3px;right:3px;display:flex;gap:2px}
+.vdot{width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.2)}
+.vdot.p1f{background:var(--p1);border-color:var(--p1)}
+.vdot.p2f{background:var(--p2);border-color:var(--p2)}
+.vdot.p3f{background:var(--p3);border-color:var(--p3)}
+.vote-bar{position:absolute;bottom:0;left:0;height:4px;background:rgba(255,255,255,.55);border-radius:0 0 4px 4px;transition:width .2s}
+.panel{width:255px;display:flex;flex-direction:column;gap:14px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px;display:flex;flex-direction:column;gap:10px}
+.card-title{font-family:'Space Mono',monospace;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--muted)}
+.mode-badge{font-family:'Space Mono',monospace;font-size:10px;letter-spacing:2px;text-transform:uppercase;padding:4px 10px;border-radius:20px;border:1px solid var(--border);color:var(--muted);text-align:center}
+.mode-badge.setup{border-color:var(--obstacle);color:var(--obstacle)}
+.mode-badge.playing{border-color:var(--exit);color:var(--exit)}
+.mode-badge.won{border-color:var(--timer);color:var(--timer)}
+select,button{background:#111;border:1px solid var(--border);color:var(--text);border-radius:4px;padding:6px 10px;font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer}
+button:hover{background:#222;border-color:var(--muted)}
+.btn-primary{background:var(--target);border-color:var(--target);color:white;width:100%;padding:9px;font-size:13px;font-weight:600}
+.btn-primary:hover{background:#c1121f}
+.btn-add{background:var(--obstacle);border-color:var(--obstacle);color:white;width:100%;padding:7px}
+.btn-danger{background:#222;border-color:#444;color:#ff6b6b;width:100%;padding:7px;font-size:12px}
+.row{display:flex;align-items:center;gap:8px;font-size:12px}
+.row label{color:var(--muted);font-size:11px;width:68px;flex-shrink:0}
+.no-sel{color:var(--muted);font-size:12px;font-style:italic}
+.pbtn{display:flex;align-items:center;gap:9px;padding:9px 12px;border-radius:6px;border:2px solid transparent;background:#111;cursor:pointer;font-size:13px;font-weight:600;transition:all .12s}
+.pbtn:hover{background:#1a1a1a}
+.pbtn.active{border-color:currentColor;background:#1a1a1a}
+.pbtn.p1{color:var(--p1)}.pbtn.p2{color:var(--p2)}.pbtn.p3{color:var(--p3)}
+.pdot{width:11px;height:11px;border-radius:50%;background:currentColor;flex-shrink:0}
+.pvote{margin-left:auto;font-size:10px;opacity:.65}
+.timer-big{font-family:'Space Mono',monospace;font-size:46px;font-weight:700;color:var(--timer);text-align:center;line-height:1}
+.timer-big.urgent{color:var(--target);animation:pulse .5s infinite alternate}
+@keyframes pulse{from{opacity:1}to{opacity:.4}}
+.log{font-size:11px;color:var(--muted);font-family:'Space Mono',monospace;max-height:110px;overflow-y:auto;display:flex;flex-direction:column;gap:3px}
+.log-entry{border-left:2px solid var(--border);padding-left:7px}
+.log-entry.success{border-color:var(--exit);color:#a8dadc}
+.log-entry.fail{border-color:#444}
+.log-entry.win{border-color:var(--exit);color:var(--exit);font-weight:700}
+.solver-result{font-family:'Space Mono',monospace;font-size:13px;font-weight:700;padding:8px;background:#111;border-radius:4px;text-align:center;color:var(--muted)}
+.step-counter{font-family:'Space Mono',monospace;font-size:11px;color:var(--muted);text-align:center}
+.preset-btn{text-align:left;padding:7px 11px;font-size:12px;width:100%}
+.btn-solve{background:#1a1a2e;border-color:#457b9d;color:#a8dadc;width:100%;padding:7px;font-size:12px}
+.btn-solve:hover{background:#16213e;border-color:#a8dadc}
+.btn-solve.active{background:var(--obstacle);border-color:var(--obstacle);color:white}
+.win-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:1000;align-items:center;justify-content:center;flex-direction:column;gap:14px}
+.win-overlay.show{display:flex}
+.win-text{font-family:'Space Mono',monospace;font-size:44px;color:var(--exit);letter-spacing:4px}
+.win-sub{font-size:15px;color:var(--muted)}
+</style>
+</head>
+<body>
+<h1>Rush Hour Voting Prototype</h1>
+<div class="main">
+  <div class="grid-wrapper">
+    <div class="grid" id="grid"></div>
+    <div class="exit-marker">EXIT</div>
+  </div>
+  <div class="panel">
+    <div class="card">
+      <div class="mode-badge setup" id="modeBadge">SETUP MODE</div>
+      <button class="btn-primary" id="startBtn" onclick="startGame()">&#9654; Start Game</button>
+      <button class="btn-danger" id="resetBtn" style="display:none" onclick="resetGame()">&#8635; Reset</button>
+    </div>
+    <div class="card" id="presetCard">
+      <div class="card-title">Preset Maps</div>
+      <button class="preset-btn" onclick="loadPreset('easy')">&#128994; Easy (5 rounds)</button>
+      <button class="preset-btn" onclick="loadPreset('medium')">&#128993; Medium (8 rounds)</button>
+      <button class="preset-btn" onclick="loadPreset('hard')">&#128308; Hard (9 rounds)</button>
+      <button class="preset-btn" onclick="loadPreset('coord')">&#129309; Coordination (6 rounds)</button>
+      <button class="preset-btn" onclick="loadPreset('vhard')">&#9889; Very Hard (12 rounds)</button>
+      <button class="preset-btn" onclick="loadPreset('grandmaster')">&#11088; Grandmaster (12 rounds)</button>
+      <div class="solver-result" id="solverResult">&#8212;</div>
+      <div class="step-counter" id="stepCounter" style="display:none">Round <span id="stepCurr">0</span> / <span id="stepTotal">0</span></div>
+      <button class="btn-solve" id="animBtn" onclick="toggleAnimate()" style="display:none">&#9654; Animate Solution</button>
+    </div>
+    <div class="card" id="addCard">
+      <div class="card-title">Add Block</div>
+      <div class="row"><label>Type</label><select id="newType"><option value="target">Target &#8594;</option><option value="obstacle">Obstacle</option></select></div>
+      <div class="row"><label>Direction</label>
+        <select id="newDir">
+          <option value="h_r">&#8594; Right</option>
+          <option value="h_l">&#8592; Left</option>
+          <option value="v_d">&#8595; Down</option>
+          <option value="v_u">&#8593; Up</option>
+        </select>
+      </div>
+      <div class="row"><label>Size</label><select id="newSize"><option value="1">1 cell</option><option value="2">2 cells</option><option value="3">3 cells</option></select></div>
+      <div class="row"><label>Votes needed</label><select id="newThresh"><option value="1">1</option><option value="2">2</option><option value="3">3</option></select></div>
+      <button class="btn-add" onclick="addBlock()">+ Add Block</button>
+    </div>
+    <div class="card" id="editCard">
+      <div class="card-title">Selected Block</div>
+      <div id="editContent" class="no-sel">Click a block to edit</div>
+    </div>
+    <div class="card" id="playersCard" style="display:none">
+      <div class="card-title">Players &mdash; select then click block</div>
+      <div class="pbtn p1" id="pb1" onclick="selectPlayer('p1')"><div class="pdot"></div>Player 1<span class="pvote" id="pv1">no vote</span></div>
+      <div class="pbtn p2" id="pb2" onclick="selectPlayer('p2')"><div class="pdot"></div>Player 2<span class="pvote" id="pv2">no vote</span></div>
+      <div class="pbtn p3" id="pb3" onclick="selectPlayer('p3')"><div class="pdot"></div>Player 3<span class="pvote" id="pv3">no vote</span></div>
+    </div>
+    <div class="card" id="timerCard" style="display:none">
+      <div class="card-title">Round Timer</div>
+      <div class="timer-big" id="timerEl">5</div>
+    </div>
+    <div class="card" id="logCard" style="display:none">
+      <div class="card-title">Round Log</div>
+      <div class="log" id="logEl"></div>
+    </div>
+  </div>
+</div>
+<div class="win-overlay" id="winOverlay">
+  <div class="win-text">WIN!</div>
+  <div class="win-sub" id="winSub"></div>
+  <button onclick="resetGame()" style="margin-top:12px;padding:10px 28px;font-size:15px">Play Again</button>
+</div>
+<script>
+var COLS=6,ROWS=6,CELL=78,GAP=4;
+var blocks=[],blockId=0,gameMode=false,activePlayer=null,votes={};
+var timerInterval=null,timerVal=5,roundNum=0,dragState=null;
+var solvedPath=null,animStep=0,animInterval=null,animRunning=false;
+
+var PRESETS={
+  easy:[
+    {type:'target',  dir:'h',dc:1, dr:0,  col:0,row:2,size:2,threshold:1},
+    {type:'obstacle',dir:'v',dc:0, dr:-1, col:2,row:1,size:2,threshold:1},
+    {type:'obstacle',dir:'v',dc:0, dr:1,  col:4,row:2,size:2,threshold:1},
+    {type:'obstacle',dir:'h',dc:1, dr:0,  col:3,row:0,size:2,threshold:1}
+  ],
+  medium:[
+    {type:'target',  dir:'h',dc:1, dr:0,  col:0,row:2,size:2,threshold:1},
+    {type:'obstacle',dir:'v',dc:0, dr:1,  col:2,row:0,size:3,threshold:1},
+    {type:'obstacle',dir:'v',dc:0, dr:1,  col:4,row:1,size:3,threshold:1},
+    {type:'obstacle',dir:'h',dc:-1,dr:0,  col:0,row:4,size:2,threshold:1},
+    {type:'obstacle',dir:'h',dc:-1,dr:0,  col:3,row:5,size:2,threshold:1},
+    {type:'obstacle',dir:'v',dc:0, dr:1,  col:3,row:3,size:2,threshold:1}
+  ],
+  hard:[
+    {type:'target',  dir:'h',dc:1, dr:0,  col:0,row:2,size:2,threshold:1},
+    {type:'obstacle',dir:'v',dc:0, dr:1,  col:2,row:0,size:3,threshold:1},
+    {type:'obstacle',dir:'v',dc:0, dr:1,  col:4,row:2,size:3,threshold:1},
+    {type:'obstacle',dir:'h',dc:-1,dr:0,  col:1,row:3,size:2,threshold:1},
+    {type:'obstacle',dir:'v',dc:0, dr:-1, col:3,row:1,size:2,threshold:1},
+    {type:'obstacle',dir:'h',dc:-1,dr:0,  col:4,row:5,size:2,threshold:1},
+    {type:'obstacle',dir:'v',dc:0, dr:1,  col:5,row:0,size:3,threshold:1}
+  ],
+  coord:[
+    {type:'target',  dir:'h',dc:1, dr:0,  col:0,row:2,size:2,threshold:1},
+    {type:'obstacle',dir:'v',dc:0, dr:-1, col:2,row:0,size:2,threshold:1},
+    {type:'obstacle',dir:'v',dc:0, dr:1,  col:2,row:3,size:2,threshold:1},
+    {type:'obstacle',dir:'v',dc:0, dr:1,  col:3,row:1,size:2,threshold:2},
+    {type:'obstacle',dir:'v',dc:0, dr:1,  col:4,row:2,size:2,threshold:2},
+    {type:'obstacle',dir:'h',dc:-1,dr:0,  col:4,row:0,size:2,threshold:1},
+    {type:'obstacle',dir:'h',dc:1, dr:0,  col:0,row:5,size:3,threshold:1},
+    {type:'obstacle',dir:'v',dc:0, dr:-1, col:5,row:1,size:2,threshold:3}
+  ],
+  vhard:[
+    {type:'target',  dir:'h',dc:1, dr:0,  col:0,row:2,size:2,threshold:1},
+    {type:'obstacle',dir:'v',dc:0, dr:1,  col:2,row:0,size:3,threshold:1},
+    {type:'obstacle',dir:'v',dc:0, dr:1,  col:4,row:2,size:3,threshold:1},
+    {type:'obstacle',dir:'h',dc:-1,dr:0,  col:1,row:3,size:2,threshold:1},
+    {type:'obstacle',dir:'v',dc:0, dr:-1, col:3,row:1,size:2,threshold:2},
+    {type:'obstacle',dir:'h',dc:-1,dr:0,  col:4,row:5,size:2,threshold:3},
+    {type:'obstacle',dir:'v',dc:0, dr:1,  col:5,row:0,size:3,threshold:1}
+  ],
+  grandmaster:[
+    {type:'target',  dir:'h',dc:1, dr:0,  col:0,row:2,size:2,threshold:1},
+    {type:'obstacle',dir:'v',dc:0, dr:1,  col:2,row:0,size:3,threshold:2},
+    {type:'obstacle',dir:'v',dc:0, dr:1,  col:4,row:2,size:3,threshold:1},
+    {type:'obstacle',dir:'h',dc:-1,dr:0,  col:1,row:3,size:2,threshold:1},
+    {type:'obstacle',dir:'v',dc:0, dr:-1, col:3,row:1,size:2,threshold:1},
+    {type:'obstacle',dir:'h',dc:-1,dr:0,  col:4,row:5,size:2,threshold:3},
+    {type:'obstacle',dir:'v',dc:0, dr:1,  col:5,row:0,size:3,threshold:1}
+  ]
+};
+
+function loadPreset(k){
+  clearBlocks();
+  var p=PRESETS[k];
+  for(var i=0;i<p.length;i++){var b=p[i];blocks.push({id:'b'+(blockId++),type:b.type,dir:b.dir,dc:b.dc,dr:b.dr,col:b.col,row:b.row,size:b.size,threshold:b.threshold});}
+  renderAllBlocks();runSolver();
+}
+
+function initGrid(){
+  var g=document.getElementById('grid');g.innerHTML='';
+  for(var r=0;r<ROWS;r++)for(var c=0;c<COLS;c++){var cell=document.createElement('div');cell.className='cell';g.appendChild(cell);}
+}
+
+function cellPos(c,r){return{x:GAP+c*(CELL+GAP),y:GAP+r*(CELL+GAP)};}
+
+function clearBlocks(){
+  for(var i=0;i<blocks.length;i++){var el=document.getElementById(blocks[i].id);if(el)el.remove();}
+  blocks=[];blockId=0;
+}
+
+function dirToDcDr(s){
+  if(s==='h_r')return{dir:'h',dc:1,dr:0};
+  if(s==='h_l')return{dir:'h',dc:-1,dr:0};
+  if(s==='v_d')return{dir:'v',dc:0,dr:1};
+  return{dir:'v',dc:0,dr:-1};
+}
+
+function addBlock(){
+  var type=document.getElementById('newType').value;
+  var dd=dirToDcDr(document.getElementById('newDir').value);
+  var size=parseInt(document.getElementById('newSize').value);
+  var threshold=parseInt(document.getElementById('newThresh').value);
+  for(var r=0;r<ROWS;r++)for(var c=0;c<COLS;c++){
+    if(!blockAt(c,r)){
+      var b={id:'b'+(blockId++),type:type,dir:dd.dir,dc:dd.dc,dr:dd.dr,col:c,row:r,size:size,threshold:threshold};
+      blocks.push(b);renderBlock(b);if(!gameMode)runSolver();return;
+    }
+  }
+}
+
+function blockAt(c,r){
+  for(var i=0;i<blocks.length;i++){
+    var b=blocks[i];if(b.col>=COLS)continue;
+    if(b.dir==='h'){if(b.row===r&&c>=b.col&&c<b.col+b.size)return b;}
+    else{if(b.col===c&&r>=b.row&&r<b.row+b.size)return b;}
+  }
+  return null;
+}
+
+function arrowChar(b){
+  if(b.dc===1)return'&#8594;';
+  if(b.dc===-1)return'&#8592;';
+  if(b.dr===1)return'&#8595;';
+  if(b.dr===-1)return'&#8593;';
+  return'?';
+}
+
+function renderBlock(b){
+  var g=document.getElementById('grid');
+  var el=document.getElementById(b.id);
+  if(!el){
+    el=document.createElement('div');el.id=b.id;el.className='block '+b.type;g.appendChild(el);
+    (function(bid){
+      el.addEventListener('click',function(e){
+        if(dragState&&dragState.moved)return;
+        if(gameMode)handleVoteClick(bid);else selectBlock(bid);
+        e.stopPropagation();
+      });
+      el.addEventListener('mousedown',function(e){startDrag(e,bid);});
+    })(b.id);
+  }
+  if(b.col>=COLS){el.style.display='none';return;}
+  el.style.display='flex';
+  var pos=cellPos(b.col,b.row);
+  var w=b.dir==='h'?b.size*(CELL+GAP)-GAP:CELL;
+  var h=b.dir==='v'?b.size*(CELL+GAP)-GAP:CELL;
+  el.style.left=pos.x+'px';el.style.top=pos.y+'px';el.style.width=w+'px';el.style.height=h+'px';
+  var label=b.type==='target'?'TARGET':'OBS';
+  el.innerHTML='<div class="b-arrow">'+arrowChar(b)+'</div><div class="b-votes">'+b.threshold+'v</div><div class="b-label">'+label+'</div><div class="vote-dots" id="dots-'+b.id+'"></div><div class="vote-bar" id="bar-'+b.id+'" style="width:0%"></div>';
+}
+
+function renderAllBlocks(){for(var i=0;i<blocks.length;i++)renderBlock(blocks[i]);}
+
+function startDrag(e,bid){
+  if(gameMode)return;
+  var block=null;for(var i=0;i<blocks.length;i++)if(blocks[i].id===bid){block=blocks[i];break;}
+  if(!block)return;
+  var rect=document.getElementById('grid').getBoundingClientRect();
+  var el=document.getElementById(bid);
+  dragState={block:block,startX:e.clientX,startY:e.clientY,moved:false};
+  el.classList.add('dragging');
+  function onMove(e){
+    var dx=e.clientX-dragState.startX,dy=e.clientY-dragState.startY;
+    if(Math.abs(dx)>3||Math.abs(dy)>3)dragState.moved=true;
+    var mx=e.clientX-rect.left,my=e.clientY-rect.top;
+    var sc=Math.round((mx-GAP)/(CELL+GAP)),sr=Math.round((my-GAP)/(CELL+GAP));
+    var maxC=COLS-(block.dir==='h'?block.size:1),maxR=ROWS-(block.dir==='v'?block.size:1);
+    block.col=Math.max(0,Math.min(maxC,sc));block.row=Math.max(0,Math.min(maxR,sr));
+    renderBlock(block);
+  }
+  function onUp(){el.classList.remove('dragging');dragState=null;document.removeEventListener('mousemove',onMove);document.removeEventListener('mouseup',onUp);runSolver();}
+  document.addEventListener('mousemove',onMove);document.addEventListener('mouseup',onUp);
+  e.preventDefault();
+}
+
+function selectBlock(id){
+  var block=null;
+  for(var i=0;i<blocks.length;i++){var el=document.getElementById(blocks[i].id);if(el)el.classList.remove('selected');if(blocks[i].id===id)block=blocks[i];}
+  if(!block)return;
+  document.getElementById(id).classList.add('selected');
+  document.getElementById('editContent').innerHTML=
+    '<div style="font-size:12px;color:var(--muted);line-height:1.6">'+
+    arrowChar(block)+' '+(block.dir==='h'?'Horizontal':'Vertical')+
+    ' &bull; size '+block.size+' &bull; '+block.threshold+' vote'+(block.threshold>1?'s':'')+
+    '</div>'+
+    '<button class="btn-danger" onclick="deleteBlock(\''+id+'\')" style="margin-top:8px">Delete Block</button>';
+}
+
+function deleteBlock(id){
+  blocks=blocks.filter(function(b){return b.id!==id;});
+  var el=document.getElementById(id);if(el)el.remove();
+  document.getElementById('editContent').innerHTML='<span class="no-sel">Click a block to edit</span>';
+  runSolver();
+}
+
+function startGame(){
+  var target=null;for(var i=0;i<blocks.length;i++)if(blocks[i].type==='target'){target=blocks[i];break;}
+  if(!target){alert('Add a target block first!');return;}
+  gameMode=true;roundNum=0;votes={};
+  document.getElementById('modeBadge').textContent='PLAYING';document.getElementById('modeBadge').className='mode-badge playing';
+  document.getElementById('startBtn').style.display='none';document.getElementById('resetBtn').style.display='block';
+  document.getElementById('presetCard').style.display='none';document.getElementById('addCard').style.display='none';
+  document.getElementById('editCard').style.display='none';document.getElementById('playersCard').style.display='block';
+  document.getElementById('timerCard').style.display='block';document.getElementById('logCard').style.display='block';
+  for(var i=0;i<blocks.length;i++){var el=document.getElementById(blocks[i].id);if(el)el.classList.remove('selected');}
+  startRound();
+}
+
+function startRound(){
+  roundNum++;timerVal=5;activePlayer=null;votes={};
+  for(var i=0;i<blocks.length;i++)votes[blocks[i].id]={p1:false,p2:false,p3:false};
+  document.getElementById('pb1').classList.remove('active');document.getElementById('pb2').classList.remove('active');document.getElementById('pb3').classList.remove('active');
+  document.getElementById('pv1').textContent='no vote';document.getElementById('pv2').textContent='no vote';document.getElementById('pv3').textContent='no vote';
+  updateVoteDisplay();updateTimer();
+  clearInterval(timerInterval);
+  timerInterval=setInterval(function(){timerVal--;updateTimer();if(timerVal<=0){clearInterval(timerInterval);resolveRound();}},1000);
+}
+
+function updateTimer(){
+  var el=document.getElementById('timerEl');el.textContent=timerVal;
+  el.className='timer-big'+(timerVal<=2?' urgent':'');
+}
+
+function selectPlayer(p){
+  if(!gameMode)return;activePlayer=p;
+  document.getElementById('pb1').classList.toggle('active',p==='p1');
+  document.getElementById('pb2').classList.toggle('active',p==='p2');
+  document.getElementById('pb3').classList.toggle('active',p==='p3');
+}
+
+function handleVoteClick(bid){
+  if(!activePlayer)return;
+  var p=activePlayer;
+  for(var i=0;i<blocks.length;i++)if(blocks[i].id!==bid&&votes[blocks[i].id])votes[blocks[i].id][p]=false;
+  if(!votes[bid])votes[bid]={p1:false,p2:false,p3:false};
+  votes[bid][p]=!votes[bid][p];
+  var b=null;for(var i=0;i<blocks.length;i++)if(blocks[i].id===bid){b=blocks[i];break;}
+  document.getElementById('pv'+p.slice(1)).textContent=votes[bid][p]?(b?arrowChar(b):'?'):'no vote';
+  updateVoteDisplay();
+}
+
+function updateVoteDisplay(){
+  for(var i=0;i<blocks.length;i++){
+    var b=blocks[i];var v=votes[b.id]||{p1:false,p2:false,p3:false};
+    var total=(v.p1?1:0)+(v.p2?1:0)+(v.p3?1:0);
+    var dots=document.getElementById('dots-'+b.id);
+    if(dots)dots.innerHTML='<div class="vdot'+(v.p1?' p1f':'')+'"></div><div class="vdot'+(v.p2?' p2f':'')+'"></div><div class="vdot'+(v.p3?' p3f':'')+'"></div>';
+    var bar=document.getElementById('bar-'+b.id);
+    if(bar)bar.style.width=Math.min(100,total/b.threshold*100)+'%';
+  }
+}
+
+function isOcc(col,row,skipId){
+  for(var i=0;i<blocks.length;i++){
+    var b=blocks[i];if(b.id===skipId||b.col>=COLS)continue;
+    if(b.dir==='h'){if(b.row===row&&col>=b.col&&col<b.col+b.size)return true;}
+    else{if(b.col===col&&row>=b.row&&row<b.row+b.size)return true;}
+  }
+  return false;
+}
+
+function canMoveBlock(b){
+  if(b.col>=COLS)return false;
+  if(b.dc===1){if(b.type==='target')return true;var rc=b.col+b.size;return rc<COLS&&!isOcc(rc,b.row,b.id);}
+  if(b.dc===-1)return b.col>0&&!isOcc(b.col-1,b.row,b.id);
+  if(b.dr===1){var br=b.row+b.size;return br<ROWS&&!isOcc(b.col,br,b.id);}
+  if(b.dr===-1)return b.row>0&&!isOcc(b.col,b.row-1,b.id);
+  return false;
+}
+
+function resolveRound(){
+  var toMove=[];
+  for(var i=0;i<blocks.length;i++){
+    var b=blocks[i];var v=votes[b.id]||{p1:false,p2:false,p3:false};
+    var total=(v.p1?1:0)+(v.p2?1:0)+(v.p3?1:0);
+    if(total>=b.threshold&&canMoveBlock(b))toMove.push(b);
+  }
+  var n=0;
+  for(var i=0;i<toMove.length;i++){
+    var b=toMove[i];
+    if(b.dc===1&&b.type==='target'&&b.col+b.size>=COLS){b.col=COLS;var el=document.getElementById(b.id);if(el)el.style.display='none';}
+    else{b.col+=b.dc;b.row+=b.dr;}
+    n++;
+  }
+  renderAllBlocks();updateVoteDisplay();
+  if(n>0)addLog('Round '+roundNum+': '+n+' block(s) moved','success');
+  else addLog('Round '+roundNum+': no block moved','fail');
+  if(!checkWin())setTimeout(startRound,700);
+}
+
+function checkWin(){
+  for(var i=0;i<blocks.length;i++){
+    if(blocks[i].type==='target'&&blocks[i].col>=COLS){
+      clearInterval(timerInterval);
+      document.getElementById('modeBadge').textContent='YOU WIN!';document.getElementById('modeBadge').className='mode-badge won';
+      addLog('Target escaped in '+roundNum+' rounds!','win');
+      document.getElementById('winSub').textContent='Solved in '+roundNum+' rounds';
+      setTimeout(function(){document.getElementById('winOverlay').classList.add('show');},400);
+      return true;
+    }
+  }
+  return false;
+}
+
+function addLog(msg,type){
+  var log=document.getElementById('logEl');var e=document.createElement('div');
+  e.className='log-entry '+type;e.textContent=msg;log.prepend(e);
+}
+
+function resetGame(){
+  clearInterval(timerInterval);stopAnimate();
+  gameMode=false;activePlayer=null;votes={};roundNum=0;
+  document.getElementById('winOverlay').classList.remove('show');
+  document.getElementById('modeBadge').textContent='SETUP MODE';document.getElementById('modeBadge').className='mode-badge setup';
+  document.getElementById('startBtn').style.display='block';document.getElementById('resetBtn').style.display='none';
+  document.getElementById('presetCard').style.display='block';document.getElementById('addCard').style.display='block';
+  document.getElementById('editCard').style.display='block';document.getElementById('playersCard').style.display='none';
+  document.getElementById('timerCard').style.display='none';document.getElementById('logCard').style.display='none';
+  document.getElementById('editContent').innerHTML='<span class="no-sel">Click a block to edit</span>';
+  document.getElementById('logEl').innerHTML='';
+  document.getElementById('solverResult').textContent='\u2014';document.getElementById('solverResult').style.color='';
+  document.getElementById('animBtn').style.display='none';document.getElementById('stepCounter').style.display='none';
+  initGrid();loadPreset('easy');
+}
+
+// ---- SOLVER (Option C: fixed directions, subset BFS) ----
+function isOccS(blist,col,row,si){
+  for(var i=0;i<blist.length;i++){
+    if(i===si)continue;var b=blist[i];if(b.col>=COLS)continue;
+    if(b.dir==='h'){if(b.row===row&&col>=b.col&&col<b.col+b.size)return true;}
+    else{if(b.col===col&&row>=b.row&&row<b.row+b.size)return true;}
+  }
+  return false;
+}
+
+function canMoveS(blist,idx){
+  var b=blist[idx];if(b.col>=COLS)return false;
+  if(b.dc===1){if(b.type==='target')return true;var rc=b.col+b.size;return rc<COLS&&!isOccS(blist,rc,b.row,idx);}
+  if(b.dc===-1)return b.col>0&&!isOccS(blist,b.col-1,b.row,idx);
+  if(b.dr===1){var br=b.row+b.size;return br<ROWS&&!isOccS(blist,b.col,br,idx);}
+  if(b.dr===-1)return b.row>0&&!isOccS(blist,b.col,b.row-1,idx);
+  return false;
+}
+
+function blocksOverlapS(blist){
+  var cells={};
+  for(var i=0;i<blist.length;i++){
+    var b=blist[i];if(b.col>=COLS)continue;
+    if(b.dir==='h'){for(var c=b.col;c<b.col+b.size;c++){var k=c+','+b.row;if(cells[k]!==undefined)return true;cells[k]=i;}}
+    else{for(var r=b.row;r<b.row+b.size;r++){var k=b.col+','+r;if(cells[k]!==undefined)return true;cells[k]=i;}}
+  }
+  return false;
+}
+
+function getSubsets(arr){
+  var res=[[]];
+  for(var i=0;i<arr.length;i++){var len=res.length;for(var j=0;j<len;j++)res.push(res[j].concat([arr[i]]));}
+  return res.filter(function(s){return s.length>0;});
+}
+
+function getRoundOutcomesS(blist){
+  var movable=[];
+  for(var i=0;i<blist.length;i++)if(canMoveS(blist,i))movable.push(i);
+  var subsets=getSubsets(movable);
+  var seen={};var results=[];
+  for(var si=0;si<subsets.length;si++){
+    var subset=subsets[si];
+    var totalThresh=0;
+    for(var j=0;j<subset.length;j++)totalThresh+=blist[subset[j]].threshold;
+    if(totalThresh>3)continue;
+    var ns=[];for(var i=0;i<blist.length;i++)ns.push({type:blist[i].type,dir:blist[i].dir,dc:blist[i].dc,dr:blist[i].dr,col:blist[i].col,row:blist[i].row,size:blist[i].size,threshold:blist[i].threshold});
+    for(var j=0;j<subset.length;j++){
+      var idx=subset[j];var b=blist[idx];
+      if(b.dc===1&&b.type==='target'&&b.col+b.size>=COLS)ns[idx]={type:b.type,dir:b.dir,dc:b.dc,dr:b.dr,col:COLS,row:b.row,size:b.size,threshold:b.threshold};
+      else ns[idx]={type:b.type,dir:b.dir,dc:b.dc,dr:b.dr,col:b.col+b.dc,row:b.row+b.dr,size:b.size,threshold:b.threshold};
+    }
+    if(blocksOverlapS(ns))continue;
+    var ser='';for(var i=0;i<ns.length;i++)ser+=ns[i].col+','+ns[i].row+'|';
+    if(!seen[ser]){seen[ser]=true;results.push({subset:subset,state:ns});}
+  }
+  return results;
+}
+
+function serS(blist){var s='';for(var i=0;i<blist.length;i++)s+=blist[i].col+','+blist[i].row+'|';return s;}
+function isSolvedS(blist){for(var i=0;i<blist.length;i++)if(blist[i].type==='target'&&blist[i].col+blist[i].size>=COLS)return true;return false;}
+
+function runSolver(){
+  var el=document.getElementById('solverResult');if(!el)return;
+  el.textContent='Solving...';el.style.color='#666';
+  document.getElementById('animBtn').style.display='none';
+  document.getElementById('stepCounter').style.display='none';
+  solvedPath=null;
+  setTimeout(function(){
+    var init=[];
+    for(var i=0;i<blocks.length;i++)init.push({type:blocks[i].type,dir:blocks[i].dir,dc:blocks[i].dc,dr:blocks[i].dr,col:blocks[i].col,row:blocks[i].row,size:blocks[i].size,threshold:blocks[i].threshold});
+    var queue=[[init,0,[]]];
+    var vis={};vis[serS(init)]=true;
+    var found=null,foundPath=null,iters=0,MAX=400000;
+    while(queue.length>0&&iters<MAX){
+      iters++;var curr=queue.shift();var state=curr[0];var steps=curr[1];var path=curr[2];
+      if(isSolvedS(state)){found=steps;foundPath=path.concat([{state:state,moved:[]}]);break;}
+      var outcomes=getRoundOutcomesS(state);
+      for(var oi=0;oi<outcomes.length;oi++){
+        var ns=outcomes[oi].state;var subset=outcomes[oi].subset;
+        var key=serS(ns);
+        if(!vis[key]){vis[key]=true;queue.push([ns,steps+1,path.concat([{state:ns,moved:subset}])]);}
+      }
+    }
+    if(found!==null){
+      el.textContent='Optimal: '+found+' round'+(found===1?'':'s');
+      el.style.color=found<=3?'#90be6d':found<=6?'#f4a261':'#e63946';
+      solvedPath=foundPath;
+      document.getElementById('animBtn').style.display='block';
+      document.getElementById('stepTotal').textContent=found;
+    } else {
+      el.textContent=iters>=MAX?'Too complex':'No solution found';
+      el.style.color='#888';
+    }
+  },20);
+}
+
+function toggleAnimate(){
+  if(animRunning){stopAnimate();return;}
+  if(!solvedPath||solvedPath.length===0)return;
+  stopAnimate();
+  applyAnimState(solvedPath[0].state,[]);
+  animStep=0;updateStepCounter();
+  animRunning=true;
+  document.getElementById('animBtn').textContent='&#9646;&#9646; Pause';
+  document.getElementById('animBtn').classList.add('active');
+  document.getElementById('stepCounter').style.display='block';
+  animInterval=setInterval(function(){
+    animStep++;
+    if(animStep>=solvedPath.length){stopAnimate();document.getElementById('animBtn').textContent='&#8635; Replay';return;}
+    applyAnimState(solvedPath[animStep].state,solvedPath[animStep].moved);
+    updateStepCounter();
+  },700);
+}
+
+function stopAnimate(){
+  clearInterval(animInterval);animInterval=null;animRunning=false;
+  document.getElementById('animBtn').classList.remove('active');
+  document.getElementById('animBtn').textContent='&#9654; Animate Solution';
+}
+
+function updateStepCounter(){
+  document.getElementById('stepCurr').textContent=animStep;
+  document.getElementById('stepCounter').style.display='block';
+}
+
+function applyAnimState(state,moved){
+  for(var i=0;i<state.length&&i<blocks.length;i++){
+    blocks[i].col=state[i].col;blocks[i].row=state[i].row;
+    var el=document.getElementById(blocks[i].id);
+    if(el)el.classList.add('animating');
+    renderBlock(blocks[i]);
+  }
+  for(var i=0;i<moved.length;i++){
+    var mel=document.getElementById(blocks[moved[i]].id);
+    if(mel){mel.classList.add('highlight');setTimeout(function(e){return function(){e.classList.remove('highlight');};}(mel),600);}
+  }
+}
+
+document.addEventListener('click',function(e){
+  if(!gameMode&&!e.target.closest('.block')){
+    for(var i=0;i<blocks.length;i++){var el=document.getElementById(blocks[i].id);if(el)el.classList.remove('selected');}
+    document.getElementById('editContent').innerHTML='<span class="no-sel">Click a block to edit</span>';
+  }
+});
+
+initGrid();
+loadPreset('easy');
+</script>
+</body>
+</html>
