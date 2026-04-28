@@ -622,8 +622,8 @@ function isValidMovePost(bid, dc, dr, positions) {
   const newRow = pos.row;
 
   if (dir === 'h') {
-    // Check board bounds
-    if (type === 'target' && dc === 1 && newCol >= COLS) return true; // exiting — always valid
+    // Check board bounds — target is allowed to slide off the right edge
+    if (type === 'target' && dc === 1 && newCol + size > COLS) return true;
     if (newCol < 0 || newCol + size > COLS) return false;
     // Check no other block occupies the new cells (skip self)
     return !blockAtInPositions(newCol, newRow, bid, dir, size, positions);
