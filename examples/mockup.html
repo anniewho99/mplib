@@ -32,6 +32,9 @@ h1{font-family:'Space Mono',monospace;font-size:13px;letter-spacing:3px;text-tra
 .vdot.p3f{background:var(--p3);border-color:var(--p3)}
 .vote-bar{position:absolute;bottom:0;left:0;height:4px;background:rgba(255,255,255,.55);border-radius:0 0 4px 4px;transition:width .2s}
 .voted-dir{position:absolute;bottom:6px;font-size:16px;opacity:.9}
+/* optimality ring: green = optimal, red = suboptimal */
+.block.opt-good{box-shadow:0 0 0 3px #90be6d,0 0 12px rgba(144,190,109,.4)}
+.block.opt-bad{box-shadow:0 0 0 3px #e63946,0 0 12px rgba(230,57,70,.3)}
 .panel{width:255px;display:flex;flex-direction:column;gap:14px}
 .card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px;display:flex;flex-direction:column;gap:10px}
 .card-title{font-family:'Space Mono',monospace;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--muted)}
@@ -68,6 +71,10 @@ button:hover{background:#222;border-color:var(--muted)}
 .btn-solve{background:#1a1a2e;border-color:#457b9d;color:#a8dadc;width:100%;padding:7px;font-size:12px}
 .btn-solve:hover{background:#16213e;border-color:#a8dadc}
 .btn-solve.active{background:var(--obstacle);border-color:var(--obstacle);color:white}
+/* play mode optimal counter */
+.opt-counter{font-family:'Space Mono',monospace;font-size:11px;color:var(--muted);text-align:center;padding:6px 8px;background:#111;border-radius:4px;border:1px solid var(--border)}
+.opt-counter span{color:var(--exit);font-size:15px;font-weight:700}
+.opt-solving{color:#555;font-style:italic;font-size:10px;text-align:center}
 .win-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:1000;align-items:center;justify-content:center;flex-direction:column;gap:14px}
 .win-overlay.show{display:flex}
 .win-text{font-family:'Space Mono',monospace;font-size:44px;color:var(--exit);letter-spacing:4px}
@@ -119,7 +126,13 @@ button:hover{background:#222;border-color:var(--muted)}
     </div>
     <div class="card" id="timerCard" style="display:none">
       <div class="card-title">Round Timer</div>
-      <div class="timer-big" id="timerEl">5</div>
+      <div class="timer-big" id="timerEl">10</div>
+    </div>
+    <!-- play mode optimal counter -->
+    <div class="card" id="optCard" style="display:none">
+      <div class="card-title">Optimal Rounds Remaining</div>
+      <div class="opt-counter" id="optCounter"><span id="optVal">—</span> rounds</div>
+      <div class="opt-solving" id="optSolving" style="display:none">solving...</div>
     </div>
     <div class="card" id="logCard" style="display:none">
       <div class="card-title">Round Log</div>
@@ -135,11 +148,13 @@ button:hover{background:#222;border-color:var(--muted)}
 <script>
 var COLS=6,ROWS=6,CELL=78,GAP=4;
 var blocks=[],blockId=0,gameMode=false,activePlayer=null,votes={};
-var timerInterval=null,timerVal=5,roundNum=0,dragState=null;
+var timerInterval=null,timerVal=10,roundNum=0,dragState=null;
 var solvedPath=null,animStep=0,animInterval=null,animRunning=false;
 
-// votes[blockId] = {p1: null|'fwd'|'back', p2: ..., p3: ...}
-// 'fwd' = right/down, 'back' = left/up (relative to block direction)
+// play mode: current optimal next-step blocks (set after re-solve)
+// optimalNextMoves = array of {blockIdx, dc, dr} for the next optimal round
+var optimalNextMoves=[];
+var optSolveTimeout=null;
 
 var PRESETS={
   easy:[
@@ -323,13 +338,17 @@ function startGame(){
   document.getElementById('startBtn').style.display='none';document.getElementById('resetBtn').style.display='block';
   document.getElementById('presetCard').style.display='none';document.getElementById('addCard').style.display='none';
   document.getElementById('editCard').style.display='none';document.getElementById('playersCard').style.display='block';
-  document.getElementById('timerCard').style.display='block';document.getElementById('logCard').style.display='block';
+  document.getElementById('timerCard').style.display='block';
+  document.getElementById('optCard').style.display='block';
+  document.getElementById('logCard').style.display='block';
   for(var i=0;i<blocks.length;i++){var el=document.getElementById(blocks[i].id);if(el)el.classList.remove('selected');}
+  // solve from current state before first round
+  runPlaySolver();
   startRound();
 }
 
 function startRound(){
-  roundNum++;timerVal=5;activePlayer=null;votes={};
+  roundNum++;timerVal=10;activePlayer=null;votes={};
   for(var i=0;i<blocks.length;i++)votes[blocks[i].id]={p1:null,p2:null,p3:null};
   document.getElementById('pb1').classList.remove('active');
   document.getElementById('pb2').classList.remove('active');
@@ -337,6 +356,11 @@ function startRound(){
   document.getElementById('pv1').textContent='no vote';
   document.getElementById('pv2').textContent='no vote';
   document.getElementById('pv3').textContent='no vote';
+  // clear optimality highlights
+  for(var i=0;i<blocks.length;i++){
+    var el=document.getElementById(blocks[i].id);
+    if(el){el.classList.remove('opt-good','opt-bad');}
+  }
   updateVoteDisplay();updateTimer();
   clearInterval(timerInterval);
   timerInterval=setInterval(function(){timerVal--;updateTimer();if(timerVal<=0){clearInterval(timerInterval);resolveRound();}},1000);
@@ -344,7 +368,7 @@ function startRound(){
 
 function updateTimer(){
   var el=document.getElementById('timerEl');el.textContent=timerVal;
-  el.className='timer-big'+(timerVal<=2?' urgent':'');
+  el.className='timer-big'+(timerVal<=3?' urgent':'');
 }
 
 function selectPlayer(p){
@@ -354,17 +378,57 @@ function selectPlayer(p){
   document.getElementById('pb3').classList.toggle('active',p==='p3');
 }
 
-// cycle: null -> 'fwd' -> 'back' -> null
 function cycleVote(current){
   if(current===null)return'fwd';
   if(current==='fwd')return'back';
   return null;
 }
 
-function dirLabel(b, voteDir){
+function dirLabel(b,voteDir){
   if(!voteDir)return'no vote';
-  if(b.dir==='h') return voteDir==='fwd'?'&#8594;':'&#8592;';
+  if(b.dir==='h')return voteDir==='fwd'?'&#8594;':'&#8592;';
   return voteDir==='fwd'?'&#8595;':'&#8593;';
+}
+
+// convert vote dir string to dc,dr
+function voteToDelta(b, voteDir){
+  if(!voteDir) return null;
+  if(b.dir==='h') return {dc: voteDir==='fwd'?1:-1, dr:0};
+  return {dc:0, dr: voteDir==='fwd'?1:-1};
+}
+
+// check if a given block index + direction is in optimalNextMoves
+function isOptimalVote(blockIdx, dc, dr){
+  for(var i=0;i<optimalNextMoves.length;i++){
+    if(optimalNextMoves[i].blockIdx===blockIdx&&optimalNextMoves[i].dc===dc&&optimalNextMoves[i].dr===dr)return true;
+  }
+  return false;
+}
+
+// update the green/red ring on a block based on current votes for it
+function updateBlockOptRing(bid){
+  if(!gameMode)return;
+  var blockIdx=-1;
+  for(var i=0;i<blocks.length;i++)if(blocks[i].id===bid){blockIdx=i;break;}
+  if(blockIdx<0)return;
+  var b=blocks[blockIdx];
+  var v=votes[bid]||{p1:null,p2:null,p3:null};
+  // collect all non-null player votes for this block
+  var playerVotes=[v.p1,v.p2,v.p3].filter(function(x){return x!==null;});
+  var el=document.getElementById(bid);
+  if(!el)return;
+  el.classList.remove('opt-good','opt-bad');
+  if(playerVotes.length===0)return;
+  // check if any vote for this block is optimal
+  var anyOptimal=false;
+  for(var pi=0;pi<playerVotes.length;pi++){
+    var delta=voteToDelta(b,playerVotes[pi]);
+    if(delta&&isOptimalVote(blockIdx,delta.dc,delta.dr)){anyOptimal=true;break;}
+  }
+  // only show ring if optimalNextMoves is populated (solver has result)
+  if(optimalNextMoves.length>0){
+    el.classList.add(anyOptimal?'opt-good':'opt-bad');
+  }
 }
 
 function handleVoteClick(bid){
@@ -376,13 +440,13 @@ function handleVoteClick(bid){
   var pn=p.slice(1);
   document.getElementById('pv'+pn).innerHTML=votes[bid][p]?(b?dirLabel(b,votes[bid][p]):'?'):'no vote';
   updateVoteDisplay();
+  updateBlockOptRing(bid);
 }
 
 function updateVoteDisplay(){
   for(var i=0;i<blocks.length;i++){
     var b=blocks[i];
     var v=votes[b.id]||{p1:null,p2:null,p3:null};
-    // tally votes per direction
     var fwd=0,back=0;
     if(v.p1==='fwd')fwd++;else if(v.p1==='back')back++;
     if(v.p2==='fwd')fwd++;else if(v.p2==='back')back++;
@@ -395,7 +459,6 @@ function updateVoteDisplay(){
       '<div class="vdot'+(v.p3?' p3f':'')+'"></div>';
     var bar=document.getElementById('bar-'+b.id);
     if(bar)bar.style.width=Math.min(100,total/3*100)+'%';
-    // show winning direction if any
     var vdir=document.getElementById('vdir-'+b.id);
     if(vdir){
       var winDir=null;
@@ -432,7 +495,6 @@ function resolveRound(){
   var n=0;
   for(var i=0;i<toMove.length;i++){
     var b=toMove[i].b,dc=toMove[i].dc,dr=toMove[i].dr;
-    // check physical validity
     var valid=false;
     if(b.dir==='h'){
       if(dc===1){var rc=b.col+b.size;valid=(b.type==='target'&&rc>=COLS)||(rc<COLS&&!isOcc(rc,b.row,b.id));}
@@ -450,16 +512,22 @@ function resolveRound(){
   renderAllBlocks();updateVoteDisplay();
   if(n>0)addLog('Round '+roundNum+': '+n+' block(s) moved','success');
   else addLog('Round '+roundNum+': no block moved','fail');
-  if(!checkWin())setTimeout(startRound,700);
+
+  if(!checkWin()){
+    // re-solve from new state before next round
+    runPlaySolver();
+    setTimeout(startRound,700);
+  }
 }
 
 function checkWin(){
   for(var i=0;i<blocks.length;i++){
-    if(blocks[i].type==='target'&&blocks[i].col>=COLS){
+    if(blocks[i].type==='target'&&blocks[i].col+blocks[i].size>=COLS){
       clearInterval(timerInterval);
       document.getElementById('modeBadge').textContent='YOU WIN!';document.getElementById('modeBadge').className='mode-badge won';
       addLog('Target escaped in '+roundNum+' rounds!','win');
       document.getElementById('winSub').textContent='Solved in '+roundNum+' rounds';
+      document.getElementById('optVal').textContent='0';
       setTimeout(function(){document.getElementById('winOverlay').classList.add('show');},400);
       return true;
     }
@@ -474,21 +542,28 @@ function addLog(msg,type){
 
 function resetGame(){
   clearInterval(timerInterval);stopAnimate();
-  gameMode=false;activePlayer=null;votes={};roundNum=0;
+  clearTimeout(optSolveTimeout);
+  gameMode=false;activePlayer=null;votes={};roundNum=0;optimalNextMoves=[];
   document.getElementById('winOverlay').classList.remove('show');
   document.getElementById('modeBadge').textContent='SETUP MODE';document.getElementById('modeBadge').className='mode-badge setup';
   document.getElementById('startBtn').style.display='block';document.getElementById('resetBtn').style.display='none';
   document.getElementById('presetCard').style.display='block';document.getElementById('addCard').style.display='block';
   document.getElementById('editCard').style.display='block';document.getElementById('playersCard').style.display='none';
-  document.getElementById('timerCard').style.display='none';document.getElementById('logCard').style.display='none';
+  document.getElementById('timerCard').style.display='none';
+  document.getElementById('optCard').style.display='none';
+  document.getElementById('logCard').style.display='none';
   document.getElementById('editContent').innerHTML='<span class="no-sel">Click a block to edit</span>';
   document.getElementById('logEl').innerHTML='';
   document.getElementById('solverResult').textContent='\u2014';document.getElementById('solverResult').style.color='';
   document.getElementById('animBtn').style.display='none';document.getElementById('stepCounter').style.display='none';
+  document.getElementById('optVal').textContent='—';
   initGrid();loadPreset('easy');
 }
 
-// ---- SOLVER ----
+// ============================================================
+// SHARED SOLVER UTILITIES
+// ============================================================
+
 function isOccS(blist,col,row,si){
   for(var i=0;i<blist.length;i++){
     if(i===si)continue;var b=blist[i];if(b.col>=COLS||b.col<0)continue;
@@ -537,7 +612,6 @@ function getRoundOutcomesS(blist){
     var vc={};
     var combo=[opts[p1],opts[p2],opts[p3]];
     for(var ci=0;ci<3;ci++){var c=combo[ci];if(c)vc[c[0]+','+c[1]+','+c[2]]=(vc[c[0]+','+c[1]+','+c[2]]||0)+1;}
-    // group by block
     var bv={};
     for(var k in vc){
       var parts=k.split(',');var idx=parseInt(parts[0]),dc=parseInt(parts[1]),dr=parseInt(parts[2]);
@@ -574,6 +648,31 @@ function getRoundOutcomesS(blist){
 function serS(blist){var s='';for(var i=0;i<blist.length;i++)s+=blist[i].col+','+blist[i].row+'|';return s;}
 function isSolvedS(blist){for(var i=0;i<blist.length;i++)if(blist[i].type==='target'&&blist[i].col+blist[i].size>=COLS)return true;return false;}
 
+// ============================================================
+// A* HEURISTIC
+// counts how many distinct blocks occupy cells between
+// the target's right edge and col 5 (the exit column)
+// ============================================================
+function heuristic(blist){
+  var target=null;
+  for(var i=0;i<blist.length;i++)if(blist[i].type==='target'){target=blist[i];break;}
+  if(!target||target.col>=COLS)return 0;
+  var rightEdge=target.col+target.size;
+  if(rightEdge>=COLS)return 0;
+  var blockers={};
+  for(var c=rightEdge;c<COLS;c++){
+    for(var i=0;i<blist.length;i++){
+      var b=blist[i];if(b.col>=COLS)continue;
+      if(b.dir==='h'&&b.row===target.row&&c>=b.col&&c<b.col+b.size)blockers[b.col+','+b.row]=true;
+      else if(b.dir==='v'&&b.col===c&&target.row>=b.row&&target.row<b.row+b.size)blockers[b.col+','+b.row]=true;
+    }
+  }
+  return Object.keys(blockers).length;
+}
+
+// ============================================================
+// A* SOLVER (setup mode / animate)
+// ============================================================
 function runSolver(){
   var el=document.getElementById('solverResult');if(!el)return;
   el.textContent='Solving...';el.style.color='#666';
@@ -583,35 +682,98 @@ function runSolver(){
   setTimeout(function(){
     var init=[];
     for(var i=0;i<blocks.length;i++)init.push({type:blocks[i].type,dir:blocks[i].dir,col:blocks[i].col,row:blocks[i].row,size:blocks[i].size});
-    var queue=[[init,0,[]]];
-    var vis={};vis[serS(init)]=true;
-    var found=null,foundPath=null,iters=0,MAX=800000;
-    while(queue.length>0&&iters<MAX){
-      iters++;var curr=queue.shift();var state=curr[0];var steps=curr[1];var path=curr[2];
-      if(isSolvedS(state)){found=steps;foundPath=path.concat([{state:state,moved:[]}]);break;}
-      var outcomes=getRoundOutcomesS(state);
-      for(var oi=0;oi<outcomes.length;oi++){
-        var ns=outcomes[oi].state;var key=serS(ns);
-        if(!vis[key]){
-          vis[key]=true;
-          var moved=[];for(var bi=0;bi<ns.length;bi++)if(ns[bi].col!==state[bi].col||ns[bi].row!==state[bi].row)moved.push(bi);
-          queue.push([ns,steps+1,path.concat([{state:ns,moved:moved}])]);
-        }
-      }
-    }
-    if(found!==null){
-      el.textContent='Optimal: '+found+' round'+(found===1?'':'s');
-      el.style.color=found<=5?'#90be6d':found<=10?'#f4a261':'#e63946';
-      solvedPath=foundPath;
+    var result=astarSolve(init,120000);
+    if(result.found!==null){
+      el.textContent='Optimal: '+result.found+' round'+(result.found===1?'':'s');
+      el.style.color=result.found<=5?'#90be6d':result.found<=10?'#f4a261':'#e63946';
+      solvedPath=result.path;
       document.getElementById('animBtn').style.display='block';
-      document.getElementById('stepTotal').textContent=found;
+      document.getElementById('stepTotal').textContent=result.found;
     } else {
-      el.textContent=iters>=MAX?'Too complex':'No solution found';
+      el.textContent=result.tooComplex?'Too complex':'No solution found';
       el.style.color='#888';
     }
   },20);
 }
 
+// ============================================================
+// A* SOLVER for play mode — runs from current block positions,
+// updates optimalNextMoves and the counter display
+// ============================================================
+function runPlaySolver(){
+  clearTimeout(optSolveTimeout);
+  document.getElementById('optSolving').style.display='block';
+  document.getElementById('optVal').textContent='—';
+  optimalNextMoves=[];
+  optSolveTimeout=setTimeout(function(){
+    var init=[];
+    for(var i=0;i<blocks.length;i++)init.push({type:blocks[i].type,dir:blocks[i].dir,col:blocks[i].col,row:blocks[i].row,size:blocks[i].size});
+    var result=astarSolve(init,200000);
+    document.getElementById('optSolving').style.display='none';
+    if(result.found!==null){
+      document.getElementById('optVal').textContent=result.found;
+      // extract which blocks move in the FIRST step of the optimal path
+      optimalNextMoves=[];
+      if(result.path&&result.path.length>=2){
+        var s0=result.path[0].state;
+        var s1=result.path[1].state;
+        for(var i=0;i<s0.length&&i<s1.length;i++){
+          if(s0[i].col!==s1[i].col||s0[i].row!==s1[i].row){
+            optimalNextMoves.push({
+              blockIdx:i,
+              dc:s1[i].col-s0[i].col,
+              dr:s1[i].row-s0[i].row
+            });
+          }
+        }
+      }
+    } else {
+      document.getElementById('optVal').textContent='?';
+    }
+  },10);
+}
+
+// ============================================================
+// Shared A* core
+// ============================================================
+function astarSolve(init, maxIters){
+  // min-heap via simple sorted array (fine for these puzzle sizes)
+  // Each entry: {state, g, f, path}
+  var startH=heuristic(init);
+  var open=[{state:init,g:0,f:startH,path:[{state:init,moved:[]}]}];
+  var vis={};vis[serS(init)]=true;
+  var iters=0;
+
+  while(open.length>0&&iters<maxIters){
+    iters++;
+    // pop lowest f
+    var best=0;
+    for(var i=1;i<open.length;i++)if(open[i].f<open[best].f)best=i;
+    var curr=open.splice(best,1)[0];
+    var state=curr.state,g=curr.g,path=curr.path;
+
+    if(isSolvedS(state)){
+      return{found:g,path:path,tooComplex:false};
+    }
+
+    var outcomes=getRoundOutcomesS(state);
+    for(var oi=0;oi<outcomes.length;oi++){
+      var ns=outcomes[oi].state;var key=serS(ns);
+      if(!vis[key]){
+        vis[key]=true;
+        var ng=g+1;
+        var nh=heuristic(ns);
+        var moved=[];for(var bi=0;bi<ns.length;bi++)if(ns[bi].col!==state[bi].col||ns[bi].row!==state[bi].row)moved.push(bi);
+        open.push({state:ns,g:ng,f:ng+nh,path:path.concat([{state:ns,moved:moved}])});
+      }
+    }
+  }
+  return{found:null,path:null,tooComplex:iters>=maxIters};
+}
+
+// ============================================================
+// ANIMATE (setup mode only)
+// ============================================================
 function toggleAnimate(){
   if(animRunning){stopAnimate();return;}
   if(!solvedPath||solvedPath.length===0)return;
