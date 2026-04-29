@@ -854,24 +854,43 @@ function applyAnimState(state,moved){
 // ============================================================
 
 function spValidMoves(blist, idx) {
-  // Single-player: one block, one cell, checks current positions
   var b = blist[idx]; if (b.col >= COLS || b.col < 0) return [];
   var moves = [];
   if (b.dir === 'h') {
-    var rc = b.col + b.size;
-    if (b.type === 'target' && rc >= COLS) moves.push([1,0]);
-    else if (rc < COLS && !isOccS(blist, rc, b.row, idx)) moves.push([1,0]);
-    if (b.col > 0 && !isOccS(blist, b.col-1, b.row, idx)) moves.push([-1,0]);
+    // Slide right: check each cell the right edge would enter
+    for (var dc = 1; ; dc++) {
+      var newRightEdge = b.col + b.size - 1 + dc;
+      if (newRightEdge >= COLS) {
+        // Target can exit off the right edge
+        if (b.type === 'target') moves.push([dc, 0]);
+        break;
+      }
+      if (isOccS(blist, newRightEdge, b.row, idx)) break;
+      moves.push([dc, 0]);
+    }
+    // Slide left: check each cell the left edge would enter
+    for (var dc = 1; b.col - dc >= 0; dc++) {
+      if (isOccS(blist, b.col - dc, b.row, idx)) break;
+      moves.push([-dc, 0]);
+    }
   } else {
-    var br = b.row + b.size;
-    if (br < ROWS && !isOccS(blist, b.col, br, idx)) moves.push([0,1]);
-    if (b.row > 0 && !isOccS(blist, b.col, b.row-1, idx)) moves.push([0,-1]);
+    // Slide down
+    for (var dr = 1; ; dr++) {
+      var newBottomEdge = b.row + b.size - 1 + dr;
+      if (newBottomEdge >= ROWS) break;
+      if (isOccS(blist, b.col, newBottomEdge, idx)) break;
+      moves.push([0, dr]);
+    }
+    // Slide up
+    for (var dr = 1; b.row - dr >= 0; dr++) {
+      if (isOccS(blist, b.col, b.row - dr, idx)) break;
+      moves.push([0, -dr]);
+    }
   }
   return moves;
 }
 
 function spNextStates(blist) {
-  // Single-player: each neighbor = exactly one block moves one cell
   var results = [];
   for (var i = 0; i < blist.length; i++) {
     var ms = spValidMoves(blist, i);
@@ -879,36 +898,36 @@ function spNextStates(blist) {
       var dc = ms[mi][0], dr = ms[mi][1];
       var b = blist[i];
       var ns = blist.map(function(x){return{type:x.type,dir:x.dir,col:x.col,row:x.row,size:x.size};});
-      if (b.type==='target' && dc===1 && b.col+b.size+dc > COLS) ns[i].col = COLS;
-      else { ns[i].col = b.col+dc; ns[i].row = b.row+dr; }
+      var newCol = b.col + dc;
+      var newRow = b.row + dr;
+      // Target exits when its new position is off the right edge
+      if (b.type==='target' && newCol + b.size > COLS) ns[i].col = COLS;
+      else { ns[i].col = newCol; ns[i].row = newRow; }
       results.push(ns);
     }
   }
   return results;
 }
 
-function spAstar(initBlist, maxIters) {
-  maxIters = maxIters || 500000;
-  var open = [{state: initBlist, g: 0, f: heuristic(initBlist)}];
-  var vis = {}; vis[serS(initBlist)] = 0;
-  var iters = 0;
-  while (open.length > 0 && iters < maxIters) {
-    iters++;
-    var best = 0;
-    for (var i = 1; i < open.length; i++) if (open[i].f < open[best].f) best = i;
-    var curr = open.splice(best, 1)[0];
+function spAstar(initBlist) {
+  // Simple BFS is actually fine for single-player Rush Hour —
+  // the state space is small enough and BFS guarantees optimal.
+  var queue = [{state: initBlist, g: 0}];
+  var vis = {}; vis[serS(initBlist)] = true;
+  var head = 0;
+  while (head < queue.length) {
+    var curr = queue[head++];
     if (isSolvedS(curr.state)) return curr.g;
     var nexts = spNextStates(curr.state);
     for (var ni = 0; ni < nexts.length; ni++) {
       var key = serS(nexts[ni]);
-      var ng = curr.g + 1;
-      if (vis[key] === undefined || ng < vis[key]) {
-        vis[key] = ng;
-        open.push({state: nexts[ni], g: ng, f: ng + heuristic(nexts[ni])});
+      if (!vis[key]) {
+        vis[key] = true;
+        queue.push({state: nexts[ni], g: curr.g + 1});
       }
     }
   }
-  return null; // unsolvable or too complex
+  return null;
 }
 
 function analyzeRound1() {
@@ -921,81 +940,83 @@ function analyzeRound1() {
   solvingEl.style.display = 'block';
   countEl.textContent = '';
 
-  setTimeout(function() {
-    // Build initial blist from current blocks
-    var init = blocks.map(function(b){return{type:b.type,dir:b.dir,col:b.col,row:b.row,size:b.size};});
+  var init = blocks.map(function(b){return{type:b.type,dir:b.dir,col:b.col,row:b.row,size:b.size};});
+  var baseline = spAstar(init);
+  var outcomes = getRoundOutcomesS(init);
+  countEl.textContent = '(scoring ' + outcomes.length + ' outcomes...)';
 
-    // Get baseline single-player score from initial state
-    var baseline = spAstar(init);
+  var scored = [];
+  var idx = 0;
 
-    // Enumerate all round-1 outcomes (1, 2, or 3 blocks moving)
-    var outcomes = getRoundOutcomesS(init);
+  function scoreNext() {
+    if (idx >= outcomes.length) {
+      // All done — sort and render
+      scored.sort(function(a,b){
+        if (a.score===null && b.score===null) return 0;
+        if (a.score===null) return 1;
+        if (b.score===null) return -1;
+        return a.score - b.score;
+      });
 
-    // Score each outcome with single-player A*
-    var scored = [];
-    for (var i = 0; i < outcomes.length; i++) {
-      var state = outcomes[i].state;
-      // Which blocks moved?
-      var moved = [];
-      for (var bi = 0; bi < state.length; bi++) {
-        if (state[bi].col !== init[bi].col || state[bi].row !== init[bi].row) {
-          moved.push({idx: bi, dc: state[bi].col - init[bi].col, dr: state[bi].row - init[bi].row});
+      solvingEl.style.display = 'none';
+      countEl.textContent = '(' + scored.length + ' outcomes, baseline ' + baseline + ' moves)';
+      resultsEl.innerHTML = '';
+
+      var dirArrow = function(b, dc, dr) {
+        if (b.dir==='h') return dc>0?'→':'←';
+        return dr>0?'↓':'↑';
+      };
+
+      var prevScore = -1;
+      for (var i = 0; i < scored.length; i++) {
+        var s = scored[i];
+        var moveDesc = s.moved.map(function(m){
+          var b = init[m.idx];
+          var label = b.type==='target' ? 'TARGET' : ('B'+m.idx);
+          return label + dirArrow(b, m.dc, m.dr);
+        }).join(' + ');
+
+        var scoreStr = s.score!==null ? s.score+' sp' : '?';
+        var delta = (s.score!==null && baseline!==null) ? (s.score - baseline) : null;
+        var deltaStr = delta!==null ? (delta<0 ? ' (▲'+Math.abs(delta)+')' : delta===0 ? ' (=)' : ' (▼'+delta+')') : '';
+        var color = s.score===null ? '#666'
+          : s.score < baseline ? '#90be6d'
+          : s.score === baseline ? '#f4a261'
+          : '#e63946';
+
+        if (s.score !== prevScore) {
+          var sep = document.createElement('div');
+          sep.style.cssText = 'border-top:1px solid #2a2a2a;margin:3px 0;';
+          resultsEl.appendChild(sep);
+          prevScore = s.score;
         }
+
+        var row = document.createElement('div');
+        row.style.cssText = 'display:flex;justify-content:space-between;padding:3px 5px;border-radius:3px;background:#111;gap:8px;';
+        row.innerHTML =
+          '<span style="color:#aaa;flex:1">'+(i+1)+'. '+moveDesc+'</span>'+
+          '<span style="color:'+color+';white-space:nowrap">'+scoreStr+deltaStr+'</span>';
+        resultsEl.appendChild(row);
       }
-      var score = spAstar(state);
-      scored.push({state: state, moved: moved, score: score});
+      return;
     }
 
-    // Sort: null (unsolvable) last, then by score ascending (fewer = better)
-    scored.sort(function(a, b) {
-      if (a.score === null && b.score === null) return 0;
-      if (a.score === null) return 1;
-      if (b.score === null) return -1;
-      return a.score - b.score;
-    });
-
-    solvingEl.style.display = 'none';
-    countEl.textContent = '(' + scored.length + ' outcomes)';
-
-    // Render results
-    var dirArrow = function(b, dc, dr) {
-      if (b.dir === 'h') return dc > 0 ? '→' : '←';
-      return dr > 0 ? '↓' : '↑';
-    };
-
-    var prevScore = -1;
-    for (var i = 0; i < scored.length; i++) {
-      var s = scored[i];
-      var moveDesc = s.moved.map(function(m) {
-        var b = init[m.idx];
-        var label = b.type === 'target' ? 'TARGET' : ('B' + m.idx);
-        return label + dirArrow(b, m.dc, m.dr);
-      }).join(' + ');
-
-      var scoreStr = s.score !== null ? s.score + ' moves' : '?';
-      var delta = (s.score !== null && baseline !== null) ? (s.score - baseline) : null;
-      var deltaStr = delta !== null ? (delta <= 0 ? ' (▲' + Math.abs(delta) + ')' : ' (▼' + delta + ')') : '';
-      var color = s.score === null ? '#666'
-        : s.score < baseline ? '#90be6d'
-        : s.score === baseline ? '#f4a261'
-        : '#e63946';
-
-      // Group separator when score changes
-      if (s.score !== prevScore) {
-        var sep = document.createElement('div');
-        sep.style.cssText = 'border-top:1px solid #2a2a2a;margin:3px 0;';
-        resultsEl.appendChild(sep);
-        prevScore = s.score;
+    // Score one outcome
+    var state = outcomes[idx].state;
+    var moved = [];
+    for (var bi = 0; bi < state.length; bi++) {
+      if (state[bi].col !== init[bi].col || state[bi].row !== init[bi].row) {
+        moved.push({idx:bi, dc:state[bi].col-init[bi].col, dr:state[bi].row-init[bi].row});
       }
-
-      var row = document.createElement('div');
-      row.style.cssText = 'display:flex;justify-content:space-between;padding:3px 5px;border-radius:3px;background:#111;';
-      row.innerHTML =
-        '<span style="color:#aaa">' + (i+1) + '. ' + moveDesc + '</span>' +
-        '<span style="color:' + color + ';white-space:nowrap;margin-left:8px">' + scoreStr + deltaStr + '</span>';
-      resultsEl.appendChild(row);
     }
-  }, 20);
+    var score = spAstar(state);
+    scored.push({state:state, moved:moved, score:score});
+    idx++;
+    solvingEl.textContent = 'scoring... ' + idx + '/' + outcomes.length;
+    setTimeout(scoreNext, 0);
+  }
+
+  setTimeout(scoreNext, 20);
 }
 
 document.addEventListener('click',function(e){
