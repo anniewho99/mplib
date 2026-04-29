@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Rush Hour Voting Prototype</title>
+<title>Rush Hour Voting Prototype (Swap-Aware)</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;600&display=swap');
 :root{--bg:#0f0f0f;--surface:#1a1a1a;--border:#2a2a2a;--text:#f0f0f0;--muted:#666;--target:#e63946;--obstacle:#457b9d;--exit:#2a9d8f;--timer:#f4a261;--p1:#e9c46a;--p2:#90be6d;--p3:#a8dadc;--cell:78px;--gap:4px}
@@ -32,7 +32,6 @@ h1{font-family:'Space Mono',monospace;font-size:13px;letter-spacing:3px;text-tra
 .vdot.p3f{background:var(--p3);border-color:var(--p3)}
 .vote-bar{position:absolute;bottom:0;left:0;height:4px;background:rgba(255,255,255,.55);border-radius:0 0 4px 4px;transition:width .2s}
 .voted-dir{position:absolute;bottom:6px;font-size:16px;opacity:.9}
-/* optimality ring: green = optimal, red = suboptimal */
 .block.opt-good{box-shadow:0 0 0 3px #90be6d,0 0 12px rgba(144,190,109,.4)}
 .block.opt-bad{box-shadow:0 0 0 3px #e63946,0 0 12px rgba(230,57,70,.3)}
 .panel{width:255px;display:flex;flex-direction:column;gap:14px}
@@ -71,7 +70,6 @@ button:hover{background:#222;border-color:var(--muted)}
 .btn-solve{background:#1a1a2e;border-color:#457b9d;color:#a8dadc;width:100%;padding:7px;font-size:12px}
 .btn-solve:hover{background:#16213e;border-color:#a8dadc}
 .btn-solve.active{background:var(--obstacle);border-color:var(--obstacle);color:white}
-/* play mode optimal counter */
 .opt-counter{font-family:'Space Mono',monospace;font-size:11px;color:var(--muted);text-align:center;padding:6px 8px;background:#111;border-radius:4px;border:1px solid var(--border)}
 .opt-counter span{color:var(--exit);font-size:15px;font-weight:700}
 .opt-solving{color:#555;font-style:italic;font-size:10px;text-align:center}
@@ -79,10 +77,11 @@ button:hover{background:#222;border-color:var(--muted)}
 .win-overlay.show{display:flex}
 .win-text{font-family:'Space Mono',monospace;font-size:44px;color:var(--exit);letter-spacing:4px}
 .win-sub{font-size:15px;color:var(--muted)}
+.swap-badge{font-family:'Space Mono',monospace;font-size:9px;letter-spacing:1px;color:var(--exit);text-align:center;opacity:.7}
 </style>
 </head>
 <body>
-<h1>Rush Hour Voting Prototype</h1>
+<h1>Rush Hour Voting Prototype &mdash; Swap-Aware Solver</h1>
 <div class="main">
   <div class="grid-wrapper">
     <div class="grid" id="grid"></div>
@@ -91,6 +90,7 @@ button:hover{background:#222;border-color:var(--muted)}
   <div class="panel">
     <div class="card">
       <div class="mode-badge setup" id="modeBadge">SETUP MODE</div>
+      <div class="swap-badge">&#10003; swaps enabled</div>
       <button class="btn-primary" id="startBtn" onclick="startGame()">&#9654; Start Game</button>
       <button class="btn-danger" id="resetBtn" style="display:none" onclick="resetGame()">&#8635; Reset</button>
     </div>
@@ -102,9 +102,20 @@ button:hover{background:#222;border-color:var(--muted)}
       <button class="preset-btn" onclick="loadPreset('coord')">&#129309; Coordination (6 rounds)</button>
       <button class="preset-btn" onclick="loadPreset('vhard')">&#9889; Very Hard (23 rounds)</button>
       <button class="preset-btn" onclick="loadPreset('grandmaster')">&#11088; Grandmaster (24 rounds)</button>
+      <button class="preset-btn" onclick="loadPreset('fog51')">&#128308; Fogleman #15 (51 moves)</button>
+      <button class="preset-btn" onclick="loadPreset('fog50')">&#128308; Fogleman #17 (50 moves)</button>
+      <button class="preset-btn" onclick="loadPreset('mapA')">&#9889; Map A (8401 states)</button>
+      <button class="preset-btn" onclick="loadPreset('mapB')">&#9889; Map B (10400 states)</button>
+      <button class="preset-btn" onclick="loadPreset('mapC')">&#9889; Map C (3489 states)</button>
       <div class="solver-result" id="solverResult">&#8212;</div>
       <div class="step-counter" id="stepCounter" style="display:none">Round <span id="stepCurr">0</span> / <span id="stepTotal">0</span></div>
       <button class="btn-solve" id="animBtn" onclick="toggleAnimate()" style="display:none">&#9654; Animate Solution</button>
+      <button class="btn-solve" id="analyzeBtn" onclick="analyzeRound1()">&#128202; Analyze Round 1</button>
+    </div>
+    <div class="card" id="analyzeCard" style="display:none">
+      <div class="card-title">Round 1 Outcomes <span id="analyzeCount" style="color:var(--muted)"></span></div>
+      <div class="opt-solving" id="analyzeSolving" style="display:none">analyzing...</div>
+      <div id="analyzeResults" style="font-family:'Space Mono',monospace;font-size:11px;display:flex;flex-direction:column;gap:4px;max-height:400px;overflow-y:auto;"></div>
     </div>
     <div class="card" id="addCard">
       <div class="card-title">Add Block</div>
@@ -128,7 +139,6 @@ button:hover{background:#222;border-color:var(--muted)}
       <div class="card-title">Round Timer</div>
       <div class="timer-big" id="timerEl">10</div>
     </div>
-    <!-- play mode optimal counter -->
     <div class="card" id="optCard" style="display:none">
       <div class="card-title">Optimal Rounds Remaining</div>
       <div class="opt-counter" id="optCounter"><span id="optVal">—</span> rounds</div>
@@ -150,21 +160,18 @@ var COLS=6,ROWS=6,CELL=78,GAP=4;
 var blocks=[],blockId=0,gameMode=false,activePlayer=null,votes={};
 var timerInterval=null,timerVal=10,roundNum=0,dragState=null;
 var solvedPath=null,animStep=0,animInterval=null,animRunning=false;
-
-// play mode: current optimal next-step blocks (set after re-solve)
-// optimalNextMoves = array of {blockIdx, dc, dr} for the next optimal round
 var optimalNextMoves=[];
 var optSolveTimeout=null;
 
 var PRESETS={
   easy:[
-    {type:'target',  dir:'h',col:0,row:2,size:2},
+    {type:'target',dir:'h',col:0,row:2,size:2},
     {type:'obstacle',dir:'v',col:2,row:1,size:2},
     {type:'obstacle',dir:'v',col:4,row:2,size:2},
     {type:'obstacle',dir:'h',col:3,row:0,size:2}
   ],
   medium:[
-    {type:'target',  dir:'h',col:0,row:2,size:2},
+    {type:'target',dir:'h',col:0,row:2,size:2},
     {type:'obstacle',dir:'v',col:2,row:0,size:3},
     {type:'obstacle',dir:'v',col:4,row:1,size:3},
     {type:'obstacle',dir:'h',col:2,row:3,size:2},
@@ -172,7 +179,7 @@ var PRESETS={
     {type:'obstacle',dir:'v',col:5,row:0,size:2}
   ],
   hard:[
-    {type:'target',  dir:'h',col:0,row:2,size:2},
+    {type:'target',dir:'h',col:0,row:2,size:2},
     {type:'obstacle',dir:'v',col:2,row:0,size:3},
     {type:'obstacle',dir:'v',col:4,row:2,size:3},
     {type:'obstacle',dir:'h',col:1,row:3,size:2},
@@ -181,7 +188,7 @@ var PRESETS={
     {type:'obstacle',dir:'v',col:5,row:0,size:3}
   ],
   coord:[
-    {type:'target',  dir:'h',col:0,row:2,size:2},
+    {type:'target',dir:'h',col:0,row:2,size:2},
     {type:'obstacle',dir:'v',col:2,row:1,size:2},
     {type:'obstacle',dir:'v',col:3,row:2,size:2},
     {type:'obstacle',dir:'v',col:4,row:2,size:2},
@@ -190,7 +197,7 @@ var PRESETS={
     {type:'obstacle',dir:'v',col:5,row:1,size:2}
   ],
   vhard:[
-    {type:'target',  dir:'h',col:0,row:2,size:2},
+    {type:'target',dir:'h',col:0,row:2,size:2},
     {type:'obstacle',dir:'v',col:2,row:0,size:3},
     {type:'obstacle',dir:'v',col:4,row:1,size:3},
     {type:'obstacle',dir:'h',col:2,row:3,size:2},
@@ -199,7 +206,7 @@ var PRESETS={
     {type:'obstacle',dir:'v',col:0,row:3,size:2}
   ],
   grandmaster:[
-    {type:'target',  dir:'h',col:0,row:2,size:2},
+    {type:'target',dir:'h',col:0,row:2,size:2},
     {type:'obstacle',dir:'v',col:2,row:0,size:3},
     {type:'obstacle',dir:'v',col:4,row:2,size:3},
     {type:'obstacle',dir:'h',col:1,row:3,size:2},
@@ -207,6 +214,85 @@ var PRESETS={
     {type:'obstacle',dir:'h',col:3,row:5,size:2},
     {type:'obstacle',dir:'v',col:5,row:0,size:3},
     {type:'obstacle',dir:'v',col:0,row:3,size:2}
+  ],
+  // Fogleman #15 — 51 single-player moves, no walls
+  // GBBoLoGHIoLMGHIAAMCCCKoMooJKDDEEJFFo
+  fog51:[
+    {type:'obstacle',dir:'v',col:0,row:0,size:3},
+    {type:'obstacle',dir:'h',col:1,row:0,size:2},
+    {type:'obstacle',dir:'v',col:4,row:0,size:2},
+    {type:'obstacle',dir:'v',col:1,row:1,size:2},
+    {type:'obstacle',dir:'v',col:2,row:1,size:2},
+    {type:'obstacle',dir:'v',col:5,row:1,size:3},
+    {type:'target',  dir:'h',col:3,row:2,size:2},
+    {type:'obstacle',dir:'h',col:0,row:3,size:3},
+    {type:'obstacle',dir:'v',col:3,row:3,size:2},
+    {type:'obstacle',dir:'v',col:2,row:4,size:2},
+    {type:'obstacle',dir:'h',col:4,row:4,size:2},
+    {type:'obstacle',dir:'h',col:0,row:5,size:2},
+    {type:'obstacle',dir:'h',col:3,row:5,size:2}
+  ],
+  // No-wall puzzles from Fogleman database
+  // BBHooLGoHCCLGoAAJLDDoIJoEEEIKoFFFIKo — 8401 states
+  mapA:[
+    {type:'obstacle',dir:'h',col:0,row:0,size:2},
+    {type:'obstacle',dir:'v',col:2,row:0,size:2},
+    {type:'obstacle',dir:'v',col:5,row:0,size:3},
+    {type:'obstacle',dir:'v',col:0,row:1,size:2},
+    {type:'obstacle',dir:'h',col:3,row:1,size:2},
+    {type:'target',  dir:'h',col:2,row:2,size:2},
+    {type:'obstacle',dir:'v',col:4,row:2,size:2},
+    {type:'obstacle',dir:'h',col:0,row:3,size:2},
+    {type:'obstacle',dir:'v',col:3,row:3,size:3},
+    {type:'obstacle',dir:'h',col:0,row:4,size:3},
+    {type:'obstacle',dir:'v',col:4,row:4,size:2},
+    {type:'obstacle',dir:'h',col:0,row:5,size:3},
+  ],
+  // GoBBooGCCCKLAAHIKLDDHIKLoooJEEoFFJoo — 10400 states
+  mapB:[
+    {type:'obstacle',dir:'v',col:0,row:0,size:2},
+    {type:'obstacle',dir:'h',col:2,row:0,size:2},
+    {type:'obstacle',dir:'h',col:1,row:1,size:3},
+    {type:'obstacle',dir:'v',col:4,row:1,size:3},
+    {type:'obstacle',dir:'v',col:5,row:1,size:3},
+    {type:'target',  dir:'h',col:0,row:2,size:2},
+    {type:'obstacle',dir:'v',col:2,row:2,size:2},
+    {type:'obstacle',dir:'v',col:3,row:2,size:2},
+    {type:'obstacle',dir:'h',col:0,row:3,size:2},
+    {type:'obstacle',dir:'v',col:3,row:4,size:2},
+    {type:'obstacle',dir:'h',col:4,row:4,size:2},
+    {type:'obstacle',dir:'h',col:1,row:5,size:2},
+  ],
+  // BBICCoHoIoKoHAAoKLHDDDKLoooJEEFFoJGG — 3489 states
+  mapC:[
+    {type:'obstacle',dir:'h',col:0,row:0,size:2},
+    {type:'obstacle',dir:'v',col:2,row:0,size:2},
+    {type:'obstacle',dir:'h',col:3,row:0,size:2},
+    {type:'obstacle',dir:'v',col:0,row:1,size:3},
+    {type:'obstacle',dir:'v',col:4,row:1,size:3},
+    {type:'target',  dir:'h',col:1,row:2,size:2},
+    {type:'obstacle',dir:'v',col:5,row:2,size:2},
+    {type:'obstacle',dir:'h',col:1,row:3,size:3},
+    {type:'obstacle',dir:'v',col:3,row:4,size:2},
+    {type:'obstacle',dir:'h',col:4,row:4,size:2},
+    {type:'obstacle',dir:'h',col:0,row:5,size:2},
+    {type:'obstacle',dir:'h',col:4,row:5,size:2},
+  ],
+  // Fogleman #17 — 50 single-player moves, no walls
+  // ooIBBBooIKooAAJKoLCCJDDLGHEEoLGHFFoo
+  fog50:[
+    {type:'obstacle',dir:'v',col:2,row:0,size:2},
+    {type:'obstacle',dir:'h',col:3,row:0,size:3},
+    {type:'obstacle',dir:'v',col:3,row:1,size:2},
+    {type:'target',  dir:'h',col:0,row:2,size:2},
+    {type:'obstacle',dir:'v',col:2,row:2,size:2},
+    {type:'obstacle',dir:'v',col:5,row:2,size:3},
+    {type:'obstacle',dir:'h',col:0,row:3,size:2},
+    {type:'obstacle',dir:'h',col:3,row:3,size:2},
+    {type:'obstacle',dir:'v',col:0,row:4,size:2},
+    {type:'obstacle',dir:'v',col:1,row:4,size:2},
+    {type:'obstacle',dir:'h',col:2,row:4,size:2},
+    {type:'obstacle',dir:'h',col:2,row:5,size:2}
   ]
 };
 
@@ -226,14 +312,11 @@ function initGrid(){
     var cell=document.createElement('div');cell.className='cell';g.appendChild(cell);
   }
 }
-
 function cellPos(c,r){return{x:GAP+c*(CELL+GAP),y:GAP+r*(CELL+GAP)};}
-
 function clearBlocks(){
   for(var i=0;i<blocks.length;i++){var el=document.getElementById(blocks[i].id);if(el)el.remove();}
   blocks=[];blockId=0;
 }
-
 function addBlock(){
   var type=document.getElementById('newType').value;
   var dir=document.getElementById('newDir').value;
@@ -245,7 +328,6 @@ function addBlock(){
     }
   }
 }
-
 function blockAt(c,r){
   for(var i=0;i<blocks.length;i++){
     var b=blocks[i];if(b.col>=COLS)continue;
@@ -254,11 +336,7 @@ function blockAt(c,r){
   }
   return null;
 }
-
-function arrowsForBlock(b){
-  return b.dir==='h'?'&#8592;&#8594;':'&#8593;&#8595;';
-}
-
+function arrowsForBlock(b){return b.dir==='h'?'&#8592;&#8594;':'&#8593;&#8595;';}
 function renderBlock(b){
   var g=document.getElementById('grid');
   var el=document.getElementById(b.id);
@@ -286,9 +364,7 @@ function renderBlock(b){
     '<div class="voted-dir" id="vdir-'+b.id+'"></div>'+
     '<div class="vote-bar" id="bar-'+b.id+'" style="width:0%"></div>';
 }
-
 function renderAllBlocks(){for(var i=0;i<blocks.length;i++)renderBlock(blocks[i]);}
-
 function startDrag(e,bid){
   if(gameMode)return;
   var block=null;for(var i=0;i<blocks.length;i++)if(blocks[i].id===bid){block=blocks[i];break;}
@@ -310,7 +386,6 @@ function startDrag(e,bid){
   document.addEventListener('mousemove',onMove);document.addEventListener('mouseup',onUp);
   e.preventDefault();
 }
-
 function selectBlock(id){
   var block=null;
   for(var i=0;i<blocks.length;i++){var el=document.getElementById(blocks[i].id);if(el)el.classList.remove('selected');if(blocks[i].id===id)block=blocks[i];}
@@ -322,14 +397,12 @@ function selectBlock(id){
     ' &bull; size '+block.size+'</div>'+
     '<button class="btn-danger" onclick="deleteBlock(\''+id+'\')" style="margin-top:8px">Delete Block</button>';
 }
-
 function deleteBlock(id){
   blocks=blocks.filter(function(b){return b.id!==id;});
   var el=document.getElementById(id);if(el)el.remove();
   document.getElementById('editContent').innerHTML='<span class="no-sel">Click a block to edit</span>';
   runSolver();
 }
-
 function startGame(){
   var target=null;for(var i=0;i<blocks.length;i++)if(blocks[i].type==='target'){target=blocks[i];break;}
   if(!target){alert('Add a target block first!');return;}
@@ -342,11 +415,9 @@ function startGame(){
   document.getElementById('optCard').style.display='block';
   document.getElementById('logCard').style.display='block';
   for(var i=0;i<blocks.length;i++){var el=document.getElementById(blocks[i].id);if(el)el.classList.remove('selected');}
-  // solve from current state before first round
   runPlaySolver();
   startRound();
 }
-
 function startRound(){
   roundNum++;timerVal=10;activePlayer=null;votes={};
   for(var i=0;i<blocks.length;i++)votes[blocks[i].id]={p1:null,p2:null,p3:null};
@@ -356,56 +427,42 @@ function startRound(){
   document.getElementById('pv1').textContent='no vote';
   document.getElementById('pv2').textContent='no vote';
   document.getElementById('pv3').textContent='no vote';
-  // clear optimality highlights
-  for(var i=0;i<blocks.length;i++){
-    var el=document.getElementById(blocks[i].id);
-    if(el){el.classList.remove('opt-good','opt-bad');}
-  }
+  for(var i=0;i<blocks.length;i++){var el=document.getElementById(blocks[i].id);if(el){el.classList.remove('opt-good','opt-bad');}}
   updateVoteDisplay();updateTimer();
   clearInterval(timerInterval);
   timerInterval=setInterval(function(){timerVal--;updateTimer();if(timerVal<=0){clearInterval(timerInterval);resolveRound();}},1000);
 }
-
 function updateTimer(){
   var el=document.getElementById('timerEl');el.textContent=timerVal;
   el.className='timer-big'+(timerVal<=3?' urgent':'');
 }
-
 function selectPlayer(p){
   if(!gameMode)return;activePlayer=p;
   document.getElementById('pb1').classList.toggle('active',p==='p1');
   document.getElementById('pb2').classList.toggle('active',p==='p2');
   document.getElementById('pb3').classList.toggle('active',p==='p3');
 }
-
 function cycleVote(current){
   if(current===null)return'fwd';
   if(current==='fwd')return'back';
   return null;
 }
-
 function dirLabel(b,voteDir){
   if(!voteDir)return'no vote';
   if(b.dir==='h')return voteDir==='fwd'?'&#8594;':'&#8592;';
   return voteDir==='fwd'?'&#8595;':'&#8593;';
 }
-
-// convert vote dir string to dc,dr
-function voteToDelta(b, voteDir){
-  if(!voteDir) return null;
-  if(b.dir==='h') return {dc: voteDir==='fwd'?1:-1, dr:0};
-  return {dc:0, dr: voteDir==='fwd'?1:-1};
+function voteToDelta(b,voteDir){
+  if(!voteDir)return null;
+  if(b.dir==='h')return{dc:voteDir==='fwd'?1:-1,dr:0};
+  return{dc:0,dr:voteDir==='fwd'?1:-1};
 }
-
-// check if a given block index + direction is in optimalNextMoves
-function isOptimalVote(blockIdx, dc, dr){
+function isOptimalVote(blockIdx,dc,dr){
   for(var i=0;i<optimalNextMoves.length;i++){
     if(optimalNextMoves[i].blockIdx===blockIdx&&optimalNextMoves[i].dc===dc&&optimalNextMoves[i].dr===dr)return true;
   }
   return false;
 }
-
-// update the green/red ring on a block based on current votes for it
 function updateBlockOptRing(bid){
   if(!gameMode)return;
   var blockIdx=-1;
@@ -413,24 +470,18 @@ function updateBlockOptRing(bid){
   if(blockIdx<0)return;
   var b=blocks[blockIdx];
   var v=votes[bid]||{p1:null,p2:null,p3:null};
-  // collect all non-null player votes for this block
   var playerVotes=[v.p1,v.p2,v.p3].filter(function(x){return x!==null;});
   var el=document.getElementById(bid);
   if(!el)return;
   el.classList.remove('opt-good','opt-bad');
   if(playerVotes.length===0)return;
-  // check if any vote for this block is optimal
   var anyOptimal=false;
   for(var pi=0;pi<playerVotes.length;pi++){
     var delta=voteToDelta(b,playerVotes[pi]);
     if(delta&&isOptimalVote(blockIdx,delta.dc,delta.dr)){anyOptimal=true;break;}
   }
-  // only show ring if optimalNextMoves is populated (solver has result)
-  if(optimalNextMoves.length>0){
-    el.classList.add(anyOptimal?'opt-good':'opt-bad');
-  }
+  if(optimalNextMoves.length>0){el.classList.add(anyOptimal?'opt-good':'opt-bad');}
 }
-
 function handleVoteClick(bid){
   if(!activePlayer)return;
   var p=activePlayer;
@@ -442,7 +493,6 @@ function handleVoteClick(bid){
   updateVoteDisplay();
   updateBlockOptRing(bid);
 }
-
 function updateVoteDisplay(){
   for(var i=0;i<blocks.length;i++){
     var b=blocks[i];
@@ -453,10 +503,7 @@ function updateVoteDisplay(){
     if(v.p3==='fwd')fwd++;else if(v.p3==='back')back++;
     var total=fwd+back;
     var dots=document.getElementById('dots-'+b.id);
-    if(dots)dots.innerHTML=
-      '<div class="vdot'+(v.p1?' p1f':'')+'"></div>'+
-      '<div class="vdot'+(v.p2?' p2f':'')+'"></div>'+
-      '<div class="vdot'+(v.p3?' p3f':'')+'"></div>';
+    if(dots)dots.innerHTML='<div class="vdot'+(v.p1?' p1f':'')+'"></div><div class="vdot'+(v.p2?' p2f':'')+'"></div><div class="vdot'+(v.p3?' p3f':'')+'"></div>';
     var bar=document.getElementById('bar-'+b.id);
     if(bar)bar.style.width=Math.min(100,total/3*100)+'%';
     var vdir=document.getElementById('vdir-'+b.id);
@@ -468,7 +515,6 @@ function updateVoteDisplay(){
     }
   }
 }
-
 function isOcc(col,row,skipId){
   for(var i=0;i<blocks.length;i++){
     var b=blocks[i];if(b.id===skipId||b.col>=COLS)continue;
@@ -478,6 +524,7 @@ function isOcc(col,row,skipId){
   return false;
 }
 
+// Resolve round using swap-aware validation (post-move positions)
 function resolveRound(){
   var toMove=[];
   for(var i=0;i<blocks.length;i++){
@@ -492,29 +539,54 @@ function resolveRound(){
     else if(back>fwd){dc=b.dir==='h'?-1:0;dr=b.dir==='v'?-1:0;}
     if(dc!==0||dr!==0)toMove.push({b:b,dc:dc,dr:dr});
   }
+
+  // Build post-move position map for swap validation
+  var postPos={};
+  for(var i=0;i<blocks.length;i++)postPos[blocks[i].id]={col:blocks[i].col,row:blocks[i].row};
+  for(var i=0;i<toMove.length;i++){
+    var b=toMove[i].b,dc=toMove[i].dc,dr=toMove[i].dr;
+    postPos[b.id]={col:b.col+dc,row:b.row+dr};
+  }
+
   var n=0;
   for(var i=0;i<toMove.length;i++){
     var b=toMove[i].b,dc=toMove[i].dc,dr=toMove[i].dr;
-    var valid=false;
-    if(b.dir==='h'){
-      if(dc===1){var rc=b.col+b.size;valid=(b.type==='target'&&rc>=COLS)||(rc<COLS&&!isOcc(rc,b.row,b.id));}
-      else{valid=b.col>0&&!isOcc(b.col-1,b.row,b.id);}
-    } else {
-      if(dr===1){var br=b.row+b.size;valid=br<ROWS&&!isOcc(b.col,br,b.id);}
-      else{valid=b.row>0&&!isOcc(b.col,b.row-1,b.id);}
-    }
-    if(!valid)continue;
-    if(b.dir==='h'&&dc===1&&b.type==='target'&&b.col+b.size>=COLS){
+    var newCol=b.col+dc,newRow=b.row+dr;
+
+    // Target exit
+    if(b.type==='target'&&dc===1&&newCol+b.size>COLS){
       b.col=COLS;var el=document.getElementById(b.id);if(el)el.style.display='none';
-    } else {b.col+=dc;b.row+=dr;}
+      n++;continue;
+    }
+
+    // Bounds check
+    if(b.dir==='h'&&(newCol<0||newCol+b.size>COLS))continue;
+    if(b.dir==='v'&&(newRow<0||newRow+b.size>ROWS))continue;
+
+    // Collision check against post-move positions of all other blocks
+    var blocked=false;
+    for(var j=0;j<blocks.length;j++){
+      var ob=blocks[j];
+      if(ob.id===b.id||ob.col>=COLS)continue;
+      var opos=postPos[ob.id];
+      // Rectangle overlap
+      var sc,sr,sw,sh,oc,or_,ow,oh;
+      if(b.dir==='h'){sc=newCol;sr=newRow;sw=b.size;sh=1;}
+      else{sc=newCol;sr=newRow;sw=1;sh=b.size;}
+      if(ob.dir==='h'){oc=opos.col;or_=opos.row;ow=ob.size;oh=1;}
+      else{oc=opos.col;or_=opos.row;ow=1;oh=ob.size;}
+      if(sc<oc+ow&&sc+sw>oc&&sr<or_+oh&&sr+sh>or_){blocked=true;break;}
+    }
+    if(blocked)continue;
+    b.col=newCol;b.row=newRow;
     n++;
   }
+
   renderAllBlocks();updateVoteDisplay();
   if(n>0)addLog('Round '+roundNum+': '+n+' block(s) moved','success');
   else addLog('Round '+roundNum+': no block moved','fail');
 
   if(!checkWin()){
-    // re-solve from new state before next round
     runPlaySolver();
     setTimeout(startRound,700);
   }
@@ -522,7 +594,7 @@ function resolveRound(){
 
 function checkWin(){
   for(var i=0;i<blocks.length;i++){
-    if(blocks[i].type==='target'&&blocks[i].col+blocks[i].size>=COLS){
+    if(blocks[i].type==='target'&&blocks[i].col+blocks[i].size>COLS){
       clearInterval(timerInterval);
       document.getElementById('modeBadge').textContent='YOU WIN!';document.getElementById('modeBadge').className='mode-badge won';
       addLog('Target escaped in '+roundNum+' rounds!','win');
@@ -534,24 +606,19 @@ function checkWin(){
   }
   return false;
 }
-
 function addLog(msg,type){
   var log=document.getElementById('logEl');var e=document.createElement('div');
   e.className='log-entry '+type;e.textContent=msg;log.prepend(e);
 }
-
 function resetGame(){
-  clearInterval(timerInterval);stopAnimate();
-  clearTimeout(optSolveTimeout);
+  clearInterval(timerInterval);stopAnimate();clearTimeout(optSolveTimeout);
   gameMode=false;activePlayer=null;votes={};roundNum=0;optimalNextMoves=[];
   document.getElementById('winOverlay').classList.remove('show');
   document.getElementById('modeBadge').textContent='SETUP MODE';document.getElementById('modeBadge').className='mode-badge setup';
   document.getElementById('startBtn').style.display='block';document.getElementById('resetBtn').style.display='none';
   document.getElementById('presetCard').style.display='block';document.getElementById('addCard').style.display='block';
   document.getElementById('editCard').style.display='block';document.getElementById('playersCard').style.display='none';
-  document.getElementById('timerCard').style.display='none';
-  document.getElementById('optCard').style.display='none';
-  document.getElementById('logCard').style.display='none';
+  document.getElementById('timerCard').style.display='none';document.getElementById('optCard').style.display='none';document.getElementById('logCard').style.display='none';
   document.getElementById('editContent').innerHTML='<span class="no-sel">Click a block to edit</span>';
   document.getElementById('logEl').innerHTML='';
   document.getElementById('solverResult').textContent='\u2014';document.getElementById('solverResult').style.color='';
@@ -561,8 +628,14 @@ function resetGame(){
 }
 
 // ============================================================
-// SHARED SOLVER UTILITIES
+// SWAP-AWARE SOLVER
+// Key change from original: getRoundOutcomesS validates each
+// block's move against post-move positions of all other blocks,
+// so two blocks can swap cells in the same round.
 // ============================================================
+
+function serS(blist){var s='';for(var i=0;i<blist.length;i++)s+=blist[i].col+','+blist[i].row+'|';return s;}
+function isSolvedS(blist){for(var i=0;i<blist.length;i++)if(blist[i].type==='target'&&blist[i].col+blist[i].size>COLS)return true;return false;}
 
 function isOccS(blist,col,row,si){
   for(var i=0;i<blist.length;i++){
@@ -573,86 +646,75 @@ function isOccS(blist,col,row,si){
   return false;
 }
 
-function blocksOverlapS(blist){
-  var cells={};
-  for(var i=0;i<blist.length;i++){
-    var b=blist[i];if(b.col>=COLS||b.col<0)continue;
-    if(b.dir==='h'){for(var c=b.col;c<b.col+b.size;c++){var k=c+','+b.row;if(cells[k]!==undefined)return true;cells[k]=i;}}
-    else{for(var r=b.row;r<b.row+b.size;r++){var k=b.col+','+r;if(cells[k]!==undefined)return true;cells[k]=i;}}
-  }
-  return false;
-}
-
+// Returns all moves that are geometrically possible for this block
+// (within board bounds), WITHOUT checking if other blocks are in the way.
+// The collision check happens later in trySubset against the final state,
+// so we don't pre-filter moves that could become valid once other blocks move.
 function getValidMovesS(blist,idx){
   var b=blist[idx];if(b.col>=COLS||b.col<0)return[];
   var moves=[];
   if(b.dir==='h'){
-    var rc=b.col+b.size;
-    if(b.type==='target'&&rc>=COLS)moves.push([1,0]);
-    else if(rc<COLS&&!isOccS(blist,rc,b.row,idx))moves.push([1,0]);
-    if(b.col>0&&!isOccS(blist,b.col-1,b.row,idx))moves.push([-1,0]);
+    // Can always try moving right if within bounds (or target exiting)
+    if(b.type==='target'||b.col+b.size<COLS)moves.push([1,0]);
+    if(b.col>0)moves.push([-1,0]);
   } else {
-    var br=b.row+b.size;
-    if(br<ROWS&&!isOccS(blist,b.col,br,idx))moves.push([0,1]);
-    if(b.row>0&&!isOccS(blist,b.col,b.row-1,idx))moves.push([0,-1]);
+    if(b.row+b.size<ROWS)moves.push([0,1]);
+    if(b.row>0)moves.push([0,-1]);
   }
   return moves;
 }
 
+// Each round: 1, 2, or 3 blocks can move (one per player).
+// Enumerate all subsets of 1-3 valid moves, apply them if no collision.
 function getRoundOutcomesS(blist){
   var n=blist.length;
-  var opts=[null];
+  var seen={};var results=[];
+
+  // Collect all valid (blockIdx, dc, dr) moves
+  var moves=[];
   for(var idx=0;idx<n;idx++){
     var ms=getValidMovesS(blist,idx);
-    for(var mi=0;mi<ms.length;mi++)opts.push([idx,ms[mi][0],ms[mi][1]]);
+    for(var mi=0;mi<ms.length;mi++)moves.push([idx,ms[mi][0],ms[mi][1]]);
   }
-  var seen={};var results=[];
-  var no=opts.length;
-  for(var p1=0;p1<no;p1++)for(var p2=0;p2<no;p2++)for(var p3=0;p3<no;p3++){
-    var vc={};
-    var combo=[opts[p1],opts[p2],opts[p3]];
-    for(var ci=0;ci<3;ci++){var c=combo[ci];if(c)vc[c[0]+','+c[1]+','+c[2]]=(vc[c[0]+','+c[1]+','+c[2]]||0)+1;}
-    var bv={};
-    for(var k in vc){
-      var parts=k.split(',');var idx=parseInt(parts[0]),dc=parseInt(parts[1]),dr=parseInt(parts[2]);
-      if(!bv[idx])bv[idx]={};
-      bv[idx][dc+','+dr]=vc[k];
+  var nm=moves.length;
+
+  // Try all subsets of size 1, 2, 3 (one move per block — no same block twice)
+  function trySubset(subset){
+    // Check no block appears twice
+    var usedBlocks={};
+    for(var i=0;i<subset.length;i++){
+      if(usedBlocks[subset[i][0]])return;
+      usedBlocks[subset[i][0]]=true;
     }
-    var ns=[];for(var i=0;i<blist.length;i++)ns.push({type:blist[i].type,dir:blist[i].dir,col:blist[i].col,row:blist[i].row,size:blist[i].size});
-    var anyMoved=false;
-    for(var bidx in bv){
-      bidx=parseInt(bidx);
-      var dv=bv[bidx];
-      var bd=null,bc=0,sc=0;
-      for(var dk in dv){var cnt=dv[dk];if(cnt>bc){sc=bc;bc=cnt;bd=dk;}else if(cnt>sc)sc=cnt;}
-      if(bc>sc&&bd){
-        var parts=bd.split(',');var dc=parseInt(parts[0]),dr=parseInt(parts[1]);
-        var b=blist[bidx];
-        var vm=getValidMovesS(blist,bidx);
-        var valid=false;for(var vi=0;vi<vm.length;vi++)if(vm[vi][0]===dc&&vm[vi][1]===dr){valid=true;break;}
-        if(valid){
-          if(b.type==='target'&&dc===1&&b.col+b.size>=COLS)ns[bidx]={type:b.type,dir:b.dir,col:COLS,row:b.row,size:b.size};
-          else ns[bidx]={type:b.type,dir:b.dir,col:b.col+dc,row:b.row+dr,size:b.size};
-          anyMoved=true;
-        }
-      }
+    // Build new state
+    var ns=[];for(var i=0;i<n;i++)ns.push({type:blist[i].type,dir:blist[i].dir,col:blist[i].col,row:blist[i].row,size:blist[i].size});
+    for(var i=0;i<subset.length;i++){
+      var idx=subset[i][0],dc=subset[i][1],dr=subset[i][2];
+      var b=blist[idx];
+      if(b.type==='target'&&dc===1&&b.col+b.size+dc>COLS) ns[idx].col=COLS;
+      else{ns[idx].col=b.col+dc;ns[idx].row=b.row+dr;}
     }
-    if(!anyMoved)continue;
-    if(blocksOverlapS(ns))continue;
-    var ser='';for(var i=0;i<ns.length;i++)ser+=ns[i].col+','+ns[i].row+'|';
+    // Check no collisions in final state (allows swaps)
+    var cells={};
+    for(var i=0;i<n;i++){
+      var b=ns[i];if(b.col>=COLS)continue;
+      if(b.dir==='h'){for(var c=b.col;c<b.col+b.size;c++){var k=c+','+b.row;if(cells[k]!==undefined)return;cells[k]=i;}}
+      else{for(var r=b.row;r<b.row+b.size;r++){var k=b.col+','+r;if(cells[k]!==undefined)return;cells[k]=i;}}
+    }
+    var ser=serS(ns);
     if(!seen[ser]){seen[ser]=true;results.push({state:ns});}
   }
+
+  // Size 1
+  for(var a=0;a<nm;a++) trySubset([moves[a]]);
+  // Size 2
+  for(var a=0;a<nm;a++)for(var b=a+1;b<nm;b++) trySubset([moves[a],moves[b]]);
+  // Size 3
+  for(var a=0;a<nm;a++)for(var b=a+1;b<nm;b++)for(var c=b+1;c<nm;c++) trySubset([moves[a],moves[b],moves[c]]);
+
   return results;
 }
 
-function serS(blist){var s='';for(var i=0;i<blist.length;i++)s+=blist[i].col+','+blist[i].row+'|';return s;}
-function isSolvedS(blist){for(var i=0;i<blist.length;i++)if(blist[i].type==='target'&&blist[i].col+blist[i].size>=COLS)return true;return false;}
-
-// ============================================================
-// A* HEURISTIC
-// counts how many distinct blocks occupy cells between
-// the target's right edge and col 5 (the exit column)
-// ============================================================
 function heuristic(blist){
   var target=null;
   for(var i=0;i<blist.length;i++)if(blist[i].type==='target'){target=blist[i];break;}
@@ -670,9 +732,32 @@ function heuristic(blist){
   return Object.keys(blockers).length;
 }
 
-// ============================================================
-// A* SOLVER (setup mode / animate)
-// ============================================================
+function astarSolve(init,maxIters){
+  var startH=heuristic(init);
+  var open=[{state:init,g:0,f:startH,path:[{state:init,moved:[]}]}];
+  var vis={};vis[serS(init)]=true;
+  var iters=0;
+  while(open.length>0&&iters<maxIters){
+    iters++;
+    var best=0;
+    for(var i=1;i<open.length;i++)if(open[i].f<open[best].f)best=i;
+    var curr=open.splice(best,1)[0];
+    var state=curr.state,g=curr.g,path=curr.path;
+    if(isSolvedS(state)){return{found:g,path:path,tooComplex:false};}
+    var outcomes=getRoundOutcomesS(state);
+    for(var oi=0;oi<outcomes.length;oi++){
+      var ns=outcomes[oi].state;var key=serS(ns);
+      if(!vis[key]){
+        vis[key]=true;
+        var ng=g+1,nh=heuristic(ns);
+        var moved=[];for(var bi=0;bi<ns.length;bi++)if(ns[bi].col!==state[bi].col||ns[bi].row!==state[bi].row)moved.push(bi);
+        open.push({state:ns,g:ng,f:ng+nh,path:path.concat([{state:ns,moved:moved}])});
+      }
+    }
+  }
+  return{found:null,path:null,tooComplex:iters>=maxIters};
+}
+
 function runSolver(){
   var el=document.getElementById('solverResult');if(!el)return;
   el.textContent='Solving...';el.style.color='#666';
@@ -696,10 +781,6 @@ function runSolver(){
   },20);
 }
 
-// ============================================================
-// A* SOLVER for play mode — runs from current block positions,
-// updates optimalNextMoves and the counter display
-// ============================================================
 function runPlaySolver(){
   clearTimeout(optSolveTimeout);
   document.getElementById('optSolving').style.display='block';
@@ -712,18 +793,12 @@ function runPlaySolver(){
     document.getElementById('optSolving').style.display='none';
     if(result.found!==null){
       document.getElementById('optVal').textContent=result.found;
-      // extract which blocks move in the FIRST step of the optimal path
       optimalNextMoves=[];
       if(result.path&&result.path.length>=2){
-        var s0=result.path[0].state;
-        var s1=result.path[1].state;
+        var s0=result.path[0].state,s1=result.path[1].state;
         for(var i=0;i<s0.length&&i<s1.length;i++){
           if(s0[i].col!==s1[i].col||s0[i].row!==s1[i].row){
-            optimalNextMoves.push({
-              blockIdx:i,
-              dc:s1[i].col-s0[i].col,
-              dr:s1[i].row-s0[i].row
-            });
+            optimalNextMoves.push({blockIdx:i,dc:s1[i].col-s0[i].col,dr:s1[i].row-s0[i].row});
           }
         }
       }
@@ -733,47 +808,6 @@ function runPlaySolver(){
   },10);
 }
 
-// ============================================================
-// Shared A* core
-// ============================================================
-function astarSolve(init, maxIters){
-  // min-heap via simple sorted array (fine for these puzzle sizes)
-  // Each entry: {state, g, f, path}
-  var startH=heuristic(init);
-  var open=[{state:init,g:0,f:startH,path:[{state:init,moved:[]}]}];
-  var vis={};vis[serS(init)]=true;
-  var iters=0;
-
-  while(open.length>0&&iters<maxIters){
-    iters++;
-    // pop lowest f
-    var best=0;
-    for(var i=1;i<open.length;i++)if(open[i].f<open[best].f)best=i;
-    var curr=open.splice(best,1)[0];
-    var state=curr.state,g=curr.g,path=curr.path;
-
-    if(isSolvedS(state)){
-      return{found:g,path:path,tooComplex:false};
-    }
-
-    var outcomes=getRoundOutcomesS(state);
-    for(var oi=0;oi<outcomes.length;oi++){
-      var ns=outcomes[oi].state;var key=serS(ns);
-      if(!vis[key]){
-        vis[key]=true;
-        var ng=g+1;
-        var nh=heuristic(ns);
-        var moved=[];for(var bi=0;bi<ns.length;bi++)if(ns[bi].col!==state[bi].col||ns[bi].row!==state[bi].row)moved.push(bi);
-        open.push({state:ns,g:ng,f:ng+nh,path:path.concat([{state:ns,moved:moved}])});
-      }
-    }
-  }
-  return{found:null,path:null,tooComplex:iters>=maxIters};
-}
-
-// ============================================================
-// ANIMATE (setup mode only)
-// ============================================================
 function toggleAnimate(){
   if(animRunning){stopAnimate();return;}
   if(!solvedPath||solvedPath.length===0)return;
@@ -791,18 +825,15 @@ function toggleAnimate(){
     updateStepCounter();
   },700);
 }
-
 function stopAnimate(){
   clearInterval(animInterval);animInterval=null;animRunning=false;
   document.getElementById('animBtn').classList.remove('active');
   document.getElementById('animBtn').textContent='&#9654; Animate Solution';
 }
-
 function updateStepCounter(){
   document.getElementById('stepCurr').textContent=animStep;
   document.getElementById('stepCounter').style.display='block';
 }
-
 function applyAnimState(state,moved){
   for(var i=0;i<state.length&&i<blocks.length;i++){
     blocks[i].col=state[i].col;blocks[i].row=state[i].row;
@@ -815,6 +846,157 @@ function applyAnimState(state,moved){
     if(mel){mel.classList.add('highlight');setTimeout(function(e){return function(){e.classList.remove('highlight');};}(mel),600);}
   }
 }
+// ============================================================
+// ROUND 1 OUTCOME ANALYSIS
+// Enumerate all 1/2/3-block combinations for round 1,
+// rank each by single-player A* optimal from the resulting state.
+// Single-player A* = one block moves one cell at a time (Fogleman style).
+// ============================================================
+
+function spValidMoves(blist, idx) {
+  // Single-player: one block, one cell, checks current positions
+  var b = blist[idx]; if (b.col >= COLS || b.col < 0) return [];
+  var moves = [];
+  if (b.dir === 'h') {
+    var rc = b.col + b.size;
+    if (b.type === 'target' && rc >= COLS) moves.push([1,0]);
+    else if (rc < COLS && !isOccS(blist, rc, b.row, idx)) moves.push([1,0]);
+    if (b.col > 0 && !isOccS(blist, b.col-1, b.row, idx)) moves.push([-1,0]);
+  } else {
+    var br = b.row + b.size;
+    if (br < ROWS && !isOccS(blist, b.col, br, idx)) moves.push([0,1]);
+    if (b.row > 0 && !isOccS(blist, b.col, b.row-1, idx)) moves.push([0,-1]);
+  }
+  return moves;
+}
+
+function spNextStates(blist) {
+  // Single-player: each neighbor = exactly one block moves one cell
+  var results = [];
+  for (var i = 0; i < blist.length; i++) {
+    var ms = spValidMoves(blist, i);
+    for (var mi = 0; mi < ms.length; mi++) {
+      var dc = ms[mi][0], dr = ms[mi][1];
+      var b = blist[i];
+      var ns = blist.map(function(x){return{type:x.type,dir:x.dir,col:x.col,row:x.row,size:x.size};});
+      if (b.type==='target' && dc===1 && b.col+b.size+dc > COLS) ns[i].col = COLS;
+      else { ns[i].col = b.col+dc; ns[i].row = b.row+dr; }
+      results.push(ns);
+    }
+  }
+  return results;
+}
+
+function spAstar(initBlist, maxIters) {
+  maxIters = maxIters || 500000;
+  var open = [{state: initBlist, g: 0, f: heuristic(initBlist)}];
+  var vis = {}; vis[serS(initBlist)] = 0;
+  var iters = 0;
+  while (open.length > 0 && iters < maxIters) {
+    iters++;
+    var best = 0;
+    for (var i = 1; i < open.length; i++) if (open[i].f < open[best].f) best = i;
+    var curr = open.splice(best, 1)[0];
+    if (isSolvedS(curr.state)) return curr.g;
+    var nexts = spNextStates(curr.state);
+    for (var ni = 0; ni < nexts.length; ni++) {
+      var key = serS(nexts[ni]);
+      var ng = curr.g + 1;
+      if (vis[key] === undefined || ng < vis[key]) {
+        vis[key] = ng;
+        open.push({state: nexts[ni], g: ng, f: ng + heuristic(nexts[ni])});
+      }
+    }
+  }
+  return null; // unsolvable or too complex
+}
+
+function analyzeRound1() {
+  var card = document.getElementById('analyzeCard');
+  var resultsEl = document.getElementById('analyzeResults');
+  var solvingEl = document.getElementById('analyzeSolving');
+  var countEl = document.getElementById('analyzeCount');
+  card.style.display = 'block';
+  resultsEl.innerHTML = '';
+  solvingEl.style.display = 'block';
+  countEl.textContent = '';
+
+  setTimeout(function() {
+    // Build initial blist from current blocks
+    var init = blocks.map(function(b){return{type:b.type,dir:b.dir,col:b.col,row:b.row,size:b.size};});
+
+    // Get baseline single-player score from initial state
+    var baseline = spAstar(init);
+
+    // Enumerate all round-1 outcomes (1, 2, or 3 blocks moving)
+    var outcomes = getRoundOutcomesS(init);
+
+    // Score each outcome with single-player A*
+    var scored = [];
+    for (var i = 0; i < outcomes.length; i++) {
+      var state = outcomes[i].state;
+      // Which blocks moved?
+      var moved = [];
+      for (var bi = 0; bi < state.length; bi++) {
+        if (state[bi].col !== init[bi].col || state[bi].row !== init[bi].row) {
+          moved.push({idx: bi, dc: state[bi].col - init[bi].col, dr: state[bi].row - init[bi].row});
+        }
+      }
+      var score = spAstar(state);
+      scored.push({state: state, moved: moved, score: score});
+    }
+
+    // Sort: null (unsolvable) last, then by score ascending (fewer = better)
+    scored.sort(function(a, b) {
+      if (a.score === null && b.score === null) return 0;
+      if (a.score === null) return 1;
+      if (b.score === null) return -1;
+      return a.score - b.score;
+    });
+
+    solvingEl.style.display = 'none';
+    countEl.textContent = '(' + scored.length + ' outcomes)';
+
+    // Render results
+    var dirArrow = function(b, dc, dr) {
+      if (b.dir === 'h') return dc > 0 ? '→' : '←';
+      return dr > 0 ? '↓' : '↑';
+    };
+
+    var prevScore = -1;
+    for (var i = 0; i < scored.length; i++) {
+      var s = scored[i];
+      var moveDesc = s.moved.map(function(m) {
+        var b = init[m.idx];
+        var label = b.type === 'target' ? 'TARGET' : ('B' + m.idx);
+        return label + dirArrow(b, m.dc, m.dr);
+      }).join(' + ');
+
+      var scoreStr = s.score !== null ? s.score + ' moves' : '?';
+      var delta = (s.score !== null && baseline !== null) ? (s.score - baseline) : null;
+      var deltaStr = delta !== null ? (delta <= 0 ? ' (▲' + Math.abs(delta) + ')' : ' (▼' + delta + ')') : '';
+      var color = s.score === null ? '#666'
+        : s.score < baseline ? '#90be6d'
+        : s.score === baseline ? '#f4a261'
+        : '#e63946';
+
+      // Group separator when score changes
+      if (s.score !== prevScore) {
+        var sep = document.createElement('div');
+        sep.style.cssText = 'border-top:1px solid #2a2a2a;margin:3px 0;';
+        resultsEl.appendChild(sep);
+        prevScore = s.score;
+      }
+
+      var row = document.createElement('div');
+      row.style.cssText = 'display:flex;justify-content:space-between;padding:3px 5px;border-radius:3px;background:#111;';
+      row.innerHTML =
+        '<span style="color:#aaa">' + (i+1) + '. ' + moveDesc + '</span>' +
+        '<span style="color:' + color + ';white-space:nowrap;margin-left:8px">' + scoreStr + deltaStr + '</span>';
+      resultsEl.appendChild(row);
+    }
+  }, 20);
+}
 
 document.addEventListener('click',function(e){
   if(!gameMode&&!e.target.closest('.block')){
@@ -822,7 +1004,6 @@ document.addEventListener('click',function(e){
     document.getElementById('editContent').innerHTML='<span class="no-sel">Click a block to edit</span>';
   }
 });
-
 initGrid();
 loadPreset('easy');
 </script>
