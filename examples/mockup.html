@@ -859,35 +859,14 @@ function spValidMoves(blist, idx) {
   var b = blist[idx]; if (b.col >= COLS || b.col < 0) return [];
   var moves = [];
   if (b.dir === 'h') {
-    // Slide right: check each cell the right edge would enter
-    for (var dc = 1; ; dc++) {
-      var newRightEdge = b.col + b.size - 1 + dc;
-      if (newRightEdge >= COLS) {
-        // Target can exit off the right edge
-        if (b.type === 'target') moves.push([dc, 0]);
-        break;
-      }
-      if (isOccS(blist, newRightEdge, b.row, idx)) break;
-      moves.push([dc, 0]);
-    }
-    // Slide left: check each cell the left edge would enter
-    for (var dc = 1; b.col - dc >= 0; dc++) {
-      if (isOccS(blist, b.col - dc, b.row, idx)) break;
-      moves.push([-dc, 0]);
-    }
+    var rc = b.col + b.size;
+    if (b.type === 'target' && rc >= COLS) moves.push([1, 0]);
+    else if (rc < COLS && !isOccS(blist, rc, b.row, idx)) moves.push([1, 0]);
+    if (b.col > 0 && !isOccS(blist, b.col - 1, b.row, idx)) moves.push([-1, 0]);
   } else {
-    // Slide down
-    for (var dr = 1; ; dr++) {
-      var newBottomEdge = b.row + b.size - 1 + dr;
-      if (newBottomEdge >= ROWS) break;
-      if (isOccS(blist, b.col, newBottomEdge, idx)) break;
-      moves.push([0, dr]);
-    }
-    // Slide up
-    for (var dr = 1; b.row - dr >= 0; dr++) {
-      if (isOccS(blist, b.col, b.row - dr, idx)) break;
-      moves.push([0, -dr]);
-    }
+    var br = b.row + b.size;
+    if (br < ROWS && !isOccS(blist, b.col, br, idx)) moves.push([0, 1]);
+    if (b.row > 0 && !isOccS(blist, b.col, b.row - 1, idx)) moves.push([0, -1]);
   }
   return moves;
 }
