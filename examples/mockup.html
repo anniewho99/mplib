@@ -357,7 +357,9 @@ function renderBlock(b){
   var w=b.dir==='h'?b.size*(CELL+GAP)-GAP:CELL;
   var h=b.dir==='v'?b.size*(CELL+GAP)-GAP:CELL;
   el.style.left=pos.x+'px';el.style.top=pos.y+'px';el.style.width=w+'px';el.style.height=h+'px';
-  var label=b.type==='target'?'TARGET':'OBS';
+  var blockIdx = -1;
+  for(var i=0;i<blocks.length;i++) if(blocks[i].id===b.id){blockIdx=i;break;}
+  var label = b.type==='target' ? 'TARGET' : 'B'+blockIdx;
   el.innerHTML='<div class="b-arrows">'+arrowsForBlock(b)+'</div>'+
     '<div class="b-label">'+label+'</div>'+
     '<div class="vote-dots" id="dots-'+b.id+'"></div>'+
@@ -992,7 +994,35 @@ function analyzeRound1() {
         }
 
         var row = document.createElement('div');
-        row.style.cssText = 'display:flex;justify-content:space-between;padding:3px 5px;border-radius:3px;background:#111;gap:8px;';
+        row.style.cssText = 'display:flex;justify-content:space-between;padding:3px 5px;border-radius:3px;background:#111;gap:8px;cursor:pointer;';
+
+        // Hover → highlight blocks on grid
+        var movedIdxs = s.moved.map(function(m){return m.idx;});
+        row.addEventListener('mouseenter', function(idxs) {
+          return function() {
+            // dim all, highlight movers
+            for(var bi=0;bi<blocks.length;bi++){
+              var el=document.getElementById(blocks[bi].id);
+              if(!el)continue;
+              if(idxs.indexOf(bi)>=0){
+                el.style.outline='3px solid white';
+                el.style.zIndex='20';
+              } else {
+                el.style.opacity='0.3';
+              }
+            }
+          };
+        }(movedIdxs));
+        row.addEventListener('mouseleave', function() {
+          for(var bi=0;bi<blocks.length;bi++){
+            var el=document.getElementById(blocks[bi].id);
+            if(!el)continue;
+            el.style.outline='';
+            el.style.opacity='';
+            el.style.zIndex='';
+          }
+        });
+
         row.innerHTML =
           '<span style="color:#aaa;flex:1">'+(i+1)+'. '+moveDesc+'</span>'+
           '<span style="color:'+color+';white-space:nowrap">'+scoreStr+deltaStr+'</span>';
