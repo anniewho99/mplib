@@ -126,19 +126,279 @@ let _movesApplied = false;   // guard: apply only once per event
 
 const instructionSteps = [
   {
-    text: `Welcome to the Rush Hour Voting game!\n\nYou'll be playing with two other participants. Together you need to slide the red TARGET block off the right side of the board (through the EXIT) — by voting on which blocks to move each round.\n\nWe'll walk you through everything step by step.`,
+    text: `Welcome to the multi-player Rush Hour!\n\nThis is just like the classic Rush Hour puzzle — slide blocks to clear a path for the red TARGET block to escape through the EXIT on the right.\n\nThe board is 6×6. Blocks slide horizontally or vertically. Your goal every level: get the red block out.`,
+    demo: 'board',
   },
   {
-    text: `The board is a 6×6 grid. Blocks can only slide horizontally or vertically along their axis — they can't turn.\n\nThe red TARGET block starts somewhere on row 3 (the exit row). Your goal is to clear a path so it can slide all the way off the right edge.`,
+    text: `You are the yellow player 🟡\n\nEach round you have 5 seconds to vote on which block to move and in which direction. There is a timer at the bottom now. Click any arrow on any block to cast your vote. You can change it anytime before the timer runs out. Your choice will be represented by a yellow dot on the block. \n\nTry it now — click any arrow!`,
+    demo: 'board-interactive',
   },
   {
-    text: `Each round you have 5 seconds to vote.\n\nClick on a block to select it, then click the arrow direction you want it to move. You can vote for any block — and change your vote as many times as you like before time runs out.\n\nWhen the timer hits zero, each block moves in whichever direction got the most votes (if there's a tie or no votes, it stays put).`,
+    text: `You'll be playing with two other real people.\n\nOne will appear as green 🟢, the other as purple 🟣. You will see their choices the second they click on any of the buttons — coordination is key!`,
+    demo: 'teammates',
   },
   {
-    text: `You're playing with two other people. All three of you vote at the same time, but you won't see each other's votes until the round resolves.\n\nCoordination is key — think about what your teammates might be planning.\n\nYour player name is: ${playerName}\n\nPress Join Game when you're ready!`,
+    text: `Key mechanic: if multiple players vote for the same block in the same direction, it moves that many cells in one round.\n\nThe green player has already voted to move the red block right ➡. Click the same arrow to move it 2 cells at once!`,
+    demo: 'multivote',
+  },
+  {
+    text: `That's it! You'll play 4 levels together.\n\nYour player name is: ${playerName}\n\nPress Join Game when you're ready!`,
     showNameEntry: true,
   },
 ];
+
+// ── Mini practice board ──
+const DEMO_CELL = 68, DEMO_GAP = 4, DEMO_COLS = 6, DEMO_ROWS = 6;
+let demoPracticeTimer = null;
+let demoVoted = false;
+let demoMultiVoted = false;
+
+function demoCellPx(col, row) {
+  return { x: DEMO_GAP + col*(DEMO_CELL+DEMO_GAP), y: DEMO_GAP + row*(DEMO_CELL+DEMO_GAP) };
+}
+
+function buildDemoGrid(container) {
+  // Exact pixel size of the grid content
+  const totalW = DEMO_GAP + 6*(DEMO_CELL+DEMO_GAP);
+  const totalH = DEMO_GAP + 6*(DEMO_CELL+DEMO_GAP);
+
+  // Wrapper sized exactly to grid — exit marker attached here
+  const wrapper = document.createElement('div');
+  wrapper.style.cssText = `position:relative;width:${totalW}px;height:${totalH}px;`;
+
+  const grid = document.createElement('div');
+  grid.style.cssText = `display:grid;grid-template-columns:repeat(6,${DEMO_CELL}px);grid-template-rows:repeat(6,${DEMO_CELL}px);gap:${DEMO_GAP}px;background:#111;padding:${DEMO_GAP}px;border:1px solid #2a2a2a;border-radius:8px;position:relative;width:${totalW}px;height:${totalH}px;box-sizing:border-box;`;
+  for (let i = 0; i < 36; i++) {
+    const cell = document.createElement('div');
+    cell.style.cssText = `width:${DEMO_CELL}px;height:${DEMO_CELL}px;background:#1a1a1a;border-radius:4px;border:1px solid #2a2a2a;`;
+    grid.appendChild(cell);
+  }
+  wrapper.appendChild(grid);
+
+  // Exit marker on the wrapper, aligned to row 2
+  const exit = document.createElement('div');
+  exit.style.cssText = `position:absolute;right:-12px;top:${DEMO_GAP+2*(DEMO_CELL+DEMO_GAP)}px;width:10px;height:${DEMO_CELL}px;background:#2a9d8f;border-radius:0 4px 4px 0;display:flex;align-items:center;justify-content:center;writing-mode:vertical-rl;font-size:7px;font-family:'Space Mono',monospace;color:white;`;
+  exit.textContent = 'EXIT';
+  wrapper.appendChild(exit);
+
+  container.appendChild(wrapper);
+  return grid;  // return grid so blocks are appended to it
+}
+
+function addDemoBlock(grid, type, dir, col, row, size, extraHtml) {
+  const el = document.createElement('div');
+  const w = dir === 'h' ? size*(DEMO_CELL+DEMO_GAP)-DEMO_GAP : DEMO_CELL;
+  const h = dir === 'v' ? size*(DEMO_CELL+DEMO_GAP)-DEMO_GAP : DEMO_CELL;
+  const pos = demoCellPx(col, row);
+  el.style.cssText = `position:absolute;left:${pos.x}px;top:${pos.y}px;width:${w}px;height:${h}px;border-radius:6px;border:2px solid rgba(255,255,255,.15);overflow:hidden;transition:left .35s ease,top .35s ease;`;
+  el.style.background = type === 'target' ? '#e63946' : '#457b9d';
+  el.dataset.dir = dir;
+  el.dataset.col = col;
+  el.dataset.row = row;
+  el.dataset.size = size;
+  if (extraHtml) el.innerHTML = extraHtml;
+  grid.appendChild(el);
+  return el;
+}
+
+function renderDemoInstructions(stepIdx) {
+  clearInterval(demoPracticeTimer);
+  demoPracticeTimer = null;
+  demoVoted = false;
+  demoMultiVoted = false;
+  const demo = document.getElementById('instructionDemo');
+  demo.innerHTML = '';
+
+  if (stepIdx === 0) {
+    // Static board
+    const gridWrap = document.createElement('div');
+    gridWrap.style.position = 'relative';
+    const grid = buildDemoGrid(gridWrap);
+    addDemoBlock(grid, 'target', 'h', 0, 2, 2,
+      '<div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:9px;font-family:\'Space Mono\',monospace;opacity:.6;">TARGET</div>');
+    addDemoBlock(grid, 'obstacle', 'v', 2, 1, 2, '');
+    addDemoBlock(grid, 'obstacle', 'h', 3, 0, 2, '');
+    addDemoBlock(grid, 'obstacle', 'v', 4, 2, 2, '');
+    demo.appendChild(gridWrap);
+  }
+
+  else if (stepIdx === 1) {
+    // Yellow badge + interactive board + timer
+    const wrapper = document.createElement('div');
+    wrapper.style.cssText = 'display:flex;flex-direction:column;gap:12px;';
+
+    const badge = document.createElement('div');
+    badge.style.cssText = 'display:flex;align-items:center;gap:10px;padding:10px 14px;background:#1a1a1a;border-radius:8px;border:1px solid #2a2a2a;width:fit-content;';
+    badge.innerHTML = '<div style="width:16px;height:16px;border-radius:50%;background:#f4c400;box-shadow:0 0 8px #f4c400;"></div><span style="font-family:\'Space Mono\',monospace;font-size:12px;color:#f4c400;">You are the yellow player</span>';
+    wrapper.appendChild(badge);
+
+    const gridWrap = document.createElement('div');
+    gridWrap.style.cssText = 'position:relative;display:inline-block;';
+    const grid = buildDemoGrid(gridWrap);
+    const target = addDemoBlock(grid, 'target', 'h', 0, 2, 2,
+      '<div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:9px;font-family:\'Space Mono\',monospace;opacity:.6;">TARGET</div>');
+    const b1 = addDemoBlock(grid, 'obstacle', 'v', 2, 1, 2, '');
+    const b2 = addDemoBlock(grid, 'obstacle', 'h', 3, 0, 2, '');
+    const b3 = addDemoBlock(grid, 'obstacle', 'v', 4, 2, 2, '');
+
+    const btnStyle = 'position:absolute;background:rgba(0,0,0,.6);border:2px solid rgba(255,255,255,.5);color:white;border-radius:5px;cursor:pointer;font-size:18px;padding:2px 8px;line-height:1;z-index:20;font-weight:bold;';
+    const nextBtn = document.getElementById('nextInstruction');
+    nextBtn.style.display = 'none';
+
+    const timerEl = document.createElement('div');
+    timerEl.style.cssText = "font-family:'Space Mono',monospace;font-size:36px;font-weight:700;color:#f4a261;text-align:center;margin-top:8px;";
+    timerEl.textContent = '5';
+
+    // Track which block+dir was voted
+    let demoVoteBlock = null, demoVoteDir = null, demoYellowDot = null;
+
+    [target, b1, b2, b3].forEach(function(block) {
+      const dir = block.dataset.dir;
+      const fwd = dir === 'h' ? '\u2192' : '\u2193';
+      const bck = dir === 'h' ? '\u2190' : '\u2191';
+      const fb = document.createElement('button');
+      fb.innerHTML = fwd;
+      fb.style.cssText = btnStyle + (dir === 'h' ? 'right:28px;top:50%;transform:translateY(-50%);' : 'bottom:28px;left:50%;transform:translateX(-50%);');
+      const bb = document.createElement('button');
+      bb.innerHTML = bck;
+      bb.style.cssText = btnStyle + (dir === 'h' ? 'left:28px;top:50%;transform:translateY(-50%);' : 'top:28px;left:50%;transform:translateX(-50%);');
+
+      function onVote(voteDir) {
+        demoVoted = true;
+        demoVoteBlock = block;
+        demoVoteDir = voteDir;
+        // Remove old yellow dot
+        if (demoYellowDot) demoYellowDot.remove();
+        // Show yellow dot on voted side
+        demoYellowDot = document.createElement('span');
+        const dotBase = 'position:absolute;width:13px;height:13px;border-radius:50%;background:#f4c400;box-shadow:0 0 5px #f4c400;z-index:15;';
+        if (dir === 'h') {
+          demoYellowDot.style.cssText = dotBase + (voteDir === 'fwd' ? 'right:6px;top:calc(50% - 6px);' : 'left:6px;top:calc(50% - 6px);');
+        } else {
+          demoYellowDot.style.cssText = dotBase + (voteDir === 'fwd' ? 'bottom:6px;left:calc(50% - 6px);' : 'top:6px;left:calc(50% - 6px);');
+        }
+        block.appendChild(demoYellowDot);
+      }
+
+      fb.onclick = function() { onVote('fwd'); };
+      bb.onclick = function() { onVote('back'); };
+      block.appendChild(fb); block.appendChild(bb);
+    });
+
+    wrapper.appendChild(gridWrap);
+    wrapper.appendChild(timerEl);
+    demo.appendChild(wrapper);
+
+    let t = 5;
+    function tickDemo() {
+      t--;
+      if (t <= 0) {
+        clearInterval(demoPracticeTimer);
+        timerEl.textContent = '0';
+        timerEl.style.color = '#e63946';
+        setTimeout(function() {
+          if (demoVoted && demoVoteBlock) {
+            // Animate the voted block moving 1 cell
+            const dir = demoVoteBlock.dataset.dir;
+            const col = parseInt(demoVoteBlock.dataset.col);
+            const row = parseInt(demoVoteBlock.dataset.row);
+            const size = parseInt(demoVoteBlock.dataset.size);
+            const isFwd = demoVoteDir === 'fwd';
+            const newCol = dir === 'h' ? col + (isFwd ? 1 : -1) : col;
+            const newRow = dir === 'v' ? row + (isFwd ? 1 : -1) : row;
+            // Bounds check
+            const validH = dir === 'h' && newCol >= 0 && newCol + size <= DEMO_COLS;
+            const validV = dir === 'v' && newRow >= 0 && newRow + size <= DEMO_ROWS;
+            if (validH || validV) {
+              const pos = demoCellPx(newCol, newRow);
+              demoVoteBlock.style.left = pos.x + 'px';
+              demoVoteBlock.style.top  = pos.y + 'px';
+              demoVoteBlock.dataset.col = newCol;
+              demoVoteBlock.dataset.row = newRow;
+            }
+            // Clear dot and highlight
+            if (demoYellowDot) { setTimeout(function(){ if(demoYellowDot) demoYellowDot.remove(); }, 300); }
+            grid.querySelectorAll('button').forEach(b => {
+              b.style.background = 'rgba(0,0,0,.6)';
+              b.style.borderColor = 'rgba(255,255,255,.5)';
+            });
+            timerEl.textContent = '\u2713 Block moved!';
+            timerEl.style.color = '#2a9d8f';
+            timerEl.style.fontSize = '18px';
+            nextBtn.style.display = 'inline-block';
+          } else {
+            // No vote — restart countdown
+            t = 5; timerEl.textContent = '5'; timerEl.style.color = '#f4a261';
+            timerEl.style.fontSize = '36px';
+            demoPracticeTimer = setInterval(tickDemo, 1000);
+          }
+        }, 800);
+        return;
+      }
+      timerEl.textContent = t;
+      timerEl.style.color = t <= 2 ? '#e63946' : '#f4a261';
+    }
+    demoPracticeTimer = setInterval(tickDemo, 1000);
+  }
+
+  else if (stepIdx === 2) {
+    // Three player colors
+    const wrap = document.createElement('div');
+    wrap.style.cssText = 'display:flex;gap:12px;flex-wrap:wrap;';
+    [['#f4c400','You (yellow)'], ['#44cc44','Green player'], ['#9b59ff','Purple player']].forEach(function(pair) {
+      const item = document.createElement('div');
+      item.style.cssText = 'display:flex;align-items:center;gap:10px;padding:12px 16px;background:#1a1a1a;border-radius:8px;border:1px solid #2a2a2a;';
+      item.innerHTML = '<div style="width:22px;height:22px;border-radius:50%;background:' + pair[0] + ';box-shadow:0 0 8px ' + pair[0] + ';flex-shrink:0;"></div><div style="font-family:\'Space Mono\',monospace;font-size:12px;color:' + pair[0] + ';">' + pair[1] + '</div>';
+      wrap.appendChild(item);
+    });
+    demo.appendChild(wrap);
+  }
+
+  else if (stepIdx === 3) {
+    // Multi-vote demo
+    const gridWrap = document.createElement('div');
+    gridWrap.style.cssText = 'position:relative;';
+    const grid = buildDemoGrid(gridWrap);
+    const target = addDemoBlock(grid, 'target', 'h', 2, 2, 2,
+      '<div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:9px;font-family:\'Space Mono\',monospace;opacity:.6;">TARGET</div>');
+
+    const greenDot = document.createElement('span');
+    greenDot.style.cssText = 'position:absolute;right:6px;top:calc(50% - 6px);width:13px;height:13px;border-radius:50%;background:#44cc44;box-shadow:0 0 5px #44cc44;z-index:15;';
+    target.appendChild(greenDot);
+
+    const btnStyle = 'position:absolute;background:rgba(0,0,0,.6);border:2px solid rgba(255,255,255,.5);color:white;border-radius:5px;cursor:pointer;font-size:18px;padding:2px 8px;line-height:1;z-index:20;font-weight:bold;';
+    const fwdBtn = document.createElement('button');
+    fwdBtn.innerHTML = '\u2192';
+    fwdBtn.style.cssText = btnStyle + 'right:28px;top:50%;transform:translateY(-50%);';
+
+    const resultEl = document.createElement('div');
+    resultEl.style.cssText = 'margin-top:14px;font-family:"Space Mono",monospace;font-size:13px;color:#2a9d8f;text-align:center;min-height:20px;';
+
+    const nextBtn = document.getElementById('nextInstruction');
+    nextBtn.style.display = 'none';
+
+    fwdBtn.onclick = function() {
+      if (demoMultiVoted) return;
+      demoMultiVoted = true;
+      fwdBtn.style.background = 'rgba(255,255,255,.25)';
+      fwdBtn.style.borderColor = 'white';
+      const yellowDot = document.createElement('span');
+      yellowDot.style.cssText = 'position:absolute;right:6px;top:calc(50% + 8px);width:13px;height:13px;border-radius:50%;background:#f4c400;box-shadow:0 0 5px #f4c400;z-index:15;';
+      target.appendChild(yellowDot);
+      setTimeout(function() {
+        const pos = demoCellPx(4, 2);
+        target.style.left = pos.x + 'px';
+        resultEl.textContent = '2 votes \u2192 moves 2 cells! \u2713';
+        nextBtn.style.display = 'inline-block';
+      }, 600);
+    };
+
+    target.appendChild(fwdBtn);
+    demo.appendChild(gridWrap);
+    demo.appendChild(resultEl);
+  }
+}
+
 
 let currentStep = 0;
 const params = new URLSearchParams(window.location.search);
@@ -150,6 +410,7 @@ function renderInstructionStep() {
   const nextBtn = document.getElementById('nextInstruction');
   nextBtn.style.display = currentStep < instructionSteps.length - 1 ? 'inline-block' : 'none';
   document.getElementById('name-entry').style.display = step.showNameEntry ? 'block' : 'none';
+  renderDemoInstructions(currentStep);
 }
 
 document.getElementById('nextInstruction').onclick = () => {
