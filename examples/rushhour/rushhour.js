@@ -142,7 +142,7 @@ const instructionSteps = [
     demo: 'multivote',
   },
   {
-    text: `That's it! You'll play 4 levels together.\n\nYour player name is: ${playerName}\n\nPress Join Game when you're ready!`,
+    text: `That's it! You'll play 4 levels together. Your team need to finish a level within 60 rounds. \n\nYour player name is: ${playerName}\n\nPress Join Game when you're ready! Please do not refresh the page after joining the game.`,
     showNameEntry: true,
   },
 ];
