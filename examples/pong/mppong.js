@@ -26,6 +26,10 @@ const VOTING_DURATION = 5;
 const MAX_ROUNDS_PER_LEVEL = 60;
 const NUM_LEVELS = 4;
 
+// ?players=2 for two-player mode, default is 3
+const _pParam = new URLSearchParams(window.location.search).get('players');
+const NUM_PLAYERS = (_pParam === '2') ? 2 : 3;
+
 const PHASE_LEASE_MS  = 6000;
 const PHASE_DRIFT_MS  = 1000;
 const PHASE_TICK_MS   = 500;
@@ -83,12 +87,12 @@ const LEVELS = [
 
 const studyId = typeof GameName !== 'undefined' ? GameName : 'rushhour_mp';
 const sessionConfig = {
-  minPlayersNeeded:              typeof MinPlayers !== 'undefined' ? MinPlayers : 3,
-  maxPlayersNeeded:              typeof MaxPlayers !== 'undefined' ? MaxPlayers : 3,
+  minPlayersNeeded:              typeof MinPlayers !== 'undefined' ? MinPlayers : NUM_PLAYERS,
+  maxPlayersNeeded:              typeof MaxPlayers !== 'undefined' ? MaxPlayers : NUM_PLAYERS,
   maxParallelSessions:           typeof MaxSessions !== 'undefined' ? MaxSessions : 0,
   allowReplacements:             typeof PlayerReplacement !== 'undefined' ? PlayerReplacement : false,
-  exitDelayWaitingRoom:          typeof LeaveWaitingRoomTime !== 'undefined' ? LeaveWaitingRoomTime : 10,
-  maxDurationBelowMinPlayersNeeded: typeof MinPlayerTimeout !== 'undefined' ? MinPlayerTimeout : 10,
+  exitDelayWaitingRoom:          5,      // 5 second countdown once all players joined
+  maxDurationBelowMinPlayersNeeded: 300, // kick after 5 minutes waiting
   maxHoursSession:               typeof MaxSessionTime !== 'undefined' ? MaxSessionTime : 2,
   recordData:                    typeof SaveData !== 'undefined' ? SaveData : true,
 };
@@ -187,16 +191,22 @@ const listenerPaths = ['players', 'blocks', 'phase', 'level', 'votes', 'moves'];
 initializeMPLIB(sessionConfig, studyId, funList, listenerPaths, verbosity);
 
 function joinedWaitingRoom() {
-  document.getElementById('messageWaitingRoom').textContent = 'Waiting for other players to join…';
+  document.getElementById('messageWaitingRoom').innerHTML =
+    `<div>1 / ${NUM_PLAYERS} players connected.</div>
+     <div style="color:#555;font-size:12px;margin-top:8px;">Session will close if not enough players join within 5 minutes.</div>`;
 }
 
 function updateWaitingRoom(info) {
   const [countdown, secsLeft] = getWaitRoomInfo();
   const n = getNumberCurrentPlayers();
-  document.getElementById('messageWaitingRoom').textContent =
-    countdown
-      ? `${n}/3 players ready. Starting in ${secsLeft}s…`
-      : `${n}/3 players connected. Waiting…`;
+  const el = document.getElementById('messageWaitingRoom');
+  if (countdown) {
+    el.innerHTML = `<div style="color:var(--exit)">${n} / ${NUM_PLAYERS} players ready — starting in ${secsLeft}s…</div>`;
+  } else {
+    el.innerHTML =
+      `<div>${n} / ${NUM_PLAYERS} players connected. Waiting for ${NUM_PLAYERS - n} more…</div>
+       <div style="color:#555;font-size:12px;margin-top:8px;">Session will close if not enough players join within 5 minutes.</div>`;
+  }
 }
 
 function startSession() {
@@ -206,8 +216,22 @@ function startSession() {
 }
 
 function updateOngoingSession() {}
-function endSession() {}
-function removePlayerState(playerId) {}
+function endSession() {
+  // Show disconnection message on all screens
+  document.getElementById('gameScreen').style.display = 'none';
+  document.getElementById('waitingRoomScreen').style.display = 'none';
+  const msg = document.createElement('div');
+  msg.style.cssText = 'max-width:500px;margin:80px auto;text-align:center;color:#f0f0f0;font-family:"Space Mono",monospace;';
+  msg.innerHTML = `<h2 style="color:#e63946;margin-bottom:16px;">Session Ended</h2>
+    <p style="color:#aaa;">A player disconnected. The session has been closed.<br>
+    Please return to Prolific and try again.</p>`;
+  document.body.appendChild(msg);
+}
+
+function removePlayerState(playerId) {
+  // A player disconnected — end the session for everyone
+  leaveSession();
+}
 
 function initGame() {
   thisPlayerId = getCurrentPlayerId();
@@ -238,9 +262,8 @@ function initGame() {
 }
 
 function assignColors() {
-  const arrIdx = getCurrentPlayerArrivalIndex();
   playerColorMap[thisPlayerId] = {
-    color: arrIdx - 1,
+    color: 0,  // always yellow for self
     name: playerName,
   };
 }
@@ -254,6 +277,11 @@ function renderPlayerPanel() {
   ['pb1','pb2','pb3'].forEach((id, i) => {
     document.getElementById(id).classList.toggle('active', i === myColor);
   });
+  // Hide P3 slot in 2-player mode
+  if (NUM_PLAYERS === 2) {
+    const pb3 = document.getElementById('pb3');
+    if (pb3) pb3.style.display = 'none';
+  }
 }
 
 async function seedLevelIfNeeded() {
@@ -324,42 +352,40 @@ function renderBlock(id, type, dir, col, row, size) {
   const fwdArrow  = dir === 'h' ? '→' : '↓';
   const backArrow = dir === 'h' ? '←' : '↑';
 
-  const dotBase = `position:absolute;width:12px;height:12px;border-radius:50%;
-    background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.2);`;
-  const btnStyle = `position:absolute;background:rgba(0,0,0,.5);
-    border:2px solid rgba(255,255,255,.3);color:white;border-radius:4px;
-    cursor:pointer;font-size:18px;padding:2px 8px;line-height:1;z-index:20;`;
+  const dotBase = `width:13px;height:13px;border-radius:50%;display:inline-block;`;
+  const btnStyle = `position:absolute;background:rgba(0,0,0,.6);
+    border:2px solid rgba(255,255,255,.5);color:white;border-radius:5px;
+    cursor:pointer;font-size:22px;padding:3px 10px;line-height:1;z-index:20;font-weight:bold;`;
 
   let html = '';
 
   if (dir === 'h') {
-    // 3 dots on left (back) and right (fwd) edges
-    html += `<span class="vdot" id="dot-${id}-back-0" style="${dotBase}left:5px;top:calc(50% - 21px);"></span>`;
-    html += `<span class="vdot" id="dot-${id}-back-1" style="${dotBase}left:5px;top:calc(50% - 6px);"></span>`;
-    html += `<span class="vdot" id="dot-${id}-back-2" style="${dotBase}left:5px;top:calc(50% + 9px);"></span>`;
-    html += `<span class="vdot" id="dot-${id}-fwd-0"  style="${dotBase}right:5px;top:calc(50% - 21px);"></span>`;
-    html += `<span class="vdot" id="dot-${id}-fwd-1"  style="${dotBase}right:5px;top:calc(50% - 6px);"></span>`;
-    html += `<span class="vdot" id="dot-${id}-fwd-2"  style="${dotBase}right:5px;top:calc(50% + 9px);"></span>`;
-    html += `<button class="dir-btn back-btn" style="${btnStyle}left:50%;top:50%;transform:translate(-110%,-50%);">${backArrow}</button>`;
-    html += `<button class="dir-btn fwd-btn"  style="${btnStyle}left:50%;top:50%;transform:translate(10%,-50%);">${fwdArrow}</button>`;
+    html += `<div id="bdots-${id}" style="position:absolute;left:6px;top:50%;transform:translateY(-50%);display:flex;flex-direction:column;gap:3px;">
+      <span class="vdot" id="dot-${id}-back-0" style="${dotBase}"></span>
+      <span class="vdot" id="dot-${id}-back-1" style="${dotBase}"></span>
+      <span class="vdot" id="dot-${id}-back-2" style="${dotBase}"></span>
+    </div>`;
+    html += `<div id="fdots-${id}" style="position:absolute;right:6px;top:50%;transform:translateY(-50%);display:flex;flex-direction:column;gap:3px;">
+      <span class="vdot" id="dot-${id}-fwd-0" style="${dotBase}"></span>
+      <span class="vdot" id="dot-${id}-fwd-1" style="${dotBase}"></span>
+      <span class="vdot" id="dot-${id}-fwd-2" style="${dotBase}"></span>
+    </div>`;
+    html += `<button class="dir-btn back-btn" style="${btnStyle}left:28px;top:50%;transform:translateY(-50%);">${backArrow}</button>`;
+    html += `<button class="dir-btn fwd-btn"  style="${btnStyle}right:28px;top:50%;transform:translateY(-50%);">${fwdArrow}</button>`;
   } else {
-    // 3 dots on top (back) and bottom (fwd) edges
-    html += `<span class="vdot" id="dot-${id}-back-0" style="${dotBase}top:5px;left:calc(50% - 21px);"></span>`;
-    html += `<span class="vdot" id="dot-${id}-back-1" style="${dotBase}top:5px;left:calc(50% - 6px);"></span>`;
-    html += `<span class="vdot" id="dot-${id}-back-2" style="${dotBase}top:5px;left:calc(50% + 9px);"></span>`;
-    html += `<span class="vdot" id="dot-${id}-fwd-0"  style="${dotBase}bottom:5px;left:calc(50% - 21px);"></span>`;
-    html += `<span class="vdot" id="dot-${id}-fwd-1"  style="${dotBase}bottom:5px;left:calc(50% - 6px);"></span>`;
-    html += `<span class="vdot" id="dot-${id}-fwd-2"  style="${dotBase}bottom:5px;left:calc(50% + 9px);"></span>`;
-    html += `<button class="dir-btn back-btn" style="${btnStyle}left:50%;top:50%;transform:translate(-50%,-110%);">${backArrow}</button>`;
-    html += `<button class="dir-btn fwd-btn"  style="${btnStyle}left:50%;top:50%;transform:translate(-50%,10%);">${fwdArrow}</button>`;
+    html += `<div id="bdots-${id}" style="position:absolute;top:6px;left:50%;transform:translateX(-50%);display:flex;flex-direction:row;gap:3px;">
+      <span class="vdot" id="dot-${id}-back-0" style="${dotBase}"></span>
+      <span class="vdot" id="dot-${id}-back-1" style="${dotBase}"></span>
+      <span class="vdot" id="dot-${id}-back-2" style="${dotBase}"></span>
+    </div>`;
+    html += `<div id="fdots-${id}" style="position:absolute;bottom:6px;left:50%;transform:translateX(-50%);display:flex;flex-direction:row;gap:3px;">
+      <span class="vdot" id="dot-${id}-fwd-0" style="${dotBase}"></span>
+      <span class="vdot" id="dot-${id}-fwd-1" style="${dotBase}"></span>
+      <span class="vdot" id="dot-${id}-fwd-2" style="${dotBase}"></span>
+    </div>`;
+    html += `<button class="dir-btn back-btn" style="${btnStyle}top:28px;left:50%;transform:translateX(-50%);">${backArrow}</button>`;
+    html += `<button class="dir-btn fwd-btn"  style="${btnStyle}bottom:28px;left:50%;transform:translateX(-50%);">${fwdArrow}</button>`;
   }
-
-  if (type === 'target') {
-    html += `<div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
-      font-size:8px;letter-spacing:1px;opacity:.5;pointer-events:none;font-family:'Space Mono',monospace;">TARGET</div>`;
-  }
-  html += `<div class="vote-bar" id="bar-${id}" style="position:absolute;bottom:0;left:0;
-    height:4px;width:0%;background:rgba(255,255,255,.55);border-radius:0 0 4px 4px;transition:width .2s;"></div>`;
 
   el.innerHTML = html;
 
@@ -452,41 +478,30 @@ function updateMyVoteIndicator() {
 }
 
 function updateVoteDisplay(votesForEvent) {
-  const counts = {};
   const playerVotes = {};
-
   Object.entries(votesForEvent || {}).forEach(([pid, v]) => {
     if (!v) return;
     playerVotes[pid] = v;
-    if (!counts[v.blockId]) counts[v.blockId] = { fwd: 0, back: 0 };
-    counts[v.blockId][v.dir]++;
   });
 
-  document.querySelectorAll('.rh-block').forEach(el => {
-    const bid = el.dataset.bid;
-    const c = counts[bid] || { fwd: 0, back: 0 };
-    const total = c.fwd + c.back;
-    const bar = document.getElementById('bar-' + bid);
-    if (bar) bar.style.width = Math.min(100, total / 3 * 100) + '%';
-  });
-
+  // Reset all dots to empty
   document.querySelectorAll('.vdot').forEach(d => {
-    d.style.background = 'rgba(255,255,255,.15)';
-    d.style.border = '1px solid rgba(255,255,255,.2)';
+    d.className = 'vdot';
   });
 
-  const colorValues = ['#e9c46a','#90be6d','#a8dadc'];
+  const colorClass = ['p1f', 'p2f', 'p3f'];
+  const colorValues = ['#f4c400', '#44cc44', '#9b59ff'];
 
   Object.entries(playerColorMap).forEach(([pid, info]) => {
     const colorIdx = typeof info.color === 'number' ? info.color : 0;
-    const colorVal = colorValues[colorIdx] || colorValues[0];
     const pvEl = document.getElementById('pv' + (colorIdx + 1));
     const v = playerVotes[pid];
+
     if (!v) { if (pvEl) pvEl.textContent = '—'; return; }
 
-    const dotId = 'dot-' + v.blockId + '-' + v.dir + '-' + colorIdx;
-    const dot = document.getElementById(dotId);
-    if (dot) { dot.style.background = colorVal; dot.style.border = '1px solid ' + colorVal; }
+    // Light up this player's dot on the correct direction edge
+    const dot = document.getElementById(`dot-${v.blockId}-${v.dir}-${colorIdx}`);
+    if (dot) dot.className = 'vdot ' + colorClass[colorIdx];
 
     if (pvEl) {
       const blockEl = document.getElementById('rh-' + v.blockId);
@@ -526,6 +541,9 @@ function setButtonsEnabled(enabled) {
   document.querySelectorAll('.dir-btn').forEach(btn => {
     btn.style.display = enabled ? 'block' : 'none';
     btn.disabled = !enabled;
+    // Always reset highlight when toggling — clears ghost highlights from previous round
+    btn.style.background = 'rgba(0,0,0,.6)';
+    btn.style.borderColor = 'rgba(255,255,255,.5)';
   });
 }
 
@@ -575,90 +593,156 @@ function computeMoves(votes) {
     counts[v.blockId][v.dir]++;
   });
 
-  // Collect intended moves (majority wins, ignoring validity for now)
+  // Collect intended moves — distance = margin, clamped to board bounds
   const intended = {};
   Object.entries(counts).forEach(([bid, c]) => {
     if (c.fwd === c.back) return;
     const el = document.getElementById('rh-' + bid);
     if (!el) return;
     const dir = el.dataset.dir;
+    const type = el.dataset.type;
+    const pos = blockPositions[bid];
+    if (!pos) return;
+    const size = parseInt(el.dataset.size);
     const fwdWins = c.fwd > c.back;
-    const dc = dir === 'h' ? (fwdWins ? 1 : -1) : 0;
-    const dr = dir === 'v' ? (fwdWins ? 1 : -1) : 0;
+    let n = fwdWins ? (c.fwd - c.back) : (c.back - c.fwd);
+
+    // Clamp n to how far the block can actually move
+    if (dir === 'h') {
+      if (fwdWins) {
+        // Target can exit — allow up to COLS - pos.col (off board), others stop at COLS - size
+        const maxFwd = type === 'target' ? (COLS - pos.col) : (COLS - size - pos.col);
+        n = Math.min(n, Math.max(0, maxFwd));
+      } else {
+        n = Math.min(n, pos.col); // can't go past col 0
+      }
+    } else {
+      if (fwdWins) {
+        n = Math.min(n, ROWS - size - pos.row);
+      } else {
+        n = Math.min(n, pos.row);
+      }
+    }
+
+    if (n <= 0) return;
+    const dc = dir === 'h' ? (fwdWins ? n : -n) : 0;
+    const dr = dir === 'v' ? (fwdWins ? n : -n) : 0;
     intended[bid] = { dc, dr };
   });
 
-  // Compute post-move positions for all intended movers, then validate
-  // against the post-move world so that cooperative swaps are allowed.
-  const postPositions = { ...blockPositions };
+  // Build plans with destination cells for each mover
+  const plans = [];
   Object.entries(intended).forEach(([bid, { dc, dr }]) => {
     const pos = blockPositions[bid];
-    if (pos) postPositions[bid] = { col: pos.col + dc, row: pos.row + dr };
+    if (!pos) return;
+    const el = document.getElementById('rh-' + bid);
+    if (!el) return;
+    const size = parseInt(el.dataset.size);
+    const dir  = el.dataset.dir;
+    const type = el.dataset.type;
+
+    const newCol = pos.col + dc;
+    const newRow = pos.row + dr;
+
+    // Bounds check — target exit is always valid
+    if (type === 'target' && dc > 0 && newCol + size > COLS) {
+      plans.push({ bid, dc, dr, cells: [], isExit: true });
+      return;
+    }
+    // (bounds already clamped in intended — this is just a safety guard)
+    if (dir === 'h' && (newCol < 0 || newCol + size > COLS)) return;
+    if (dir === 'v' && (newRow < 0 || newRow + size > ROWS)) return;
+
+    // Compute destination cells
+    const cells = [];
+    if (dir === 'h') {
+      for (let c = newCol; c < newCol + size; c++) cells.push({ col: c, row: newRow });
+    } else {
+      for (let r = newRow; r < newRow + size; r++) cells.push({ col: newCol, row: r });
+    }
+
+    // Also check against stationary blocks (non-movers)
+    let blockedByStationary = false;
+    for (const cell of cells) {
+      for (const [otherId, otherPos] of Object.entries(blockPositions)) {
+        if (otherId === bid || otherId in intended) continue; // skip self and movers
+        if (otherPos.col >= COLS) continue;
+        const otherEl = document.getElementById('rh-' + otherId);
+        if (!otherEl) continue;
+        const os = parseInt(otherEl.dataset.size);
+        const od = otherEl.dataset.dir;
+        if (od === 'h') {
+          if (otherPos.row === cell.row && cell.col >= otherPos.col && cell.col < otherPos.col + os) {
+            blockedByStationary = true; break;
+          }
+        } else {
+          if (otherPos.col === cell.col && cell.row >= otherPos.row && cell.row < otherPos.row + os) {
+            blockedByStationary = true; break;
+          }
+        }
+      }
+      if (blockedByStationary) break;
+    }
+    if (blockedByStationary) return;
+
+    plans.push({ bid, dc, dr, cells, isExit: false });
   });
+
+  // Collision check between movers:
+  // If A's destination overlaps B's destination, block BOTH (genuine conflict).
+  // But if B's destination overlaps A's *current* position AND A is moving away,
+  // only block B — A's move is valid and B is trying to move into a cell A is leaving.
+  for (let i = 0; i < plans.length; i++) {
+    for (let j = i + 1; j < plans.length; j++) {
+      const a = plans[i], b = plans[j];
+      if (a.isExit || b.isExit) continue;
+
+      const destOverlap = a.cells.some(ca => b.cells.some(cb => ca.col === cb.col && ca.row === cb.row));
+      if (!destOverlap) continue;
+
+      // Destinations overlap — figure out who's at fault.
+      // Check if B is moving into A's destination (A has right of way since its dest is empty).
+      // Check if A is moving into B's destination (B has right of way).
+      // If both destinations conflict with each other symmetrically, block both.
+      const aPos = blockPositions[a.bid];
+      const bPos = blockPositions[b.bid];
+      const aEl  = document.getElementById('rh-' + a.bid);
+      const bEl  = document.getElementById('rh-' + b.bid);
+      const aSize = parseInt(aEl.dataset.size), aDirEl = aEl.dataset.dir;
+      const bSize = parseInt(bEl.dataset.size), bDirEl = bEl.dataset.dir;
+
+      // Current cells of A and B
+      const aCurrent = [];
+      if (aDirEl === 'h') { for (let c = aPos.col; c < aPos.col + aSize; c++) aCurrent.push({ col: c, row: aPos.row }); }
+      else                { for (let r = aPos.row; r < aPos.row + aSize; r++) aCurrent.push({ col: aPos.col, row: r }); }
+      const bCurrent = [];
+      if (bDirEl === 'h') { for (let c = bPos.col; c < bPos.col + bSize; c++) bCurrent.push({ col: c, row: bPos.row }); }
+      else                { for (let r = bPos.row; r < bPos.row + bSize; r++) bCurrent.push({ col: bPos.col, row: r }); }
+
+      // Does B's destination overlap A's CURRENT cells? (B moving into where A currently is)
+      const bIntoAcurrent = b.cells.some(cb => aCurrent.some(ca => ca.col === cb.col && ca.row === cb.row));
+      // Does A's destination overlap B's CURRENT cells? (A moving into where B currently is)
+      const aIntoBcurrent = a.cells.some(ca => bCurrent.some(cb => ca.col === cb.col && ca.row === cb.row));
+
+      if (bIntoAcurrent && !aIntoBcurrent) {
+        // B is trying to move into A's current spot; A is moving away → only block B
+        b.blocked = true;
+      } else if (aIntoBcurrent && !bIntoAcurrent) {
+        // A is trying to move into B's current spot; B is moving away → only block A
+        a.blocked = true;
+      } else {
+        // Genuine head-on conflict — block both
+        a.blocked = true;
+        b.blocked = true;
+      }
+    }
+  }
 
   const moves = {};
-  Object.entries(intended).forEach(([bid, { dc, dr }]) => {
-    if (isValidMovePost(bid, dc, dr, postPositions)) {
-      moves[bid] = { dc, dr };
-    }
+  plans.forEach(({ bid, dc, dr, blocked, isExit }) => {
+    if (!blocked) moves[bid] = { dc, dr };
   });
   return moves;
-}
-
-// Validates a single block's move against a given position snapshot.
-// This lets cooperative swaps work: each block's destination is checked
-// against where *all* blocks land, not where they started.
-function isValidMovePost(bid, dc, dr, positions) {
-  const pos = positions[bid];
-  if (!pos) return false;
-  const el = document.getElementById('rh-' + bid);
-  if (!el) return false;
-  const size = parseInt(el.dataset.size);
-  const dir  = el.dataset.dir;
-  const type = el.dataset.type;
-
-  // The new top-left after moving
-  const newCol = pos.col;  // positions[bid] already has the post-move col/row
-  const newRow = pos.row;
-
-  if (dir === 'h') {
-    // Check board bounds — target is allowed to slide off the right edge
-    if (type === 'target' && dc === 1 && newCol + size > COLS) return true;
-    if (newCol < 0 || newCol + size > COLS) return false;
-    // Check no other block occupies the new cells (skip self)
-    return !blockAtInPositions(newCol, newRow, bid, dir, size, positions);
-  } else {
-    if (newRow < 0 || newRow + size > ROWS) return false;
-    return !blockAtInPositions(newCol, newRow, bid, dir, size, positions);
-  }
-}
-
-// Check if any block OTHER than skipId occupies the rectangle [col,row,size,dir]
-function blockAtInPositions(col, row, skipId, dir, size, positions) {
-  for (const [bid, pos] of Object.entries(positions)) {
-    if (bid === skipId) continue;
-    if (pos.col >= COLS) continue; // already exited
-    const el = document.getElementById('rh-' + bid);
-    if (!el) continue;
-    const bsize = parseInt(el.dataset.size);
-    const bdir  = el.dataset.dir;
-
-    // Check overlap between two blocks
-    if (dir === 'h' && bdir === 'h') {
-      if (pos.row !== row) continue;
-      if (col < pos.col + bsize && col + size > pos.col) return true;
-    } else if (dir === 'v' && bdir === 'v') {
-      if (pos.col !== col) continue;
-      if (row < pos.row + bsize && row + size > pos.row) return true;
-    } else if (dir === 'h' && bdir === 'v') {
-      // horizontal mover vs vertical block
-      if (pos.col >= col && pos.col < col + size && row >= pos.row && row < pos.row + bsize) return true;
-    } else {
-      // vertical mover vs horizontal block
-      if (pos.row >= row && pos.row < row + size && col >= pos.col && col < pos.col + bsize) return true;
-    }
-  }
-  return false;
 }
 
 // Legacy helper still used by nothing — kept for safety
@@ -699,7 +783,7 @@ function applyMoves(moves) {
     const newCol = pos.col + dc;
     const newRow = pos.row + dr;
 
-    if (type === 'target' && dc === 1 && newCol + size > COLS) {
+    if (type === 'target' && dc > 0 && newCol + size > COLS) {
       // Target has slid past the exit — level cleared
       blockPositions[bid] = { col: COLS, row: pos.row };
       el.style.display = 'none';
@@ -721,18 +805,10 @@ function applyMoves(moves) {
 }
 
 function clearVoteDisplay() {
-  document.querySelectorAll('.rh-block').forEach(el => {
-    const bid = el.dataset.bid;
-    const bar = document.getElementById('bar-' + bid);
-    if (bar) bar.style.width = '0%';
-  });
-  document.querySelectorAll('.vdot').forEach(d => {
-    d.style.background = 'rgba(255,255,255,.15)';
-    d.style.border = '1px solid rgba(255,255,255,.2)';
-  });
+  document.querySelectorAll('.vdot').forEach(d => { d.className = 'vdot'; });
   document.querySelectorAll('.dir-btn').forEach(b => {
-    b.style.background = 'rgba(0,0,0,.5)';
-    b.style.borderColor = 'rgba(255,255,255,.3)';
+    b.style.background = 'rgba(0,0,0,.6)';
+    b.style.borderColor = 'rgba(255,255,255,.5)';
   });
   ['pv1','pv2','pv3'].forEach(id => {
     const el = document.getElementById(id);
@@ -839,7 +915,18 @@ function receiveStateChange(pathNow, nodeName, newState, typeChange) {
     if (data && data.name) {
       if (!playerColorMap[pid]) playerColorMap[pid] = {};
       playerColorMap[pid].name = data.name;
-      if (typeof data.arrivalColor === 'number') playerColorMap[pid].color = data.arrivalColor;
+      if (typeof data.arrivalColor === 'number' && pid !== thisPlayerId) {
+        // Remap so color 0 is never used for others (0 = yellow = self)
+        // arrivalColor 0→1, 1→2, 2→1 or 2 depending on self
+        // Simple: use 1 + (data.arrivalColor % 2) to get 1 or 2, never 0
+        const myArrival = getCurrentPlayerArrivalIndex() - 1;
+        let c = data.arrivalColor;
+        if (c === myArrival) c = 0; // shouldn't happen but safety
+        // Map the two non-self arrivals to 1 and 2
+        const nonSelf = [0, 1, 2].filter(x => x !== myArrival);
+        const relIdx = nonSelf.indexOf(c);
+        playerColorMap[pid].color = relIdx === 0 ? 1 : 2;
+      }
       updatePlayerNameDisplay(pid);
     }
     return;
@@ -1161,6 +1248,8 @@ function submitBetweenLevel(levelIdx) {
 function showFinalSurvey() {
   document.getElementById('gameScreen').style.display = 'none';
   document.getElementById('levelCompleteScreen').style.display = 'none';
+  document.getElementById('finishScreen').style.display = 'block';
+  window.scrollTo(0, 0);
 
   const container = document.getElementById('teammate-questions');
   container.innerHTML = '';
@@ -1171,9 +1260,14 @@ function showFinalSurvey() {
     const name = info.name || `Player ${colorIdx + 1}`;
 
     const block = document.createElement('div');
+    const colorValues = ['#f4c400', '#44cc44', '#9b59ff'];
+    const colorVal = colorValues[colorIdx] || '#aaa';
     block.className = 'teammate-block';
     block.innerHTML = `
-      <div style="font-weight:bold; margin-bottom:12px;">${name}</div>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+        <div style="width:18px;height:18px;border-radius:50%;background:${colorVal};box-shadow:0 0 6px ${colorVal};flex-shrink:0;"></div>
+        <div style="font-weight:bold;">${name}</div>
+      </div>
       <label><strong>This player is a good teammate.</strong></label>
       <div class="likert-row mb-2"><span>Completely disagree</span>
         ${[1,2,3,4,5,6,7].map(v=>`<label><input type="radio" name="collab-${pid}" value="${v}"> ${v}</label>`).join(' ')}
@@ -1233,8 +1327,6 @@ function showFinalSurvey() {
   submitBtn.textContent = 'Submit';
   submitBtn.onclick = submitFinalSurvey;
   document.getElementById('postTrialForm').appendChild(submitBtn);
-
-  document.getElementById('finishScreen').style.display = 'block';
 }
 
 function submitFinalSurvey() {
@@ -1252,6 +1344,7 @@ function submitFinalSurvey() {
 
   Object.entries(playerColorMap).forEach(([pid, info]) => {
     if (pid === thisPlayerId) return;
+    const colorIdx = typeof info.color === 'number' ? info.color : 0;
     const fields = ['collab','team','competent','intentionthem','intentionmy','easy','fun','similar','human'];
     const responses = {};
     fields.forEach(f => {
@@ -1261,7 +1354,13 @@ function submitFinalSurvey() {
     });
     const desc = document.getElementById(`desc-${pid}`)?.value.trim() || '';
     if (desc.length < 20) incomplete = true;
-    teammateResponses[pid] = { ...responses, description: desc };
+    teammateResponses[pid] = {
+      teammateId: pid,
+      teammateName: info.name,
+      displayColor: colorIdx,
+      ...responses,
+      description: desc
+    };
   });
 
   if (incomplete) {
@@ -1269,13 +1368,22 @@ function submitFinalSurvey() {
     return;
   }
 
-  updateStateDirect(`players/${thisPlayerId}`, { satisfaction, difficulty, contribution, teammates: teammateResponses }, 'finalSurvey');
+  // Disable submit button to prevent double-submit
+  document.querySelectorAll('.submit-btn').forEach(b => {
+    b.disabled = true;
+    b.textContent = 'Submitting…';
+  });
+
+  try {
+    updateStateDirect(`players/${thisPlayerId}`, { satisfaction, difficulty, contribution, teammates: teammateResponses }, 'finalSurvey');
+  } catch (e) {
+    console.warn('finalSurvey save failed:', e);
+  }
 
   document.getElementById('messageFinish').innerHTML = '<p>Thank you! Your responses have been recorded.<br>Redirecting to Prolific…</p>';
   setTimeout(() => {
     window.location.href = 'https://app.prolific.com/submissions/complete?cc=C71S2AXW';
-    leaveSession();
-  }, 3000);
+  }, 2000);
 }
 
 function generateRandomName() {

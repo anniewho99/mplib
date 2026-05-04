@@ -19,9 +19,9 @@
             --obstacle: #457b9d;
             --exit: #2a9d8f;
             --timer-color: #f4a261;
-            --p1: #e9c46a;
-            --p2: #90be6d;
-            --p3: #a8dadc;
+            --p1: #f4c400;
+            --p2: #44cc44;
+            --p3: #9b59ff;
             --cell: 78px;
             --gap: 4px;
         }
@@ -31,6 +31,7 @@
             color: var(--text);
             font-family: 'DM Sans', sans-serif;
             min-height: 100vh;
+            overflow-y: auto;
         }
 
         /* ── Consent ── */
@@ -116,12 +117,19 @@
             border: 2px solid rgba(255,255,255,.15);
             cursor: default;
             transition: box-shadow .1s;
-            /* NO display:flex — all children are position:absolute inside */
         }
         .rh-block:hover { box-shadow: 0 0 0 2px rgba(255,255,255,.3); }
         .rh-block.target { background: var(--target); }
         .rh-block.obstacle { background: var(--obstacle); }
-        .vdot { width: 7px; height: 7px; border-radius: 50%; background: rgba(255,255,255,.15); border: 1px solid rgba(255,255,255,.2); }
+        /* Vote indicator dots — invisible by default, colored when voted */
+        .vdot {
+            width: 13px; height: 13px; border-radius: 50%;
+            background: transparent;
+            display: inline-block;
+        }
+        .vdot.p1f { background: var(--p1); box-shadow: 0 0 5px var(--p1); }
+        .vdot.p2f { background: var(--p2); box-shadow: 0 0 5px var(--p2); }
+        .vdot.p3f { background: var(--p3); box-shadow: 0 0 5px var(--p3); }
 
         /* ── Panel ── */
         .panel { width: 240px; display: flex; flex-direction: column; gap: 14px; }
@@ -181,7 +189,10 @@
         .likert-row span:last-child { text-align: right; }
 
         /* ── Finish screen ── */
-        #finishScreen { max-width: 640px; margin: 40px auto; color: var(--text); display: none; }
+        #finishScreen {
+            max-width: 640px; margin: 0 auto; color: var(--text); display: none;
+            padding: 40px 20px 80px 20px;
+        }
         #finishScreen h1 { font-family: 'Space Mono', monospace; font-size: 16px; letter-spacing: 3px; text-transform: uppercase; color: var(--muted); margin-bottom: 20px; }
         .teammate-block { background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 8px; padding: 16px; margin-bottom: 16px; color: #ddd; }
         .teammate-block label strong { color: #eee; }
@@ -279,12 +290,14 @@
 </div>
 
 <!-- ═══ FINISH ═══ -->
-<div id="finishScreen" style="display:none;">
-    <h1>Completion</h1>
-    <div id="messageFinish"></div>
-    <form id="postTrialForm">
-        <div id="teammate-questions"></div>
-    </form>
+<div id="finishScreen" style="display:none;position:fixed;inset:0;z-index:2000;background:var(--bg);overflow-y:auto;">
+    <div style="max-width:640px;margin:0 auto;padding:40px 20px 80px;">
+        <h1 style="font-family:'Space Mono',monospace;font-size:16px;letter-spacing:3px;text-transform:uppercase;color:var(--muted);margin-bottom:20px;">Completion</h1>
+        <div id="messageFinish"></div>
+        <div id="postTrialForm">
+            <div id="teammate-questions"></div>
+        </div>
+    </div>
 </div>
 
 <script src="/mplib/src/mpconfig.js"></script>
