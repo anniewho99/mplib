@@ -456,10 +456,46 @@ window.addEventListener('beforeunload', () => {
   leaveSession();
 });
 
+let _waitingRoomTimeoutId = null;
+let _waitingRoomDeadline = null;
+const WAITING_ROOM_TIMEOUT_MS = 5 * 60 * 1000;
+
 function joinedWaitingRoom() {
+  _waitingRoomDeadline = Date.now() + WAITING_ROOM_TIMEOUT_MS;
   document.getElementById('messageWaitingRoom').innerHTML =
     `<div>1 / ${NUM_PLAYERS} players connected.</div>
-     <div style="color:#555;font-size:12px;margin-top:8px;">Session will close if not enough players join within 5 minutes.</div>`;
+     <div style="color:#555;font-size:12px;margin-top:8px;">Session will close if not enough players join within 5:00.</div>`;
+  _startWaitingRoomCountdown();
+}
+
+function _startWaitingRoomCountdown() {
+  if (_waitingRoomTimeoutId) return;
+  _waitingRoomTimeoutId = setInterval(() => {
+    const secsLeft = Math.ceil((_waitingRoomDeadline - Date.now()) / 1000);
+    if (secsLeft <= 0) {
+      clearInterval(_waitingRoomTimeoutId);
+      _waitingRoomTimeoutId = null;
+      document.getElementById('waitingRoomScreen').style.display = 'none';
+      const msg = document.createElement('div');
+      msg.style.cssText = 'max-width:500px;margin:80px auto;text-align:center;color:#f0f0f0;font-family:"Space Mono",monospace;';
+      msg.innerHTML = `<h2 style="color:#e63946;margin-bottom:16px;">Session Timed Out</h2>
+        <p style="color:#aaa;">Not enough players joined within 5 minutes.<br>
+        Please return to Prolific and try again later.</p>`;
+      document.body.appendChild(msg);
+      leaveSession();
+      return;
+    }
+    const [countdown] = getWaitRoomInfo();
+    if (!countdown) {
+      const n = getNumberCurrentPlayers();
+      const mins = Math.floor(secsLeft / 60);
+      const secs = secsLeft % 60;
+      const timeStr = mins + ':' + secs.toString().padStart(2, '0');
+      document.getElementById('messageWaitingRoom').innerHTML =
+        `<div>${n} / ${NUM_PLAYERS} players connected. Waiting for ${NUM_PLAYERS - n} more…</div>
+         <div style="color:#555;font-size:12px;margin-top:8px;">Session will close in ${timeStr} if not enough players join.</div>`;
+    }
+  }, 1000);
 }
 
 function updateWaitingRoom(info) {
@@ -476,6 +512,7 @@ function updateWaitingRoom(info) {
 }
 
 function startSession() {
+  if (_waitingRoomTimeoutId) { clearInterval(_waitingRoomTimeoutId); _waitingRoomTimeoutId = null; }
   document.getElementById('waitingRoomScreen').style.display = 'none';
   document.getElementById('gameScreen').style.display = 'flex';
   initGame();
@@ -1642,7 +1679,17 @@ function submitFinalSurvey() {
 
   // Mark this player done; when all players are done the state flips to 'redirecting'
   // and renderLevelFromAuthority fires redirectToProlific() on every client simultaneously.
-  updateStateTransaction('level', 'finalDone', {});
+  // Retry because Firebase transactions can silently return isSuccess=false on first attempt
+  // (known null-state quirk) and unlike between-level surveys there's no heartbeat to retry.
+  (async () => {
+    for (let attempt = 0; attempt < 10; attempt++) {
+      const ok = await updateStateTransaction('level', 'finalDone', {});
+      if (ok) return;
+      // If state already flipped to redirecting (other player finished first), stop retrying
+      if (currentLevelSnap?.state === 'redirecting') return;
+      await new Promise(r => setTimeout(r, 400 * (attempt + 1)));
+    }
+  })();
 }
 
 function redirectToProlific() {
