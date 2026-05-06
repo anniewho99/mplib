@@ -85,7 +85,7 @@ const LEVELS = [
   },
 ];
 
-const studyId = typeof GameName !== 'undefined' ? GameName : 'rushhour_561';
+const studyId = typeof GameName !== 'undefined' ? GameName : 'rushhour_54';
 const sessionConfig = {
   minPlayersNeeded:              typeof MinPlayers !== 'undefined' ? MinPlayers : NUM_PLAYERS,
   maxPlayersNeeded:              typeof MaxPlayers !== 'undefined' ? MaxPlayers : NUM_PLAYERS,
@@ -126,15 +126,15 @@ let _movesApplied = false;   // guard: apply only once per event
 
 const instructionSteps = [
   {
-    text: `Welcome to the Rush Hour Voting game!\n\nThis is just like the classic Rush Hour puzzle — slide blocks to clear a path for the red TARGET block to escape through the EXIT on the right.\n\nThe board is 6×6. Blocks slide horizontally or vertically. Your goal every level: get the red block out.`,
+    text: `Welcome to multi-player Rush Hour!\n\nWork together to solve each level. The game is played on a 6×6 grid, just like the classic Rush Hour puzzle.\n\nThe goal is to move the red TARGET block to the EXIT on the right side of the board.\n\nBlocks can slide only in the direction they face: horizontally or vertically.\n\nTry to work together to solve the puzzle in as few moves as possible!`,
     demo: 'board',
   },
   {
-    text: `You are the yellow player 🟡\n\nEach round you have 5 seconds to vote on which block to move and in which direction. Click any arrow on any block to cast your vote. You can change it anytime before the timer runs out.\n\nTry it now — click any arrow!`,
+    text: `You are the yellow player 🟡\n\nEach round you have 5 seconds to vote on which block to move and in which direction. There is a timer at the bottom now. Click any arrow on any block to cast your vote. You can change it anytime before the timer runs out. Your choice will be represented by a yellow dot on the block. \n\nTry it now — click any arrow!`,
     demo: 'board-interactive',
   },
   {
-    text: `You'll be playing with two other real people.\n\nOne will appear as green 🟢, the other as purple 🟣. You won't see their votes until the round resolves — coordination is key!`,
+    text: `You'll be playing with two other real people.\n\nOne will appear as green 🟢, the other as purple 🟣. You will see their choices the second they click on any of the buttons — coordination is key!`,
     demo: 'teammates',
   },
   {
@@ -142,7 +142,7 @@ const instructionSteps = [
     demo: 'multivote',
   },
   {
-    text: `That's it! You'll play 4 levels together.\n\nYour player name is: ${playerName}\n\nPress Join Game when you're ready!`,
+    text: `That's it! You'll play 4 levels together. Your team need to finish a level within 60 rounds. \n\nYour player name is: ${playerName}\n\nPress Join Game when you're ready! Please do not refresh the page after joining the game.`,
     showNameEntry: true,
   },
 ];
@@ -450,6 +450,11 @@ const funList = {
 const listenerPaths = ['players', 'blocks', 'phase', 'level', 'votes', 'moves'];
 
 initializeMPLIB(sessionConfig, studyId, funList, listenerPaths, verbosity);
+
+// If a player refreshes or closes the tab mid-session, signal disconnect to all other clients.
+window.addEventListener('beforeunload', () => {
+  leaveSession();
+});
 
 function joinedWaitingRoom() {
   document.getElementById('messageWaitingRoom').innerHTML =
@@ -832,7 +837,6 @@ function maybeApplyPendingMoves() {
   if (Object.keys(_pendingMoves).length === 0) {
     // No moves this round — still mark applied and log
     _movesApplied = true;
-    addLog('Round: no block moved', 'fail');
     clearVoteDisplay();
     return;
   }
@@ -1056,11 +1060,6 @@ function applyMoves(moves) {
     anyMoved = true;
   });
 
-  addLog(
-    anyMoved ? `Round: ${Object.keys(moves).length} block(s) moved` : 'Round: no block moved',
-    anyMoved ? 'success' : 'fail'
-  );
-
   clearVoteDisplay();
   return won;
 }
@@ -1078,13 +1077,7 @@ function clearVoteDisplay() {
   myVote = null;
 }
 
-function addLog(msg, type) {
-  const log = document.getElementById('logEl');
-  const e = document.createElement('div');
-  e.className = 'log-entry ' + (type || '');
-  e.textContent = msg;
-  log.prepend(e);
-}
+
 
 // ─────────────────────────────────────────
 //  Controller loop
@@ -1121,7 +1114,7 @@ async function renewLease() {
 async function maybeAdvancePhase() {
   const p = currentPhaseSnap;
   if (!p || !iAmController) return;
-  if (currentLevelSnap?.state === 'survey' || currentLevelSnap?.state === 'ended') return;
+  if (currentLevelSnap?.state === 'survey' || currentLevelSnap?.state === 'ended' || currentLevelSnap?.state === 'redirecting') return;
 
   try {
     const expectVersion = Number(p.version || 0);
@@ -1285,11 +1278,12 @@ function renderLevelFromAuthority(L) {
     _pendingMoves = {};
     _pendingMovesEvent = -1;
     _movesApplied = false;
-    addLog('Level ' + (L.index + 1) + ' started', 'success');
   } else if (L.state === 'survey') {
     showBetweenLevelSurvey(L.index);
   } else if (L.state === 'ended') {
     showFinalSurvey();
+  } else if (L.state === 'redirecting') {
+    redirectToProlific();
   }
 }
 
@@ -1380,13 +1374,9 @@ function evaluateUpdate(path, state, action, args) {
       return { isAllowed: false, newState: null };
     }
 
-  if (action === 'toSurvey') {
+    if (action === 'toSurvey') {
       const reason = args?.reason === 'cleared' ? 'cleared' : 'time';
       if (stateName === 'play') {
-        // Last level goes straight to ended — no between-level survey needed
-        if (index >= NUM_LEVELS - 1) {
-          return { isAllowed: true, newState: { ...L, state: 'ended', reason } };
-        }
         return { isAllowed: true, newState: { ...L, state: 'survey', reason, surveyDone: {} } };
       }
       if (stateName === 'survey') return { isAllowed: true, newState: L };
@@ -1396,6 +1386,21 @@ function evaluateUpdate(path, state, action, args) {
     if (action === 'markDone') {
       if (stateName === 'survey') {
         return { isAllowed: true, newState: { ...L, surveyDone: { ...surveyDone, [me]: true } } };
+      }
+      return { isAllowed: false, newState: null };
+    }
+
+    if (action === 'finalDone') {
+      // Track who has submitted the final survey; once all are done, flip to 'redirecting'
+      if (stateName === 'ended') {
+        const finalDone = L.finalDone || {};
+        const updated = { ...finalDone, [me]: true };
+        const ids = Object.keys(playerColorMap);
+        const allDone = ids.length > 0 && ids.every(id => !!updated[id]);
+        return {
+          isAllowed: true,
+          newState: { ...L, finalDone: updated, state: allDone ? 'redirecting' : 'ended' },
+        };
       }
       return { isAllowed: false, newState: null };
     }
@@ -1442,20 +1447,11 @@ function showBetweenLevelSurvey(levelIdx) {
 
   const isLast = levelIdx >= NUM_LEVELS - 1;
 
-  if (isLast) {
-    lcScreen.innerHTML = `
-      <div class="lc-title">All Levels Complete!</div>
-      <div class="lc-sub">Redirecting to final questionnaire…</div>
-    `;
-    setTimeout(showFinalSurvey, 2500);
-    return;
-  }
-
   const card = document.createElement('div');
   card.className = 'survey-card';
   card.innerHTML = `
-    <div class="lc-title" style="font-size:22px; margin-bottom:10px;">Level ${levelIdx + 1} Complete!</div>
-    <p style="margin-bottom:16px;">Before Level ${levelIdx + 2}, please answer a few quick questions.</p>
+    <div class="lc-title" style="font-size:22px; margin-bottom:10px;">${isLast ? 'All Levels Complete!' : 'Level ' + (levelIdx + 1) + ' Complete!'}</div>
+    <p style="margin-bottom:16px;">${isLast ? 'Please answer a few final questions about your experience.' : 'Before Level ' + (levelIdx + 2) + ', please answer a few quick questions.'}</p>
     <div class="mb-3">
       <label><strong>How satisfied are you with the gameplay?</strong></label>
       <div class="likert-row">
@@ -1483,7 +1479,7 @@ function showBetweenLevelSurvey(levelIdx) {
   `;
 
   const submitBtn = document.createElement('button');
-  submitBtn.textContent = 'Submit & Continue';
+  submitBtn.textContent = isLast ? 'Submit & Continue to Final Survey' : 'Submit & Continue';
   submitBtn.onclick = () => submitBetweenLevel(levelIdx);
   card.appendChild(submitBtn);
   lcScreen.appendChild(card);
@@ -1510,33 +1506,23 @@ function submitBetweenLevel(levelIdx) {
 // ─────────────────────────────────────────
 //  Final survey
 // ─────────────────────────────────────────
-let _finalSurveyShown = false;
-
 function showFinalSurvey() {
-  if (_finalSurveyShown) return;
-  _finalSurveyShown = true;
-
   document.getElementById('gameScreen').style.display = 'none';
   document.getElementById('levelCompleteScreen').style.display = 'none';
   document.getElementById('finishScreen').style.display = 'block';
   window.scrollTo(0, 0);
 
-  // Clear form completely before building
-  const form = document.getElementById('postTrialForm');
-  form.innerHTML = '';
-
-  const container = document.createElement('div');
-  container.id = 'teammate-questions';
-  form.appendChild(container);
+  const container = document.getElementById('teammate-questions');
+  container.innerHTML = '';
 
   Object.entries(playerColorMap).forEach(([pid, info]) => {
     if (pid === thisPlayerId) return;
     const colorIdx = info.color ?? 0;
     const name = info.name || `Player ${colorIdx + 1}`;
-    const colorValues = ['#f4c400', '#44cc44', '#9b59ff'];
-    const colorVal = colorValues[colorIdx] || '#aaa';
 
     const block = document.createElement('div');
+    const colorValues = ['#f4c400', '#44cc44', '#9b59ff'];
+    const colorVal = colorValues[colorIdx] || '#aaa';
     block.className = 'teammate-block';
     block.innerHTML = `
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
@@ -1585,33 +1571,27 @@ function showFinalSurvey() {
     container.appendChild(block);
   });
 
-  // General questions
-  const finalCard = document.createElement('div');
-  finalCard.className = 'mb-4';
-  finalCard.innerHTML = `
-    <div><label><strong>How satisfied are you with the gameplay in the last level?</strong></label>
-    <div class="likert-row">${[1,2,3,4,5,6,7].map(v=>`<label><input type="radio" name="satisfaction" value="${v}"> ${v}</label>`).join(' ')}</div></div>
-    <div><label><strong>How difficult was the last level?</strong></label>
-    <div class="likert-row">${[1,2,3,4,5,6,7].map(v=>`<label><input type="radio" name="difficulty" value="${v}"> ${v}</label>`).join(' ')}</div></div>
-    <div><label><strong>Did you feel like you contributed in the last level?</strong></label>
-    <div class="likert-row">${[1,2,3,4,5,6,7].map(v=>`<label><input type="radio" name="contribution" value="${v}"> ${v}</label>`).join(' ')}</div></div>
+  const prolificCard = document.createElement('div');
+  prolificCard.className = 'teammate-block';
+  prolificCard.innerHTML = `
+    <label><strong>Please enter your Prolific ID:</strong></label><br>
+    <input type="text" id="prolific-id-input" placeholder="e.g. 5f3e2a1b9c7d4e8f2a0b1c3d"
+      style="width:100%;max-width:500px;margin-top:8px;background:#111;border:1px solid #333;
+      color:#eee;border-radius:4px;padding:8px;font-family:'Space Mono',monospace;font-size:13px;">
   `;
-  form.appendChild(finalCard);
+  document.getElementById('postTrialForm').appendChild(prolificCard);
 
   const submitBtn = document.createElement('button');
   submitBtn.className = 'submit-btn';
   submitBtn.textContent = 'Submit';
   submitBtn.onclick = submitFinalSurvey;
-  form.appendChild(submitBtn);
+  document.getElementById('postTrialForm').appendChild(submitBtn);
 }
 
 function submitFinalSurvey() {
-  const satisfaction = document.querySelector('input[name="satisfaction"]:checked')?.value || null;
-  const difficulty   = document.querySelector('input[name="difficulty"]:checked')?.value || null;
-  const contribution = document.querySelector('input[name="contribution"]:checked')?.value || null;
-
-  if (!satisfaction || !difficulty || !contribution) {
-    alert('Please answer all general questions before submitting.');
+  const prolificId = document.getElementById('prolific-id-input')?.value.trim() || '';
+  if (!prolificId) {
+    alert('Please enter your Prolific ID before submitting.');
     return;
   }
 
@@ -1650,16 +1630,27 @@ function submitFinalSurvey() {
     b.textContent = 'Submitting…';
   });
 
-  try {
-    updateStateDirect(`players/${thisPlayerId}`, { satisfaction, difficulty, contribution, teammates: teammateResponses }, 'finalSurvey');
-  } catch (e) {
-    console.warn('finalSurvey save failed:', e);
-  }
+  // Save this player's responses
+  updateStateDirect(`players/${thisPlayerId}`, { prolificId, teammates: teammateResponses }, 'finalSurvey');
 
-  document.getElementById('messageFinish').innerHTML = '<p>Thank you! Your responses have been recorded.<br>Redirecting to Prolific…</p>';
+  const otherNames = Object.entries(playerColorMap)
+    .filter(([pid]) => pid !== thisPlayerId)
+    .map(([, info]) => info.name || 'another player')
+    .join(' and ');
+  document.getElementById('messageFinish').innerHTML =
+    `<p>Thank you! Your responses have been recorded. Please do not close the tab — after your teammate submits their response, you will be redirected automatically.</p><p>Waiting for ${otherNames} to finish…</p>`;
+
+  // Mark this player done; when all players are done the state flips to 'redirecting'
+  // and renderLevelFromAuthority fires redirectToProlific() on every client simultaneously.
+  updateStateTransaction('level', 'finalDone', {});
+}
+
+function redirectToProlific() {
+  document.getElementById('messageFinish').innerHTML =
+    '<p>All done! Redirecting to Prolific…</p>';
   setTimeout(() => {
     window.location.href = 'https://app.prolific.com/submissions/complete?cc=C16IJCB9';
-  }, 2000);
+  }, 1500);
 }
 
 function generateRandomName() {
