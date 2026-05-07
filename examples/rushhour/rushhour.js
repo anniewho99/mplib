@@ -85,7 +85,7 @@ const LEVELS = [
   },
 ];
 
-const studyId = typeof GameName !== 'undefined' ? GameName : 'rushhour_54';
+const studyId = typeof GameName !== 'undefined' ? GameName : 'rushhour_57';
 const sessionConfig = {
   minPlayersNeeded:              typeof MinPlayers !== 'undefined' ? MinPlayers : NUM_PLAYERS,
   maxPlayersNeeded:              typeof MaxPlayers !== 'undefined' ? MaxPlayers : NUM_PLAYERS,
@@ -926,6 +926,50 @@ function computeMoves(votes) {
       }
     }
 
+    // Clamp n further to the nearest stationary block in the path.
+    // The grid-edge clamp above only handles the wall; this handles neighbouring blocks.
+    // Without this, n=2 with 1 cell of space would overshoot into the blocker and
+    // then fail the destination-overlap check, cancelling the move entirely instead
+    // of moving the 1 available cell.
+    for (const [otherId, otherPos] of Object.entries(blockPositions)) {
+      if (otherId === bid) continue;
+      if (otherPos.col >= COLS) continue;
+      const otherEl = document.getElementById('rh-' + otherId);
+      if (!otherEl) continue;
+      const os = parseInt(otherEl.dataset.size);
+      const od = otherEl.dataset.dir;
+
+      if (dir === 'h') {
+        // Other block occupies rows [otherPos.row .. otherPos.row + (od==='v' ? os-1 : 0)]
+        //                     cols [otherPos.col .. otherPos.col + (od==='h' ? os-1 : 0)]
+        const otherRowMin = otherPos.row;
+        const otherRowMax = otherPos.row + (od === 'v' ? os - 1 : 0);
+        const otherColMin = otherPos.col;
+        const otherColMax = otherPos.col + (od === 'h' ? os - 1 : 0);
+        // Our block occupies row pos.row, cols pos.col .. pos.col+size-1
+        if (pos.row >= otherRowMin && pos.row <= otherRowMax) {
+          if (fwdWins && otherColMin >= pos.col + size) {
+            n = Math.min(n, otherColMin - (pos.col + size));
+          } else if (!fwdWins && otherColMax < pos.col) {
+            n = Math.min(n, pos.col - otherColMax - 1);
+          }
+        }
+      } else { // dir === 'v'
+        const otherRowMin = otherPos.row;
+        const otherRowMax = otherPos.row + (od === 'v' ? os - 1 : 0);
+        const otherColMin = otherPos.col;
+        const otherColMax = otherPos.col + (od === 'h' ? os - 1 : 0);
+        // Our block occupies col pos.col, rows pos.row .. pos.row+size-1
+        if (pos.col >= otherColMin && pos.col <= otherColMax) {
+          if (fwdWins && otherRowMin >= pos.row + size) {
+            n = Math.min(n, otherRowMin - (pos.row + size));
+          } else if (!fwdWins && otherRowMax < pos.row) {
+            n = Math.min(n, pos.row - otherRowMax - 1);
+          }
+        }
+      }
+    }
+
     if (n <= 0) return;
     const dc = dir === 'h' ? (fwdWins ? n : -n) : 0;
     const dr = dir === 'v' ? (fwdWins ? n : -n) : 0;
@@ -955,7 +999,7 @@ function computeMoves(votes) {
     if (dir === 'h' && (newCol < 0 || newCol + size > COLS)) return;
     if (dir === 'v' && (newRow < 0 || newRow + size > ROWS)) return;
 
-    // Compute destination cells
+    // Compute destination cells (full footprint at new position)
     const cells = [];
     if (dir === 'h') {
       for (let c = newCol; c < newCol + size; c++) cells.push({ col: c, row: newRow });
