@@ -85,7 +85,7 @@ const LEVELS = [
   },
 ];
 
-const studyId = typeof GameName !== 'undefined' ? GameName : 'rushhour_57';
+const studyId = typeof GameName !== 'undefined' ? GameName : 'rushhour_3p';
 const sessionConfig = {
   minPlayersNeeded:              typeof MinPlayers !== 'undefined' ? MinPlayers : NUM_PLAYERS,
   maxPlayersNeeded:              typeof MaxPlayers !== 'undefined' ? MaxPlayers : NUM_PLAYERS,
@@ -1740,7 +1740,7 @@ function redirectToProlific() {
   document.getElementById('messageFinish').innerHTML =
     '<p>All done! Redirecting to Prolific…</p>';
   setTimeout(() => {
-    window.location.href = 'https://app.prolific.com/submissions/complete?cc=C16IJCB9';
+    window.location.href = 'https://app.prolific.com/submissions/complete?cc=C1QNECVZ';
   }, 1500);
 }
 
