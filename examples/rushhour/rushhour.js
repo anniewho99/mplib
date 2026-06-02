@@ -1,6 +1,6 @@
 /*
-  rushhour_mp.js
-  Rush Hour – Group Voting, multiplayer version
+  rushhour_sp.js
+  Rush Hour – Solo version (single player)
 */
 
 import {
@@ -26,16 +26,14 @@ const VOTING_DURATION = 5;
 const MAX_ROUNDS_PER_LEVEL = 60;
 const NUM_LEVELS = 4;
 
-// ?players=2 for two-player mode, default is 3
-const _pParam = new URLSearchParams(window.location.search).get('players');
-const NUM_PLAYERS = (_pParam === '2') ? 2 : 3;
+const NUM_PLAYERS = 1;
 
 const PHASE_LEASE_MS  = 6000;
 const PHASE_DRIFT_MS  = 1000;
 const PHASE_TICK_MS   = 500;
 
-const PLAYER_COLORS = ['p1', 'p2', 'p3'];
-const PLAYER_LABELS = ['Player 1', 'Player 2', 'Player 3'];
+const PLAYER_COLORS = ['p1'];
+const PLAYER_LABELS = ['Player 1'];
 
 const LEVELS = [
   {
@@ -85,14 +83,14 @@ const LEVELS = [
   },
 ];
 
-const studyId = typeof GameName !== 'undefined' ? GameName : 'rushhour_3p';
+const studyId = typeof GameName !== 'undefined' ? GameName : 'rushhour_sp';
 const sessionConfig = {
-  minPlayersNeeded:              typeof MinPlayers !== 'undefined' ? MinPlayers : NUM_PLAYERS,
-  maxPlayersNeeded:              typeof MaxPlayers !== 'undefined' ? MaxPlayers : NUM_PLAYERS,
+  minPlayersNeeded:              1,
+  maxPlayersNeeded:              1,
   maxParallelSessions:           typeof MaxSessions !== 'undefined' ? MaxSessions : 0,
-  allowReplacements:             typeof PlayerReplacement !== 'undefined' ? PlayerReplacement : false,
-  exitDelayWaitingRoom:          5,      // 5 second countdown once all players joined
-  maxDurationBelowMinPlayersNeeded: 300, // kick after 5 minutes waiting
+  allowReplacements:             false,
+  exitDelayWaitingRoom:          0,
+  maxDurationBelowMinPlayersNeeded: 300,
   maxHoursSession:               typeof MaxSessionTime !== 'undefined' ? MaxSessionTime : 2,
   recordData:                    typeof SaveData !== 'undefined' ? SaveData : true,
 };
@@ -118,31 +116,21 @@ let timerInterval = null;
 let _lastLevelState = null;
 let _lastLevelEndAt = null;
 
-// Moves are buffered here as Firebase fires one child at a time.
-// We apply them all at once when the phase switches to 'moving'.
-let _pendingMoves = {};      // bid → { dc, dr }
-let _pendingMovesEvent = -1; // which event these moves belong to
-let _movesApplied = false;   // guard: apply only once per event
+let _pendingMoves = {};
+let _pendingMovesEvent = -1;
+let _movesApplied = false;
 
 const instructionSteps = [
   {
-    text: `Welcome to multi-player Rush Hour!\n\nWork together to solve each level. The game is played on a 6×6 grid, just like the classic Rush Hour puzzle.\n\nThe goal is to move the red TARGET block to the EXIT on the right side of the board.\n\nBlocks can slide only in the direction they face: horizontally or vertically.\n\nTry to work together to solve the puzzle in as few moves as possible!`,
+    text: `Welcome to Rush Hour!\n\nSolve each puzzle on your own. The game is played on a 6×6 grid, just like the classic Rush Hour puzzle.\n\nThe goal is to move the red TARGET block to the EXIT on the right side of the board.\n\nBlocks can slide only in the direction they face: horizontally or vertically.\n\nTry to solve each puzzle in as few moves as possible!`,
     demo: 'board',
   },
   {
-    text: `You are the yellow player 🟡\n\nEach round you have 5 seconds to vote on which block to move and in which direction. There is a timer at the bottom now. Click any arrow on any block to cast your vote. You can change it anytime before the timer runs out. Your choice will be represented by a yellow dot on the block. \n\nTry it now — click any arrow!`,
+    text: `Each round you have 5 seconds to vote on which block to move and in which direction. There is a timer at the bottom. Click any arrow on any block to cast your vote. You can change it anytime before the timer runs out.\n\nTry it now — click any arrow!`,
     demo: 'board-interactive',
   },
   {
-    text: `You'll be playing with two other real people.\n\nOne will appear as green 🟢, the other as purple 🟣. You will see their choices the second they click on any of the buttons — coordination is key!`,
-    demo: 'teammates',
-  },
-  {
-    text: `Key mechanic: if multiple players vote for the same block in the same direction, it moves that many cells in one round.\n\nThe green player has already voted to move the red block right ➡. Click the same arrow to move it 2 cells at once!`,
-    demo: 'multivote',
-  },
-  {
-    text: `That's it! You'll play 4 levels together. Your team need to finish a level within 60 rounds. \n\nYour player name is: ${playerName}\n\nPress Join Game when you're ready! Please do not refresh the page after joining the game.`,
+    text: `That's it! You'll play 4 levels. You need to finish each level within 60 rounds.\n\nYour player name is: ${playerName}\n\nPress Join Game when you're ready! Please do not refresh the page after joining.`,
     showNameEntry: true,
   },
 ];
@@ -151,18 +139,15 @@ const instructionSteps = [
 const DEMO_CELL = 68, DEMO_GAP = 4, DEMO_COLS = 6, DEMO_ROWS = 6;
 let demoPracticeTimer = null;
 let demoVoted = false;
-let demoMultiVoted = false;
 
 function demoCellPx(col, row) {
   return { x: DEMO_GAP + col*(DEMO_CELL+DEMO_GAP), y: DEMO_GAP + row*(DEMO_CELL+DEMO_GAP) };
 }
 
 function buildDemoGrid(container) {
-  // Exact pixel size of the grid content
   const totalW = DEMO_GAP + 6*(DEMO_CELL+DEMO_GAP);
   const totalH = DEMO_GAP + 6*(DEMO_CELL+DEMO_GAP);
 
-  // Wrapper sized exactly to grid — exit marker attached here
   const wrapper = document.createElement('div');
   wrapper.style.cssText = `position:relative;width:${totalW}px;height:${totalH}px;`;
 
@@ -175,14 +160,13 @@ function buildDemoGrid(container) {
   }
   wrapper.appendChild(grid);
 
-  // Exit marker on the wrapper, aligned to row 2
   const exit = document.createElement('div');
   exit.style.cssText = `position:absolute;right:-12px;top:${DEMO_GAP+2*(DEMO_CELL+DEMO_GAP)}px;width:10px;height:${DEMO_CELL}px;background:#2a9d8f;border-radius:0 4px 4px 0;display:flex;align-items:center;justify-content:center;writing-mode:vertical-rl;font-size:7px;font-family:'Space Mono',monospace;color:white;`;
   exit.textContent = 'EXIT';
   wrapper.appendChild(exit);
 
   container.appendChild(wrapper);
-  return grid;  // return grid so blocks are appended to it
+  return grid;
 }
 
 function addDemoBlock(grid, type, dir, col, row, size, extraHtml) {
@@ -205,12 +189,10 @@ function renderDemoInstructions(stepIdx) {
   clearInterval(demoPracticeTimer);
   demoPracticeTimer = null;
   demoVoted = false;
-  demoMultiVoted = false;
   const demo = document.getElementById('instructionDemo');
   demo.innerHTML = '';
 
   if (stepIdx === 0) {
-    // Static board
     const gridWrap = document.createElement('div');
     gridWrap.style.position = 'relative';
     const grid = buildDemoGrid(gridWrap);
@@ -223,14 +205,8 @@ function renderDemoInstructions(stepIdx) {
   }
 
   else if (stepIdx === 1) {
-    // Yellow badge + interactive board + timer
     const wrapper = document.createElement('div');
     wrapper.style.cssText = 'display:flex;flex-direction:column;gap:12px;';
-
-    const badge = document.createElement('div');
-    badge.style.cssText = 'display:flex;align-items:center;gap:10px;padding:10px 14px;background:#1a1a1a;border-radius:8px;border:1px solid #2a2a2a;width:fit-content;';
-    badge.innerHTML = '<div style="width:16px;height:16px;border-radius:50%;background:#f4c400;box-shadow:0 0 8px #f4c400;"></div><span style="font-family:\'Space Mono\',monospace;font-size:12px;color:#f4c400;">You are the yellow player</span>';
-    wrapper.appendChild(badge);
 
     const gridWrap = document.createElement('div');
     gridWrap.style.cssText = 'position:relative;display:inline-block;';
@@ -249,7 +225,6 @@ function renderDemoInstructions(stepIdx) {
     timerEl.style.cssText = "font-family:'Space Mono',monospace;font-size:36px;font-weight:700;color:#f4a261;text-align:center;margin-top:8px;";
     timerEl.textContent = '5';
 
-    // Track which block+dir was voted
     let demoVoteBlock = null, demoVoteDir = null, demoYellowDot = null;
 
     [target, b1, b2, b3].forEach(function(block) {
@@ -267,9 +242,7 @@ function renderDemoInstructions(stepIdx) {
         demoVoted = true;
         demoVoteBlock = block;
         demoVoteDir = voteDir;
-        // Remove old yellow dot
         if (demoYellowDot) demoYellowDot.remove();
-        // Show yellow dot on voted side
         demoYellowDot = document.createElement('span');
         const dotBase = 'position:absolute;width:13px;height:13px;border-radius:50%;background:#f4c400;box-shadow:0 0 5px #f4c400;z-index:15;';
         if (dir === 'h') {
@@ -298,7 +271,6 @@ function renderDemoInstructions(stepIdx) {
         timerEl.style.color = '#e63946';
         setTimeout(function() {
           if (demoVoted && demoVoteBlock) {
-            // Animate the voted block moving 1 cell
             const dir = demoVoteBlock.dataset.dir;
             const col = parseInt(demoVoteBlock.dataset.col);
             const row = parseInt(demoVoteBlock.dataset.row);
@@ -306,7 +278,6 @@ function renderDemoInstructions(stepIdx) {
             const isFwd = demoVoteDir === 'fwd';
             const newCol = dir === 'h' ? col + (isFwd ? 1 : -1) : col;
             const newRow = dir === 'v' ? row + (isFwd ? 1 : -1) : row;
-            // Bounds check
             const validH = dir === 'h' && newCol >= 0 && newCol + size <= DEMO_COLS;
             const validV = dir === 'v' && newRow >= 0 && newRow + size <= DEMO_ROWS;
             if (validH || validV) {
@@ -316,7 +287,6 @@ function renderDemoInstructions(stepIdx) {
               demoVoteBlock.dataset.col = newCol;
               demoVoteBlock.dataset.row = newRow;
             }
-            // Clear dot and highlight
             if (demoYellowDot) { setTimeout(function(){ if(demoYellowDot) demoYellowDot.remove(); }, 300); }
             grid.querySelectorAll('button').forEach(b => {
               b.style.background = 'rgba(0,0,0,.6)';
@@ -327,7 +297,6 @@ function renderDemoInstructions(stepIdx) {
             timerEl.style.fontSize = '18px';
             nextBtn.style.display = 'inline-block';
           } else {
-            // No vote — restart countdown
             t = 5; timerEl.textContent = '5'; timerEl.style.color = '#f4a261';
             timerEl.style.fontSize = '36px';
             demoPracticeTimer = setInterval(tickDemo, 1000);
@@ -339,63 +308,6 @@ function renderDemoInstructions(stepIdx) {
       timerEl.style.color = t <= 2 ? '#e63946' : '#f4a261';
     }
     demoPracticeTimer = setInterval(tickDemo, 1000);
-  }
-
-  else if (stepIdx === 2) {
-    // Three player colors
-    const wrap = document.createElement('div');
-    wrap.style.cssText = 'display:flex;gap:12px;flex-wrap:wrap;';
-    [['#f4c400','You (yellow)'], ['#44cc44','Green player'], ['#9b59ff','Purple player']].forEach(function(pair) {
-      const item = document.createElement('div');
-      item.style.cssText = 'display:flex;align-items:center;gap:10px;padding:12px 16px;background:#1a1a1a;border-radius:8px;border:1px solid #2a2a2a;';
-      item.innerHTML = '<div style="width:22px;height:22px;border-radius:50%;background:' + pair[0] + ';box-shadow:0 0 8px ' + pair[0] + ';flex-shrink:0;"></div><div style="font-family:\'Space Mono\',monospace;font-size:12px;color:' + pair[0] + ';">' + pair[1] + '</div>';
-      wrap.appendChild(item);
-    });
-    demo.appendChild(wrap);
-  }
-
-  else if (stepIdx === 3) {
-    // Multi-vote demo
-    const gridWrap = document.createElement('div');
-    gridWrap.style.cssText = 'position:relative;';
-    const grid = buildDemoGrid(gridWrap);
-    const target = addDemoBlock(grid, 'target', 'h', 2, 2, 2,
-      '<div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:9px;font-family:\'Space Mono\',monospace;opacity:.6;">TARGET</div>');
-
-    const greenDot = document.createElement('span');
-    greenDot.style.cssText = 'position:absolute;right:6px;top:calc(50% - 6px);width:13px;height:13px;border-radius:50%;background:#44cc44;box-shadow:0 0 5px #44cc44;z-index:15;';
-    target.appendChild(greenDot);
-
-    const btnStyle = 'position:absolute;background:rgba(0,0,0,.6);border:2px solid rgba(255,255,255,.5);color:white;border-radius:5px;cursor:pointer;font-size:18px;padding:2px 8px;line-height:1;z-index:20;font-weight:bold;';
-    const fwdBtn = document.createElement('button');
-    fwdBtn.innerHTML = '\u2192';
-    fwdBtn.style.cssText = btnStyle + 'right:28px;top:50%;transform:translateY(-50%);';
-
-    const resultEl = document.createElement('div');
-    resultEl.style.cssText = 'margin-top:14px;font-family:"Space Mono",monospace;font-size:13px;color:#2a9d8f;text-align:center;min-height:20px;';
-
-    const nextBtn = document.getElementById('nextInstruction');
-    nextBtn.style.display = 'none';
-
-    fwdBtn.onclick = function() {
-      if (demoMultiVoted) return;
-      demoMultiVoted = true;
-      fwdBtn.style.background = 'rgba(255,255,255,.25)';
-      fwdBtn.style.borderColor = 'white';
-      const yellowDot = document.createElement('span');
-      yellowDot.style.cssText = 'position:absolute;right:6px;top:calc(50% + 8px);width:13px;height:13px;border-radius:50%;background:#f4c400;box-shadow:0 0 5px #f4c400;z-index:15;';
-      target.appendChild(yellowDot);
-      setTimeout(function() {
-        const pos = demoCellPx(4, 2);
-        target.style.left = pos.x + 'px';
-        resultEl.textContent = '2 votes \u2192 moves 2 cells! \u2713';
-        nextBtn.style.display = 'inline-block';
-      }, 600);
-    };
-
-    target.appendChild(fwdBtn);
-    demo.appendChild(gridWrap);
-    demo.appendChild(resultEl);
   }
 }
 
@@ -451,68 +363,28 @@ const listenerPaths = ['players', 'blocks', 'phase', 'level', 'votes', 'moves'];
 
 initializeMPLIB(sessionConfig, studyId, funList, listenerPaths, verbosity);
 
-// If a player refreshes or closes the tab mid-session, signal disconnect to all other clients.
 window.addEventListener('beforeunload', () => {
   leaveSession();
 });
 
 let _waitingRoomTimeoutId = null;
-let _waitingRoomDeadline = null;
-const WAITING_ROOM_TIMEOUT_MS = 5 * 60 * 1000;
 
 function joinedWaitingRoom() {
-  _waitingRoomDeadline = Date.now() + WAITING_ROOM_TIMEOUT_MS;
   document.getElementById('messageWaitingRoom').innerHTML =
-    `<div>1 / ${NUM_PLAYERS} players connected.</div>
-     <div style="color:#555;font-size:12px;margin-top:8px;">Session will close if not enough players join within 5:00.</div>`;
-  _startWaitingRoomCountdown();
-}
-
-function _startWaitingRoomCountdown() {
-  if (_waitingRoomTimeoutId) return;
-  _waitingRoomTimeoutId = setInterval(() => {
-    const secsLeft = Math.ceil((_waitingRoomDeadline - Date.now()) / 1000);
-    if (secsLeft <= 0) {
-      clearInterval(_waitingRoomTimeoutId);
-      _waitingRoomTimeoutId = null;
-      document.getElementById('waitingRoomScreen').style.display = 'none';
-      const msg = document.createElement('div');
-      msg.style.cssText = 'max-width:500px;margin:80px auto;text-align:center;color:#f0f0f0;font-family:"Space Mono",monospace;';
-      msg.innerHTML = `<h2 style="color:#e63946;margin-bottom:16px;">Session Timed Out</h2>
-        <p style="color:#aaa;">Not enough players joined within 5 minutes.<br>
-        Please return to Prolific and try again later.</p>`;
-      document.body.appendChild(msg);
-      leaveSession();
-      return;
-    }
-    const [countdown] = getWaitRoomInfo();
-    if (!countdown) {
-      const n = getNumberCurrentPlayers();
-      const mins = Math.floor(secsLeft / 60);
-      const secs = secsLeft % 60;
-      const timeStr = mins + ':' + secs.toString().padStart(2, '0');
-      document.getElementById('messageWaitingRoom').innerHTML =
-        `<div>${n} / ${NUM_PLAYERS} players connected. Waiting for ${NUM_PLAYERS - n} more…</div>
-         <div style="color:#555;font-size:12px;margin-top:8px;">Session will close in ${timeStr} if not enough players join.</div>`;
-    }
-  }, 1000);
+    `<div>Connecting…</div>`;
 }
 
 function updateWaitingRoom(info) {
   const [countdown, secsLeft] = getWaitRoomInfo();
-  const n = getNumberCurrentPlayers();
   const el = document.getElementById('messageWaitingRoom');
   if (countdown) {
-    el.innerHTML = `<div style="color:var(--exit)">${n} / ${NUM_PLAYERS} players ready — starting in ${secsLeft}s…</div>`;
+    el.innerHTML = `<div style="color:var(--exit)">Starting in ${secsLeft}s…</div>`;
   } else {
-    el.innerHTML =
-      `<div>${n} / ${NUM_PLAYERS} players connected. Waiting for ${NUM_PLAYERS - n} more…</div>
-       <div style="color:#555;font-size:12px;margin-top:8px;">Session will close if not enough players join within 5 minutes.</div>`;
+    el.innerHTML = `<div>Connecting…</div>`;
   }
 }
 
 function startSession() {
-  if (_waitingRoomTimeoutId) { clearInterval(_waitingRoomTimeoutId); _waitingRoomTimeoutId = null; }
   document.getElementById('waitingRoomScreen').style.display = 'none';
   document.getElementById('gameScreen').style.display = 'flex';
   initGame();
@@ -520,19 +392,16 @@ function startSession() {
 
 function updateOngoingSession() {}
 function endSession() {
-  // Show disconnection message on all screens
   document.getElementById('gameScreen').style.display = 'none';
   document.getElementById('waitingRoomScreen').style.display = 'none';
   const msg = document.createElement('div');
   msg.style.cssText = 'max-width:500px;margin:80px auto;text-align:center;color:#f0f0f0;font-family:"Space Mono",monospace;';
   msg.innerHTML = `<h2 style="color:#e63946;margin-bottom:16px;">Session Ended</h2>
-    <p style="color:#aaa;">A player disconnected. The session has been closed.<br>
-    Please return to Prolific and try again.</p>`;
+    <p style="color:#aaa;">The session has been closed. Please return to Prolific.</p>`;
   document.body.appendChild(msg);
 }
 
 function removePlayerState(playerId) {
-  // A player disconnected — end the session for everyone
   leaveSession();
 }
 
@@ -566,25 +435,22 @@ function initGame() {
 
 function assignColors() {
   playerColorMap[thisPlayerId] = {
-    color: 0,  // always yellow for self
+    color: 0,
     name: playerName,
   };
 }
 
 function writePlayerName() {
-  updateStateDirect(`players/${thisPlayerId}`, { name: playerName, arrivalColor: getCurrentPlayerArrivalIndex() - 1 }, 'register player');
+  updateStateDirect(`players/${thisPlayerId}`, { name: playerName, arrivalColor: 0 }, 'register player');
 }
 
 function renderPlayerPanel() {
-  const myColor = playerColorMap[thisPlayerId]?.color ?? 0;
-  ['pb1','pb2','pb3'].forEach((id, i) => {
-    document.getElementById(id).classList.toggle('active', i === myColor);
-  });
-  // Hide P3 slot in 2-player mode
-  if (NUM_PLAYERS === 2) {
-    const pb3 = document.getElementById('pb3');
-    if (pb3) pb3.style.display = 'none';
-  }
+  // Only show p1 slot; hide p2 and p3
+  document.getElementById('pb1').classList.add('active');
+  const pb2 = document.getElementById('pb2');
+  const pb3 = document.getElementById('pb3');
+  if (pb2) pb2.style.display = 'none';
+  if (pb3) pb3.style.display = 'none';
 }
 
 async function seedLevelIfNeeded() {
@@ -599,7 +465,6 @@ async function seedLevelIfNeeded() {
 function initGrid() {
   const g = document.getElementById('rhGrid');
   g.innerHTML = '';
-  // Background cells
   for (let r = 0; r < ROWS; r++) {
     for (let c = 0; c < COLS; c++) {
       const cell = document.createElement('div');
@@ -609,8 +474,6 @@ function initGrid() {
   }
 }
 
-// Convert grid col/row to pixel offsets within the grid element.
-// The grid has padding=GAP on all sides, then cells are CELL px with GAP between.
 function cellPx(col, row) {
   return {
     x: GAP + col * (CELL + GAP),
@@ -620,7 +483,6 @@ function cellPx(col, row) {
 
 function renderLevel(levelIdx) {
   const g = document.getElementById('rhGrid');
-  // Remove any existing block elements (leave background cells)
   g.querySelectorAll('.rh-block').forEach(el => el.remove());
   blockPositions = {};
 
@@ -638,7 +500,6 @@ function renderLevel(levelIdx) {
 function renderBlock(id, type, dir, col, row, size) {
   const g = document.getElementById('rhGrid');
 
-  // Remove old element if it exists (for re-renders)
   const old = document.getElementById('rh-' + id);
   if (old) old.remove();
 
@@ -665,26 +526,18 @@ function renderBlock(id, type, dir, col, row, size) {
   if (dir === 'h') {
     html += `<div id="bdots-${id}" style="position:absolute;left:6px;top:50%;transform:translateY(-50%);display:flex;flex-direction:column;gap:3px;">
       <span class="vdot" id="dot-${id}-back-0" style="${dotBase}"></span>
-      <span class="vdot" id="dot-${id}-back-1" style="${dotBase}"></span>
-      <span class="vdot" id="dot-${id}-back-2" style="${dotBase}"></span>
     </div>`;
     html += `<div id="fdots-${id}" style="position:absolute;right:6px;top:50%;transform:translateY(-50%);display:flex;flex-direction:column;gap:3px;">
       <span class="vdot" id="dot-${id}-fwd-0" style="${dotBase}"></span>
-      <span class="vdot" id="dot-${id}-fwd-1" style="${dotBase}"></span>
-      <span class="vdot" id="dot-${id}-fwd-2" style="${dotBase}"></span>
     </div>`;
     html += `<button class="dir-btn back-btn" style="${btnStyle}left:28px;top:50%;transform:translateY(-50%);">${backArrow}</button>`;
     html += `<button class="dir-btn fwd-btn"  style="${btnStyle}right:28px;top:50%;transform:translateY(-50%);">${fwdArrow}</button>`;
   } else {
     html += `<div id="bdots-${id}" style="position:absolute;top:6px;left:50%;transform:translateX(-50%);display:flex;flex-direction:row;gap:3px;">
       <span class="vdot" id="dot-${id}-back-0" style="${dotBase}"></span>
-      <span class="vdot" id="dot-${id}-back-1" style="${dotBase}"></span>
-      <span class="vdot" id="dot-${id}-back-2" style="${dotBase}"></span>
     </div>`;
     html += `<div id="fdots-${id}" style="position:absolute;bottom:6px;left:50%;transform:translateX(-50%);display:flex;flex-direction:row;gap:3px;">
       <span class="vdot" id="dot-${id}-fwd-0" style="${dotBase}"></span>
-      <span class="vdot" id="dot-${id}-fwd-1" style="${dotBase}"></span>
-      <span class="vdot" id="dot-${id}-fwd-2" style="${dotBase}"></span>
     </div>`;
     html += `<button class="dir-btn back-btn" style="${btnStyle}top:28px;left:50%;transform:translateX(-50%);">${backArrow}</button>`;
     html += `<button class="dir-btn fwd-btn"  style="${btnStyle}bottom:28px;left:50%;transform:translateX(-50%);">${fwdArrow}</button>`;
@@ -692,13 +545,9 @@ function renderBlock(id, type, dir, col, row, size) {
 
   el.innerHTML = html;
 
-  // Wire up vote buttons
   el.querySelector('.fwd-btn').addEventListener('click',  e => { e.stopPropagation(); castVote(id, 'fwd');  });
   el.querySelector('.back-btn').addEventListener('click', e => { e.stopPropagation(); castVote(id, 'back'); });
 
-  // ── KEY FIX: size and position the block using absolute pixels ──
-  // The grid uses CSS Grid for the background cells, but blocks float above it
-  // as position:absolute children. The grid itself must be position:relative.
   const w = dir === 'h' ? size * (CELL + GAP) - GAP : CELL;
   const h = dir === 'v' ? size * (CELL + GAP) - GAP : CELL;
   const pos = cellPx(col, row);
@@ -709,7 +558,6 @@ function renderBlock(id, type, dir, col, row, size) {
   el.style.width    = w + 'px';
   el.style.height   = h + 'px';
   el.style.overflow = 'hidden';
-  // Do NOT set display:flex — all children are position:absolute inside
 
   if (col >= COLS) {
     el.style.display = 'none';
@@ -768,8 +616,7 @@ function updateRoundCounter(eventNumber) {
 }
 
 function updateMyVoteIndicator() {
-  const myColor = playerColorMap[thisPlayerId]?.color ?? 0;
-  const pvEl = document.getElementById('pv' + (myColor + 1));
+  const pvEl = document.getElementById('pv1');
   if (!pvEl) return;
   if (!myVote) { pvEl.textContent = '—'; return; }
   const el = document.getElementById('rh-' + myVote.blockId);
@@ -781,40 +628,23 @@ function updateMyVoteIndicator() {
 }
 
 function updateVoteDisplay(votesForEvent) {
-  const playerVotes = {};
-  Object.entries(votesForEvent || {}).forEach(([pid, v]) => {
-    if (!v) return;
-    playerVotes[pid] = v;
-  });
+  document.querySelectorAll('.vdot').forEach(d => { d.className = 'vdot'; });
 
-  // Reset all dots to empty
-  document.querySelectorAll('.vdot').forEach(d => {
-    d.className = 'vdot';
-  });
+  const v = votesForEvent[thisPlayerId];
+  const pvEl = document.getElementById('pv1');
+  if (!v) { if (pvEl) pvEl.textContent = '—'; return; }
 
-  const colorClass = ['p1f', 'p2f', 'p3f'];
-  const colorValues = ['#f4c400', '#44cc44', '#9b59ff'];
+  const dot = document.getElementById(`dot-${v.blockId}-${v.dir}-0`);
+  if (dot) dot.className = 'vdot p1f';
 
-  Object.entries(playerColorMap).forEach(([pid, info]) => {
-    const colorIdx = typeof info.color === 'number' ? info.color : 0;
-    const pvEl = document.getElementById('pv' + (colorIdx + 1));
-    const v = playerVotes[pid];
-
-    if (!v) { if (pvEl) pvEl.textContent = '—'; return; }
-
-    // Light up this player's dot on the correct direction edge
-    const dot = document.getElementById(`dot-${v.blockId}-${v.dir}-${colorIdx}`);
-    if (dot) dot.className = 'vdot ' + colorClass[colorIdx];
-
-    if (pvEl) {
-      const blockEl = document.getElementById('rh-' + v.blockId);
-      if (!blockEl) return;
-      const bdir = blockEl.dataset.dir;
-      pvEl.innerHTML = v.dir === 'fwd'
-        ? (bdir === 'h' ? '→' : '↓')
-        : (bdir === 'h' ? '←' : '↑');
-    }
-  });
+  if (pvEl) {
+    const blockEl = document.getElementById('rh-' + v.blockId);
+    if (!blockEl) return;
+    const bdir = blockEl.dataset.dir;
+    pvEl.innerHTML = v.dir === 'fwd'
+      ? (bdir === 'h' ? '→' : '↓')
+      : (bdir === 'h' ? '←' : '↑');
+  }
 }
 
 // ─────────────────────────────────────────
@@ -844,7 +674,6 @@ function setButtonsEnabled(enabled) {
   document.querySelectorAll('.dir-btn').forEach(btn => {
     btn.style.display = enabled ? 'block' : 'none';
     btn.disabled = !enabled;
-    // Always reset highlight when toggling — clears ghost highlights from previous round
     btn.style.background = 'rgba(0,0,0,.6)';
     btn.style.borderColor = 'rgba(255,255,255,.5)';
   });
@@ -858,7 +687,6 @@ function renderPhase(p) {
   } else if (p.current === 'moving') {
     stopLocalTimer();
     setButtonsEnabled(false);
-    // Apply any buffered moves now that phase is confirmed moving
     maybeApplyPendingMoves();
   }
 }
@@ -866,13 +694,9 @@ function renderPhase(p) {
 function maybeApplyPendingMoves() {
   if (_movesApplied) return;
   if (currentPhaseSnap?.current !== 'moving') return;
-  // The event number in the phase snap tells us which round just resolved.
-  // Moves were written under moves/{prevEvent}, which is eventNumber - 1
-  // (controller increments eventNumber after writing moves).
   const resolvedEvent = (currentPhaseSnap.eventNumber || 0) - 1;
   if (_pendingMovesEvent !== resolvedEvent) return;
   if (Object.keys(_pendingMoves).length === 0) {
-    // No moves this round — still mark applied and log
     _movesApplied = true;
     clearVoteDisplay();
     return;
@@ -895,7 +719,6 @@ function computeMoves(votes) {
     counts[v.blockId][v.dir]++;
   });
 
-  // Collect intended moves — distance = margin, clamped to board bounds
   const intended = {};
   Object.entries(counts).forEach(([bid, c]) => {
     if (c.fwd === c.back) return;
@@ -909,14 +732,12 @@ function computeMoves(votes) {
     const fwdWins = c.fwd > c.back;
     let n = fwdWins ? (c.fwd - c.back) : (c.back - c.fwd);
 
-    // Clamp n to how far the block can actually move
     if (dir === 'h') {
       if (fwdWins) {
-        // Target can exit — allow up to COLS - pos.col (off board), others stop at COLS - size
         const maxFwd = type === 'target' ? (COLS - pos.col) : (COLS - size - pos.col);
         n = Math.min(n, Math.max(0, maxFwd));
       } else {
-        n = Math.min(n, pos.col); // can't go past col 0
+        n = Math.min(n, pos.col);
       }
     } else {
       if (fwdWins) {
@@ -926,11 +747,6 @@ function computeMoves(votes) {
       }
     }
 
-    // Clamp n further to the nearest stationary block in the path.
-    // The grid-edge clamp above only handles the wall; this handles neighbouring blocks.
-    // Without this, n=2 with 1 cell of space would overshoot into the blocker and
-    // then fail the destination-overlap check, cancelling the move entirely instead
-    // of moving the 1 available cell.
     for (const [otherId, otherPos] of Object.entries(blockPositions)) {
       if (otherId === bid) continue;
       if (otherPos.col >= COLS) continue;
@@ -940,13 +756,10 @@ function computeMoves(votes) {
       const od = otherEl.dataset.dir;
 
       if (dir === 'h') {
-        // Other block occupies rows [otherPos.row .. otherPos.row + (od==='v' ? os-1 : 0)]
-        //                     cols [otherPos.col .. otherPos.col + (od==='h' ? os-1 : 0)]
         const otherRowMin = otherPos.row;
         const otherRowMax = otherPos.row + (od === 'v' ? os - 1 : 0);
         const otherColMin = otherPos.col;
         const otherColMax = otherPos.col + (od === 'h' ? os - 1 : 0);
-        // Our block occupies row pos.row, cols pos.col .. pos.col+size-1
         if (pos.row >= otherRowMin && pos.row <= otherRowMax) {
           if (fwdWins && otherColMin >= pos.col + size) {
             n = Math.min(n, otherColMin - (pos.col + size));
@@ -954,12 +767,11 @@ function computeMoves(votes) {
             n = Math.min(n, pos.col - otherColMax - 1);
           }
         }
-      } else { // dir === 'v'
+      } else {
         const otherRowMin = otherPos.row;
         const otherRowMax = otherPos.row + (od === 'v' ? os - 1 : 0);
         const otherColMin = otherPos.col;
         const otherColMax = otherPos.col + (od === 'h' ? os - 1 : 0);
-        // Our block occupies col pos.col, rows pos.row .. pos.row+size-1
         if (pos.col >= otherColMin && pos.col <= otherColMax) {
           if (fwdWins && otherRowMin >= pos.row + size) {
             n = Math.min(n, otherRowMin - (pos.row + size));
@@ -976,7 +788,6 @@ function computeMoves(votes) {
     intended[bid] = { dc, dr };
   });
 
-  // Build plans with destination cells for each mover
   const plans = [];
   Object.entries(intended).forEach(([bid, { dc, dr }]) => {
     const pos = blockPositions[bid];
@@ -990,16 +801,13 @@ function computeMoves(votes) {
     const newCol = pos.col + dc;
     const newRow = pos.row + dr;
 
-    // Bounds check — target exit is always valid
     if (type === 'target' && dc > 0 && newCol + size > COLS) {
       plans.push({ bid, dc, dr, cells: [], isExit: true });
       return;
     }
-    // (bounds already clamped in intended — this is just a safety guard)
     if (dir === 'h' && (newCol < 0 || newCol + size > COLS)) return;
     if (dir === 'v' && (newRow < 0 || newRow + size > ROWS)) return;
 
-    // Compute destination cells (full footprint at new position)
     const cells = [];
     if (dir === 'h') {
       for (let c = newCol; c < newCol + size; c++) cells.push({ col: c, row: newRow });
@@ -1007,11 +815,10 @@ function computeMoves(votes) {
       for (let r = newRow; r < newRow + size; r++) cells.push({ col: newCol, row: r });
     }
 
-    // Also check against stationary blocks (non-movers)
     let blockedByStationary = false;
     for (const cell of cells) {
       for (const [otherId, otherPos] of Object.entries(blockPositions)) {
-        if (otherId === bid || otherId in intended) continue; // skip self and movers
+        if (otherId === bid || otherId in intended) continue;
         if (otherPos.col >= COLS) continue;
         const otherEl = document.getElementById('rh-' + otherId);
         if (!otherEl) continue;
@@ -1034,53 +841,30 @@ function computeMoves(votes) {
     plans.push({ bid, dc, dr, cells, isExit: false });
   });
 
-  // Collision check between movers:
-  // If A's destination overlaps B's destination, block BOTH (genuine conflict).
-  // But if B's destination overlaps A's *current* position AND A is moving away,
-  // only block B — A's move is valid and B is trying to move into a cell A is leaving.
+  // No multi-mover collision needed for single player, but kept for correctness
   for (let i = 0; i < plans.length; i++) {
     for (let j = i + 1; j < plans.length; j++) {
       const a = plans[i], b = plans[j];
       if (a.isExit || b.isExit) continue;
-
       const destOverlap = a.cells.some(ca => b.cells.some(cb => ca.col === cb.col && ca.row === cb.row));
       if (!destOverlap) continue;
-
-      // Destinations overlap — figure out who's at fault.
-      // Check if B is moving into A's destination (A has right of way since its dest is empty).
-      // Check if A is moving into B's destination (B has right of way).
-      // If both destinations conflict with each other symmetrically, block both.
       const aPos = blockPositions[a.bid];
       const bPos = blockPositions[b.bid];
       const aEl  = document.getElementById('rh-' + a.bid);
       const bEl  = document.getElementById('rh-' + b.bid);
       const aSize = parseInt(aEl.dataset.size), aDirEl = aEl.dataset.dir;
       const bSize = parseInt(bEl.dataset.size), bDirEl = bEl.dataset.dir;
-
-      // Current cells of A and B
       const aCurrent = [];
       if (aDirEl === 'h') { for (let c = aPos.col; c < aPos.col + aSize; c++) aCurrent.push({ col: c, row: aPos.row }); }
       else                { for (let r = aPos.row; r < aPos.row + aSize; r++) aCurrent.push({ col: aPos.col, row: r }); }
       const bCurrent = [];
       if (bDirEl === 'h') { for (let c = bPos.col; c < bPos.col + bSize; c++) bCurrent.push({ col: c, row: bPos.row }); }
       else                { for (let r = bPos.row; r < bPos.row + bSize; r++) bCurrent.push({ col: bPos.col, row: r }); }
-
-      // Does B's destination overlap A's CURRENT cells? (B moving into where A currently is)
       const bIntoAcurrent = b.cells.some(cb => aCurrent.some(ca => ca.col === cb.col && ca.row === cb.row));
-      // Does A's destination overlap B's CURRENT cells? (A moving into where B currently is)
       const aIntoBcurrent = a.cells.some(ca => bCurrent.some(cb => ca.col === cb.col && ca.row === cb.row));
-
-      if (bIntoAcurrent && !aIntoBcurrent) {
-        // B is trying to move into A's current spot; A is moving away → only block B
-        b.blocked = true;
-      } else if (aIntoBcurrent && !bIntoAcurrent) {
-        // A is trying to move into B's current spot; B is moving away → only block A
-        a.blocked = true;
-      } else {
-        // Genuine head-on conflict — block both
-        a.blocked = true;
-        b.blocked = true;
-      }
+      if (bIntoAcurrent && !aIntoBcurrent) { b.blocked = true; }
+      else if (aIntoBcurrent && !bIntoAcurrent) { a.blocked = true; }
+      else { a.blocked = true; b.blocked = true; }
     }
   }
 
@@ -1091,22 +875,7 @@ function computeMoves(votes) {
   return moves;
 }
 
-// Legacy helper still used by nothing — kept for safety
-function blockAt(col, row, skipId) {
-  for (const [bid, pos] of Object.entries(blockPositions)) {
-    if (bid === skipId || pos.col >= COLS) continue;
-    const el = document.getElementById('rh-' + bid);
-    if (!el) continue;
-    const size = parseInt(el.dataset.size);
-    const dir  = el.dataset.dir;
-    if (dir === 'h') { if (pos.row === row && col >= pos.col && col < pos.col + size) return true; }
-    else              { if (pos.col === col && row >= pos.row && row < pos.row + size) return true; }
-  }
-  return false;
-}
-
 function applyMoves(moves) {
-  let anyMoved = false;
   let won = false;
 
   document.querySelectorAll('.rh-block').forEach(el => {
@@ -1120,7 +889,7 @@ function applyMoves(moves) {
     const dc = Number(move.dc);
     const dr = Number(move.dr);
     const pos = blockPositions[bid];
-    if (!pos) { console.warn('no position for', bid); return; }
+    if (!pos) return;
     const el = document.getElementById('rh-' + bid);
     if (!el) return;
     const size = parseInt(el.dataset.size);
@@ -1130,7 +899,6 @@ function applyMoves(moves) {
     const newRow = pos.row + dr;
 
     if (type === 'target' && dc > 0 && newCol + size > COLS) {
-      // Target has slid past the exit — level cleared
       blockPositions[bid] = { col: COLS, row: pos.row };
       el.style.display = 'none';
       won = true;
@@ -1138,7 +906,6 @@ function applyMoves(moves) {
       blockPositions[bid] = { col: newCol, row: newRow };
       updateBlockPosition(bid, newCol, newRow);
     }
-    anyMoved = true;
   });
 
   clearVoteDisplay();
@@ -1151,14 +918,10 @@ function clearVoteDisplay() {
     b.style.background = 'rgba(0,0,0,.6)';
     b.style.borderColor = 'rgba(255,255,255,.5)';
   });
-  ['pv1','pv2','pv3'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.textContent = '—';
-  });
+  const pvEl = document.getElementById('pv1');
+  if (pvEl) pvEl.textContent = '—';
   myVote = null;
 }
-
-
 
 // ─────────────────────────────────────────
 //  Controller loop
@@ -1250,18 +1013,7 @@ function receiveStateChange(pathNow, nodeName, newState, typeChange) {
     if (data && data.name) {
       if (!playerColorMap[pid]) playerColorMap[pid] = {};
       playerColorMap[pid].name = data.name;
-      if (typeof data.arrivalColor === 'number' && pid !== thisPlayerId) {
-        // Remap so color 0 is never used for others (0 = yellow = self)
-        // arrivalColor 0→1, 1→2, 2→1 or 2 depending on self
-        // Simple: use 1 + (data.arrivalColor % 2) to get 1 or 2, never 0
-        const myArrival = getCurrentPlayerArrivalIndex() - 1;
-        let c = data.arrivalColor;
-        if (c === myArrival) c = 0; // shouldn't happen but safety
-        // Map the two non-self arrivals to 1 and 2
-        const nonSelf = [0, 1, 2].filter(x => x !== myArrival);
-        const relIdx = nonSelf.indexOf(c);
-        playerColorMap[pid].color = relIdx === 0 ? 1 : 2;
-      }
+      playerColorMap[pid].color = 0;
       updatePlayerNameDisplay(pid);
     }
     return;
@@ -1282,11 +1034,8 @@ function receiveStateChange(pathNow, nodeName, newState, typeChange) {
   }
 
   if (pathNow === 'moves') {
-    // nodeName is the eventNumber; newState is { bid: {dc,dr}, ... } for that event.
-    // Firebase fires this once per event node (or when the whole subtree updates).
     const eventNum = parseInt(nodeName);
     if (newState && typeof newState === 'object') {
-      // Merge into pending buffer for this event
       if (eventNum !== _pendingMovesEvent) {
         _pendingMoves = {};
         _pendingMovesEvent = eventNum;
@@ -1295,7 +1044,6 @@ function receiveStateChange(pathNow, nodeName, newState, typeChange) {
       Object.entries(newState).forEach(([bid, m]) => {
         if (m) _pendingMoves[bid] = { dc: Number(m.dc), dr: Number(m.dr) };
       });
-      // Apply only if we're in moving phase and haven't applied yet
       maybeApplyPendingMoves();
     }
     return;
@@ -1340,9 +1088,9 @@ function receiveStateChange(pathNow, nodeName, newState, typeChange) {
 
 function updatePlayerNameDisplay(pid) {
   const info = playerColorMap[pid];
-  if (!info || typeof info.color !== 'number') return;
-  const nameEl = document.getElementById('pname' + (info.color + 1));
-  if (nameEl) nameEl.textContent = info.name + (pid === thisPlayerId ? ' (you)' : '');
+  if (!info) return;
+  const nameEl = document.getElementById('pname1');
+  if (nameEl) nameEl.textContent = info.name + ' (you)';
 }
 
 function renderLevelFromAuthority(L) {
@@ -1472,15 +1220,11 @@ function evaluateUpdate(path, state, action, args) {
     }
 
     if (action === 'finalDone') {
-      // Track who has submitted the final survey; once all are done, flip to 'redirecting'
       if (stateName === 'ended') {
-        const finalDone = L.finalDone || {};
-        const updated = { ...finalDone, [me]: true };
-        const ids = Object.keys(playerColorMap);
-        const allDone = ids.length > 0 && ids.every(id => !!updated[id]);
+        // Single player — immediately flip to redirecting
         return {
           isAllowed: true,
-          newState: { ...L, finalDone: updated, state: allDone ? 'redirecting' : 'ended' },
+          newState: { ...L, state: 'redirecting' },
         };
       }
       return { isAllowed: false, newState: null };
@@ -1488,9 +1232,7 @@ function evaluateUpdate(path, state, action, args) {
 
     if (action === 'advance') {
       if (stateName === 'survey') {
-        const ids = Object.keys(playerColorMap);
-        const allDone = ids.length > 0 && ids.every(id => !!surveyDone[id]);
-        if (!allDone) return { isAllowed: false, newState: null };
+        // Single player — always advance immediately
         const nextIndex = index + 1;
         if (nextIndex >= NUM_LEVELS) {
           return { isAllowed: true, newState: { ...L, index: NUM_LEVELS, state: 'ended' } };
@@ -1532,7 +1274,7 @@ function showBetweenLevelSurvey(levelIdx) {
   card.className = 'survey-card';
   card.innerHTML = `
     <div class="lc-title" style="font-size:22px; margin-bottom:10px;">${isLast ? 'All Levels Complete!' : 'Level ' + (levelIdx + 1) + ' Complete!'}</div>
-    <p style="margin-bottom:16px;">${isLast ? 'Please answer a few final questions about your experience.' : 'Before Level ' + (levelIdx + 2) + ', please answer a few quick questions.'}</p>
+    <p style="margin-bottom:16px;">${isLast ? 'Please answer a few quick questions before finishing.' : 'Before Level ' + (levelIdx + 2) + ', please answer a few quick questions.'}</p>
     <div class="mb-3">
       <label><strong>How satisfied are you with the gameplay?</strong></label>
       <div class="likert-row">
@@ -1578,7 +1320,7 @@ function submitBetweenLevel(levelIdx) {
   updateStateDirect(`players/${thisPlayerId}`, { level: levelIdx, satisfaction, difficulty, contribution }, 'betweenLevel');
 
   const lcScreen = document.getElementById('levelCompleteScreen');
-  lcScreen.innerHTML = `<div class="lc-sub">Thanks! Waiting for other players…</div>`;
+  lcScreen.innerHTML = `<div class="lc-sub">Saving…</div>`;
 
   updateStateTransaction('level', 'markDone', {});
   updateStateTransaction('level', 'advance', {});
@@ -1593,143 +1335,82 @@ function showFinalSurvey() {
   document.getElementById('finishScreen').style.display = 'block';
   window.scrollTo(0, 0);
 
-  const container = document.getElementById('teammate-questions');
-  container.innerHTML = '';
+  const form = document.getElementById('postTrialForm');
+  form.innerHTML = '';
 
-  Object.entries(playerColorMap).forEach(([pid, info]) => {
-    if (pid === thisPlayerId) return;
-    const colorIdx = info.color ?? 0;
-    const name = info.name || `Player ${colorIdx + 1}`;
-
-    const block = document.createElement('div');
-    const colorValues = ['#f4c400', '#44cc44', '#9b59ff'];
-    const colorVal = colorValues[colorIdx] || '#aaa';
-    block.className = 'teammate-block';
-    block.innerHTML = `
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
-        <div style="width:18px;height:18px;border-radius:50%;background:${colorVal};box-shadow:0 0 6px ${colorVal};flex-shrink:0;"></div>
-        <div style="font-weight:bold;">${name}</div>
+  const card = document.createElement('div');
+  card.className = 'teammate-block';
+  card.innerHTML = `
+    <div style="font-size:18px;font-weight:bold;margin-bottom:16px;">Final Survey</div>
+    <div class="mb-3">
+      <label><strong>How satisfied are you with the gameplay overall?</strong></label>
+      <div class="likert-row">
+        <span>Not at all</span>
+        ${[1,2,3,4,5,6,7].map(v => `<label><input type="radio" name="final-satisfaction" value="${v}"> ${v}</label>`).join(' ')}
+        <span>Very satisfied</span>
       </div>
-      <label><strong>This player is a good teammate.</strong></label>
-      <div class="likert-row mb-2"><span>Completely disagree</span>
-        ${[1,2,3,4,5,6,7].map(v=>`<label><input type="radio" name="collab-${pid}" value="${v}"> ${v}</label>`).join(' ')}
-        <span>Completely agree</span></div>
-      <label><strong>This player and I were a team.</strong></label>
-      <div class="likert-row mb-2"><span>Completely disagree</span>
-        ${[1,2,3,4,5,6,7].map(v=>`<label><input type="radio" name="team-${pid}" value="${v}"> ${v}</label>`).join(' ')}
-        <span>Completely agree</span></div>
-      <label><strong>This player was competent.</strong></label>
-      <div class="likert-row mb-2"><span>Completely disagree</span>
-        ${[1,2,3,4,5,6,7].map(v=>`<label><input type="radio" name="competent-${pid}" value="${v}"> ${v}</label>`).join(' ')}
-        <span>Completely agree</span></div>
-      <label><strong>I understood this player's intentions.</strong></label>
-      <div class="likert-row mb-2"><span>Completely disagree</span>
-        ${[1,2,3,4,5,6,7].map(v=>`<label><input type="radio" name="intentionthem-${pid}" value="${v}"> ${v}</label>`).join(' ')}
-        <span>Completely agree</span></div>
-      <label><strong>This player understood my intentions.</strong></label>
-      <div class="likert-row mb-2"><span>Completely disagree</span>
-        ${[1,2,3,4,5,6,7].map(v=>`<label><input type="radio" name="intentionmy-${pid}" value="${v}"> ${v}</label>`).join(' ')}
-        <span>Completely agree</span></div>
-      <label><strong>This player was easy to play with.</strong></label>
-      <div class="likert-row mb-2"><span>Completely disagree</span>
-        ${[1,2,3,4,5,6,7].map(v=>`<label><input type="radio" name="easy-${pid}" value="${v}"> ${v}</label>`).join(' ')}
-        <span>Completely agree</span></div>
-      <label><strong>This player was fun to play with.</strong></label>
-      <div class="likert-row mb-2"><span>Completely disagree</span>
-        ${[1,2,3,4,5,6,7].map(v=>`<label><input type="radio" name="fun-${pid}" value="${v}"> ${v}</label>`).join(' ')}
-        <span>Completely agree</span></div>
-      <label><strong>This player and I had a similar playing style.</strong></label>
-      <div class="likert-row mb-2"><span>Completely disagree</span>
-        ${[1,2,3,4,5,6,7].map(v=>`<label><input type="radio" name="similar-${pid}" value="${v}"> ${v}</label>`).join(' ')}
-        <span>Completely agree</span></div>
-      <label><strong>This player was human-like.</strong></label>
-      <div class="likert-row mb-2"><span>Completely disagree</span>
-        ${[1,2,3,4,5,6,7].map(v=>`<label><input type="radio" name="human-${pid}" value="${v}"> ${v}</label>`).join(' ')}
-        <span>Completely agree</span></div>
-      <label><strong>How would you describe this teammate? (min 20 chars)</strong></label><br>
-      <textarea id="desc-${pid}" rows="3" style="width:100%;max-width:500px;margin-top:5px;background:#111;border:1px solid #333;color:#eee;border-radius:4px;padding:8px;"></textarea>
-    `;
-    container.appendChild(block);
-  });
-
-  const prolificCard = document.createElement('div');
-  prolificCard.className = 'teammate-block';
-  prolificCard.innerHTML = `
-    <label><strong>Please enter your Prolific ID:</strong></label><br>
-    <input type="text" id="prolific-id-input" placeholder="e.g. 5f3e2a1b9c7d4e8f2a0b1c3d"
-      style="width:100%;max-width:500px;margin-top:8px;background:#111;border:1px solid #333;
-      color:#eee;border-radius:4px;padding:8px;font-family:'Space Mono',monospace;font-size:13px;">
+    </div>
+    <div class="mb-3">
+      <label><strong>How difficult did you find the game overall?</strong></label>
+      <div class="likert-row">
+        <span>Not difficult</span>
+        ${[1,2,3,4,5,6,7].map(v => `<label><input type="radio" name="final-difficulty" value="${v}"> ${v}</label>`).join(' ')}
+        <span>Extremely difficult</span>
+      </div>
+    </div>
+    <div class="mb-3">
+      <label><strong>Did you feel like you contributed to solving the puzzles?</strong></label>
+      <div class="likert-row">
+        <span>Not at all</span>
+        ${[1,2,3,4,5,6,7].map(v => `<label><input type="radio" name="final-contribution" value="${v}"> ${v}</label>`).join(' ')}
+        <span>A lot</span>
+      </div>
+    </div>
+    <div class="mb-3">
+      <label><strong>Please enter your Prolific ID:</strong></label><br>
+      <input type="text" id="prolific-id-input" placeholder="e.g. 5f3e2a1b9c7d4e8f2a0b1c3d"
+        style="width:100%;max-width:500px;margin-top:8px;background:#111;border:1px solid #333;
+        color:#eee;border-radius:4px;padding:8px;font-family:'Space Mono',monospace;font-size:13px;">
+    </div>
   `;
-  document.getElementById('postTrialForm').appendChild(prolificCard);
 
   const submitBtn = document.createElement('button');
   submitBtn.className = 'submit-btn';
   submitBtn.textContent = 'Submit';
   submitBtn.onclick = submitFinalSurvey;
-  document.getElementById('postTrialForm').appendChild(submitBtn);
+  card.appendChild(submitBtn);
+  form.appendChild(card);
 }
 
 function submitFinalSurvey() {
-  const prolificId = document.getElementById('prolific-id-input')?.value.trim() || '';
+  const satisfaction = document.querySelector('input[name="final-satisfaction"]:checked')?.value || null;
+  const difficulty   = document.querySelector('input[name="final-difficulty"]:checked')?.value || null;
+  const contribution = document.querySelector('input[name="final-contribution"]:checked')?.value || null;
+  const prolificId   = document.getElementById('prolific-id-input')?.value.trim() || '';
+
+  if (!satisfaction || !difficulty || !contribution) {
+    alert('Please answer all questions before submitting.');
+    return;
+  }
   if (!prolificId) {
     alert('Please enter your Prolific ID before submitting.');
     return;
   }
 
-  const teammateResponses = {};
-  let incomplete = false;
-
-  Object.entries(playerColorMap).forEach(([pid, info]) => {
-    if (pid === thisPlayerId) return;
-    const colorIdx = typeof info.color === 'number' ? info.color : 0;
-    const fields = ['collab','team','competent','intentionthem','intentionmy','easy','fun','similar','human'];
-    const responses = {};
-    fields.forEach(f => {
-      const el = document.querySelector(`input[name="${f}-${pid}"]:checked`);
-      responses[f] = el ? el.value : null;
-      if (!el) incomplete = true;
-    });
-    const desc = document.getElementById(`desc-${pid}`)?.value.trim() || '';
-    if (desc.length < 20) incomplete = true;
-    teammateResponses[pid] = {
-      teammateId: pid,
-      teammateName: info.name,
-      displayColor: colorIdx,
-      ...responses,
-      description: desc
-    };
-  });
-
-  if (incomplete) {
-    alert('Please answer all questions about your teammates. Descriptions must be at least 20 characters.');
-    return;
-  }
-
-  // Disable submit button to prevent double-submit
   document.querySelectorAll('.submit-btn').forEach(b => {
     b.disabled = true;
     b.textContent = 'Submitting…';
   });
 
-  // Save this player's responses
-  updateStateDirect(`players/${thisPlayerId}`, { prolificId, teammates: teammateResponses }, 'finalSurvey');
+  updateStateDirect(`players/${thisPlayerId}`, { prolificId, finalSatisfaction: satisfaction, finalDifficulty: difficulty, finalContribution: contribution }, 'finalSurvey');
 
-  const otherNames = Object.entries(playerColorMap)
-    .filter(([pid]) => pid !== thisPlayerId)
-    .map(([, info]) => info.name || 'another player')
-    .join(' and ');
   document.getElementById('messageFinish').innerHTML =
-    `<p>Thank you! Your responses have been recorded. Please do not close the tab — after your teammate submits their response, you will be redirected automatically.</p><p>Waiting for ${otherNames} to finish…</p>`;
+    `<p>Thank you! Your responses have been recorded. Redirecting…</p>`;
 
-  // Mark this player done; when all players are done the state flips to 'redirecting'
-  // and renderLevelFromAuthority fires redirectToProlific() on every client simultaneously.
-  // Retry because Firebase transactions can silently return isSuccess=false on first attempt
-  // (known null-state quirk) and unlike between-level surveys there's no heartbeat to retry.
   (async () => {
     for (let attempt = 0; attempt < 10; attempt++) {
       const ok = await updateStateTransaction('level', 'finalDone', {});
       if (ok) return;
-      // If state already flipped to redirecting (other player finished first), stop retrying
       if (currentLevelSnap?.state === 'redirecting') return;
       await new Promise(r => setTimeout(r, 400 * (attempt + 1)));
     }
