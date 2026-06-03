@@ -96,17 +96,26 @@ button:hover{background:#222;border-color:var(--muted)}
     </div>
     <div class="card" id="presetCard">
       <div class="card-title">Preset Maps</div>
-      <button class="preset-btn" onclick="loadPreset('easy')">&#128994; Easy (5 rounds)</button>
-      <button class="preset-btn" onclick="loadPreset('medium')">&#128993; Medium (10 rounds)</button>
+      <!-- <button class="preset-btn" onclick="loadPreset('medium')">&#128993; Medium (10 rounds)</button>
       <button class="preset-btn" onclick="loadPreset('hard')">&#128308; Hard (9 rounds)</button>
       <button class="preset-btn" onclick="loadPreset('coord')">&#129309; Coordination (6 rounds)</button>
       <button class="preset-btn" onclick="loadPreset('vhard')">&#9889; Very Hard (23 rounds)</button>
-      <button class="preset-btn" onclick="loadPreset('grandmaster')">&#11088; Grandmaster (24 rounds)</button>
-      <button class="preset-btn" onclick="loadPreset('fog51')">&#128308; Fogleman #15 (51 moves)</button>
-      <button class="preset-btn" onclick="loadPreset('fog50')">&#128308; Fogleman #17 (50 moves)</button>
-      <button class="preset-btn" onclick="loadPreset('mapA')">&#9889; Map A (8401 states)</button>
-      <button class="preset-btn" onclick="loadPreset('mapB')">&#9889; Map B (10400 states)</button>
+      <button class="preset-btn" onclick="loadPreset('grandmaster')">&#11088; Grandmaster (24 rounds)</button> -->
+      <button class="preset-btn" onclick="loadPreset('mapA')">&#9889; Map A (3130 states)</button>
+      <button class="preset-btn" onclick="loadPreset('mapB')">&#9889; Map B (3203 states)</button>
       <button class="preset-btn" onclick="loadPreset('mapC')">&#9889; Map C (3489 states)</button>
+      <button class="preset-btn" onclick="loadPreset('mapD')">&#128308; MAP D (3115 states)</button>
+      <button class="preset-btn" onclick="loadPreset('mapE')">&#128308; MAP E (3320 states)</button>
+      <button class="preset-btn" onclick="loadPreset('map1')">&#128308; Map 1 (3130 states)</button>
+      <button class="preset-btn" onclick="loadPreset('map3')">&#128308; Map 3 (3203 states)</button>
+      <button class="preset-btn" onclick="loadPreset('map4')">&#128308; Map 4 (3204 states)</button>
+      <button class="preset-btn" onclick="loadPreset('map5')">&#128308; Map 5 (3300 states)</button>
+      <button class="preset-btn" onclick="loadPreset('map6')">&#128308; Map 6 (3300 states)</button>
+      <button class="preset-btn" onclick="loadPreset('map7')">&#128308; Map 7 (3300 states)</button>
+      <button class="preset-btn" onclick="loadPreset('map8')">&#128308; Map 8 (3307 states)</button>
+      <button class="preset-btn" onclick="loadPreset('map9')">&#128308; Map 9 (3312 states)</button>
+      <button class="preset-btn" onclick="loadPreset('map10')">&#128308; Map 10 (3313 states)</button>
+      <button class="preset-btn" onclick="loadPreset('map11')">&#128308; Map 11 (3320 states)</button>
       <div class="solver-result" id="solverResult">&#8212;</div>
       <div class="step-counter" id="stepCounter" style="display:none">Round <span id="stepCurr">0</span> / <span id="stepTotal">0</span></div>
       <button class="btn-solve" id="animBtn" onclick="toggleAnimate()" style="display:none">&#9654; Animate Solution</button>
@@ -164,12 +173,6 @@ var optimalNextMoves=[];
 var optSolveTimeout=null;
 
 var PRESETS={
-  easy:[
-    {type:'target',dir:'h',col:0,row:2,size:2},
-    {type:'obstacle',dir:'v',col:2,row:1,size:2},
-    {type:'obstacle',dir:'v',col:4,row:2,size:2},
-    {type:'obstacle',dir:'h',col:3,row:0,size:2}
-  ],
   medium:[
     {type:'target',dir:'h',col:0,row:2,size:2},
     {type:'obstacle',dir:'v',col:2,row:0,size:3},
@@ -215,53 +218,44 @@ var PRESETS={
     {type:'obstacle',dir:'v',col:5,row:0,size:3},
     {type:'obstacle',dir:'v',col:0,row:3,size:2}
   ],
-  // Fogleman #15 — 51 single-player moves, no walls
-  // GBBoLoGHIoLMGHIAAMCCCKoMooJKDDEEJFFo
-  fog51:[
-    {type:'obstacle',dir:'v',col:0,row:0,size:3},
-    {type:'obstacle',dir:'h',col:1,row:0,size:2},
-    {type:'obstacle',dir:'v',col:4,row:0,size:2},
-    {type:'obstacle',dir:'v',col:1,row:1,size:2},
-    {type:'obstacle',dir:'v',col:2,row:1,size:2},
-    {type:'obstacle',dir:'v',col:5,row:1,size:3},
-    {type:'target',  dir:'h',col:3,row:2,size:2},
-    {type:'obstacle',dir:'h',col:0,row:3,size:3},
-    {type:'obstacle',dir:'v',col:3,row:3,size:2},
-    {type:'obstacle',dir:'v',col:2,row:4,size:2},
-    {type:'obstacle',dir:'h',col:4,row:4,size:2},
-    {type:'obstacle',dir:'h',col:0,row:5,size:2},
-    {type:'obstacle',dir:'h',col:3,row:5,size:2}
-  ],
-  // No-wall puzzles from Fogleman database
-  // BBHooLGoHCCLGoAAJLDDoIJoEEEIKoFFFIKo — 8401 states
-  mapA:[
-    {type:'obstacle',dir:'h',col:0,row:0,size:2},
-    {type:'obstacle',dir:'v',col:2,row:0,size:2},
-    {type:'obstacle',dir:'v',col:5,row:0,size:3},
-    {type:'obstacle',dir:'v',col:0,row:1,size:2},
-    {type:'obstacle',dir:'h',col:3,row:1,size:2},
-    {type:'target',  dir:'h',col:2,row:2,size:2},
-    {type:'obstacle',dir:'v',col:4,row:2,size:2},
-    {type:'obstacle',dir:'h',col:0,row:3,size:2},
-    {type:'obstacle',dir:'v',col:3,row:3,size:3},
-    {type:'obstacle',dir:'h',col:0,row:4,size:3},
-    {type:'obstacle',dir:'v',col:4,row:4,size:2},
-    {type:'obstacle',dir:'h',col:0,row:5,size:3},
-  ],
-  // GoBBooGCCCKLAAHIKLDDHIKLoooJEEoFFJoo — 10400 states
-  mapB:[
-    {type:'obstacle',dir:'v',col:0,row:0,size:2},
-    {type:'obstacle',dir:'h',col:2,row:0,size:2},
-    {type:'obstacle',dir:'h',col:1,row:1,size:3},
-    {type:'obstacle',dir:'v',col:4,row:1,size:3},
-    {type:'obstacle',dir:'v',col:5,row:1,size:3},
-    {type:'target',  dir:'h',col:0,row:2,size:2},
+  //map D ooooGHBBBoGHAAFoGHEoFCCoEDDooooooooo 3115
+  mapD: [
+    {type:'target',dir:'h',col:0,row:2,size:2},
+    {type:'obstacle',dir:'h',col:0,row:1,size:3},
+    {type:'obstacle',dir:'h',col:3,row:3,size:2},
+    {type:'obstacle',dir:'h',col:1,row:4,size:2},
+    {type:'obstacle',dir:'v',col:0,row:3,size:2},
     {type:'obstacle',dir:'v',col:2,row:2,size:2},
-    {type:'obstacle',dir:'v',col:3,row:2,size:2},
-    {type:'obstacle',dir:'h',col:0,row:3,size:2},
-    {type:'obstacle',dir:'v',col:3,row:4,size:2},
-    {type:'obstacle',dir:'h',col:4,row:4,size:2},
-    {type:'obstacle',dir:'h',col:1,row:5,size:2},
+    {type:'obstacle',dir:'v',col:4,row:0,size:3},
+    {type:'obstacle',dir:'v',col:5,row:0,size:3}
+  ],
+  // BBooIoCCooIKAAooJKFGDDJoFGHoJooGHEEo 3130
+  mapA:[
+    {type:'target',dir:'h',col:0,row:2,size:2},
+    {type:'obstacle',dir:'h',col:0,row:0,size:2},
+    {type:'obstacle',dir:'h',col:0,row:1,size:2},
+    {type:'obstacle',dir:'h',col:2,row:3,size:2},
+    {type:'obstacle',dir:'h',col:3,row:5,size:2},
+    {type:'obstacle',dir:'v',col:0,row:3,size:2},
+    {type:'obstacle',dir:'v',col:1,row:3,size:3},
+    {type:'obstacle',dir:'v',col:2,row:4,size:2},
+    {type:'obstacle',dir:'v',col:4,row:0,size:2},
+    {type:'obstacle',dir:'v',col:4,row:2,size:3},
+    {type:'obstacle',dir:'v',col:5,row:1,size:2}
+  ],
+  // GHBBCCGHooJKGAAoJKDDDooKoIoEEEoIooFF 3203
+  mapB: [
+    {type:'target',dir:'h',col:1,row:2,size:2},
+    {type:'obstacle',dir:'h',col:2,row:0,size:2},
+    {type:'obstacle',dir:'h',col:4,row:0,size:2},
+    {type:'obstacle',dir:'h',col:0,row:3,size:3},
+    {type:'obstacle',dir:'h',col:3,row:4,size:3},
+    {type:'obstacle',dir:'h',col:4,row:5,size:2},
+    {type:'obstacle',dir:'v',col:0,row:0,size:3},
+    {type:'obstacle',dir:'v',col:1,row:0,size:2},
+    {type:'obstacle',dir:'v',col:1,row:4,size:2},
+    {type:'obstacle',dir:'v',col:4,row:1,size:2},
+    {type:'obstacle',dir:'v',col:5,row:1,size:3}
   ],
   // BBICCoHoIoKoHAAoKLHDDDKLoooJEEFFoJGG — 3489 states
   mapC:[
@@ -278,22 +272,142 @@ var PRESETS={
     {type:'obstacle',dir:'h',col:0,row:5,size:2},
     {type:'obstacle',dir:'h',col:4,row:5,size:2},
   ],
-  // Fogleman #17 — 50 single-player moves, no walls
-  // ooIBBBooIKooAAJKoLCCJDDLGHEEoLGHFFoo
-  fog50:[
-    {type:'obstacle',dir:'v',col:2,row:0,size:2},
-    {type:'obstacle',dir:'h',col:3,row:0,size:3},
-    {type:'obstacle',dir:'v',col:3,row:1,size:2},
-    {type:'target',  dir:'h',col:0,row:2,size:2},
+  // GBBBoKGoCCoKAAIJoKHoIJDDHoooooHoEEFF 3320
+  mapE:[
+    {type:'target',dir:'h',col:0,row:2,size:2},
+    {type:'obstacle',dir:'h',col:1,row:0,size:3},
+    {type:'obstacle',dir:'h',col:2,row:1,size:2},
+    {type:'obstacle',dir:'h',col:4,row:3,size:2},
+    {type:'obstacle',dir:'h',col:2,row:5,size:2},
+    {type:'obstacle',dir:'h',col:4,row:5,size:2},
+    {type:'obstacle',dir:'v',col:0,row:0,size:2},
+    {type:'obstacle',dir:'v',col:0,row:3,size:3},
     {type:'obstacle',dir:'v',col:2,row:2,size:2},
-    {type:'obstacle',dir:'v',col:5,row:2,size:3},
-    {type:'obstacle',dir:'h',col:0,row:3,size:2},
-    {type:'obstacle',dir:'h',col:3,row:3,size:2},
-    {type:'obstacle',dir:'v',col:0,row:4,size:2},
+    {type:'obstacle',dir:'v',col:3,row:2,size:2},
+    {type:'obstacle',dir:'v',col:5,row:0,size:3}
+  ],
+  map1: [
+    {type:'target',dir:'h',col:0,row:2,size:2},
+    {type:'obstacle',dir:'h',col:0,row:0,size:2},
+    {type:'obstacle',dir:'h',col:0,row:1,size:2},
+    {type:'obstacle',dir:'h',col:2,row:3,size:2},
+    {type:'obstacle',dir:'h',col:3,row:5,size:2},
+    {type:'obstacle',dir:'v',col:0,row:3,size:2},
+    {type:'obstacle',dir:'v',col:1,row:3,size:3},
+    {type:'obstacle',dir:'v',col:2,row:4,size:2},
+    {type:'obstacle',dir:'v',col:4,row:0,size:2},
+    {type:'obstacle',dir:'v',col:4,row:2,size:3},
+    {type:'obstacle',dir:'v',col:5,row:1,size:2}
+  ],
+  map3: [
+    {type:'target',dir:'h',col:1,row:2,size:2},
+    {type:'obstacle',dir:'h',col:2,row:0,size:2},
+    {type:'obstacle',dir:'h',col:4,row:0,size:2},
+    {type:'obstacle',dir:'h',col:0,row:3,size:3},
+    {type:'obstacle',dir:'h',col:3,row:4,size:3},
+    {type:'obstacle',dir:'h',col:4,row:5,size:2},
+    {type:'obstacle',dir:'v',col:0,row:0,size:3},
+    {type:'obstacle',dir:'v',col:1,row:0,size:2},
     {type:'obstacle',dir:'v',col:1,row:4,size:2},
-    {type:'obstacle',dir:'h',col:2,row:4,size:2},
-    {type:'obstacle',dir:'h',col:2,row:5,size:2}
-  ]
+    {type:'obstacle',dir:'v',col:4,row:1,size:2},
+    {type:'obstacle',dir:'v',col:5,row:1,size:3}
+  ],
+  map4: [
+    {type:'target',dir:'h',col:1,row:2,size:2},
+    {type:'obstacle',dir:'h',col:3,row:1,size:3},
+    {type:'obstacle',dir:'v',col:0,row:1,size:2},
+    {type:'obstacle',dir:'v',col:1,row:0,size:2},
+    {type:'obstacle',dir:'v',col:1,row:3,size:2},
+    {type:'obstacle',dir:'v',col:2,row:0,size:2},
+    {type:'obstacle',dir:'v',col:3,row:2,size:2},
+    {type:'obstacle',dir:'v',col:4,row:2,size:2},
+    {type:'obstacle',dir:'v',col:4,row:4,size:2},
+    {type:'obstacle',dir:'v',col:5,row:2,size:3}
+  ],
+  map5: [
+    {type:'target',dir:'h',col:0,row:2,size:2},
+    {type:'obstacle',dir:'h',col:2,row:0,size:3},
+    {type:'obstacle',dir:'h',col:0,row:3,size:3},
+    {type:'obstacle',dir:'h',col:1,row:4,size:3},
+    {type:'obstacle',dir:'h',col:1,row:5,size:2},
+    {type:'obstacle',dir:'h',col:3,row:5,size:3},
+    {type:'obstacle',dir:'v',col:0,row:4,size:2},
+    {type:'obstacle',dir:'v',col:1,row:0,size:2},
+    {type:'obstacle',dir:'v',col:3,row:2,size:2},
+    {type:'obstacle',dir:'v',col:5,row:0,size:3}
+  ],
+  map6: [
+    {type:'target',dir:'h',col:0,row:2,size:2},
+    {type:'obstacle',dir:'h',col:0,row:0,size:2},
+    {type:'obstacle',dir:'h',col:0,row:1,size:2},
+    {type:'obstacle',dir:'h',col:2,row:3,size:2},
+    {type:'obstacle',dir:'h',col:4,row:3,size:2},
+    {type:'obstacle',dir:'h',col:3,row:4,size:3},
+    {type:'obstacle',dir:'v',col:0,row:3,size:2},
+    {type:'obstacle',dir:'v',col:1,row:3,size:3},
+    {type:'obstacle',dir:'v',col:2,row:4,size:2},
+    {type:'obstacle',dir:'v',col:5,row:0,size:3}
+  ],
+  map7: [
+    {type:'target',dir:'h',col:0,row:2,size:2},
+    {type:'obstacle',dir:'h',col:0,row:0,size:2},
+    {type:'obstacle',dir:'h',col:0,row:1,size:2},
+    {type:'obstacle',dir:'h',col:1,row:3,size:2},
+    {type:'obstacle',dir:'h',col:3,row:3,size:2},
+    {type:'obstacle',dir:'h',col:2,row:4,size:3},
+    {type:'obstacle',dir:'v',col:0,row:3,size:3},
+    {type:'obstacle',dir:'v',col:3,row:1,size:2},
+    {type:'obstacle',dir:'v',col:4,row:0,size:3},
+    {type:'obstacle',dir:'v',col:5,row:1,size:2}
+  ],
+  map8: [
+    {type:'target',dir:'h',col:2,row:2,size:2},
+    {type:'obstacle',dir:'h',col:0,row:0,size:3},
+    {type:'obstacle',dir:'h',col:1,row:5,size:2},
+    {type:'obstacle',dir:'h',col:3,row:5,size:2},
+    {type:'obstacle',dir:'v',col:0,row:1,size:3},
+    {type:'obstacle',dir:'v',col:0,row:4,size:2},
+    {type:'obstacle',dir:'v',col:1,row:1,size:2},
+    {type:'obstacle',dir:'v',col:3,row:0,size:2},
+    {type:'obstacle',dir:'v',col:4,row:0,size:3},
+    {type:'obstacle',dir:'v',col:5,row:0,size:3}
+  ],
+  map9: [
+    {type:'target',dir:'h',col:0,row:2,size:2},
+    {type:'obstacle',dir:'h',col:2,row:0,size:2},
+    {type:'obstacle',dir:'h',col:4,row:0,size:2},
+    {type:'obstacle',dir:'h',col:3,row:4,size:2},
+    {type:'obstacle',dir:'h',col:1,row:5,size:2},
+    {type:'obstacle',dir:'h',col:3,row:5,size:2},
+    {type:'obstacle',dir:'v',col:0,row:3,size:3},
+    {type:'obstacle',dir:'v',col:1,row:0,size:2},
+    {type:'obstacle',dir:'v',col:4,row:1,size:3},
+    {type:'obstacle',dir:'v',col:5,row:1,size:2},
+    {type:'obstacle',dir:'v',col:5,row:3,size:3}
+  ],
+  map10: [
+    {type:'target',dir:'h',col:0,row:2,size:2},
+    {type:'obstacle',dir:'h',col:4,row:0,size:2},
+    {type:'obstacle',dir:'h',col:0,row:5,size:2},
+    {type:'obstacle',dir:'h',col:2,row:5,size:2},
+    {type:'obstacle',dir:'v',col:2,row:0,size:3},
+    {type:'obstacle',dir:'v',col:3,row:0,size:3},
+    {type:'obstacle',dir:'v',col:4,row:2,size:2},
+    {type:'obstacle',dir:'v',col:4,row:4,size:2},
+    {type:'obstacle',dir:'v',col:5,row:2,size:2},
+    {type:'obstacle',dir:'v',col:5,row:4,size:2}
+  ],
+  map11: [
+    {type:'target',dir:'h',col:1,row:2,size:2},
+    {type:'obstacle',dir:'h',col:4,row:5,size:2},
+    {type:'obstacle',dir:'v',col:0,row:1,size:2},
+    {type:'obstacle',dir:'v',col:2,row:3,size:3},
+    {type:'obstacle',dir:'v',col:3,row:1,size:2},
+    {type:'obstacle',dir:'v',col:3,row:3,size:3},
+    {type:'obstacle',dir:'v',col:4,row:1,size:2},
+    {type:'obstacle',dir:'v',col:5,row:0,size:3}
+  ],
+
 };
 
 function loadPreset(k){
@@ -626,7 +740,7 @@ function resetGame(){
   document.getElementById('solverResult').textContent='\u2014';document.getElementById('solverResult').style.color='';
   document.getElementById('animBtn').style.display='none';document.getElementById('stepCounter').style.display='none';
   document.getElementById('optVal').textContent='—';
-  initGrid();loadPreset('easy');
+  initGrid();loadPreset('mapA');
 }
 
 // ============================================================
@@ -1035,7 +1149,7 @@ document.addEventListener('click',function(e){
   }
 });
 initGrid();
-loadPreset('easy');
+loadPreset('mapA');
 </script>
 </body>
 </html>
