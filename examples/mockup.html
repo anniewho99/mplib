@@ -104,18 +104,32 @@ button:hover{background:#222;border-color:var(--muted)}
       <button class="preset-btn" onclick="loadPreset('mapA')">&#9889; Map A (3130 states)</button>
       <button class="preset-btn" onclick="loadPreset('mapB')">&#9889; Map B (3203 states)</button>
       <button class="preset-btn" onclick="loadPreset('mapC')">&#9889; Map C (3489 states)</button>
-      <button class="preset-btn" onclick="loadPreset('mapD')">&#128308; MAP D (3115 states)</button>
-      <button class="preset-btn" onclick="loadPreset('mapE')">&#128308; MAP E (3320 states)</button>
-      <button class="preset-btn" onclick="loadPreset('map1')">&#128308; Map 1 (3130 states)</button>
+      <!-- <button class="preset-btn" onclick="loadPreset('mapD')">&#128308; MAP D (3115 states)</button> -->
+      <!-- <button class="preset-btn" onclick="loadPreset('mapE')">&#128308; MAP E (3320 states)</button>
+      <button class="preset-btn" onclick="loadPreset('map1')">&#128308; Map 1 (3130 states)</button> -->
       <button class="preset-btn" onclick="loadPreset('map3')">&#128308; Map 3 (3203 states)</button>
       <button class="preset-btn" onclick="loadPreset('map4')">&#128308; Map 4 (3204 states)</button>
       <button class="preset-btn" onclick="loadPreset('map5')">&#128308; Map 5 (3300 states)</button>
       <button class="preset-btn" onclick="loadPreset('map6')">&#128308; Map 6 (3300 states)</button>
-      <button class="preset-btn" onclick="loadPreset('map7')">&#128308; Map 7 (3300 states)</button>
+      <!-- <button class="preset-btn" onclick="loadPreset('map7')">&#128308; Map 7 (3300 states)</button>
       <button class="preset-btn" onclick="loadPreset('map8')">&#128308; Map 8 (3307 states)</button>
       <button class="preset-btn" onclick="loadPreset('map9')">&#128308; Map 9 (3312 states)</button>
       <button class="preset-btn" onclick="loadPreset('map10')">&#128308; Map 10 (3313 states)</button>
-      <button class="preset-btn" onclick="loadPreset('map11')">&#128308; Map 11 (3320 states)</button>
+      <button class="preset-btn" onclick="loadPreset('map11')">&#128308; Map 11 (3320 states)</button> -->
+      <button class="preset-btn" onclick="loadPreset('map13')">&#128308; Map 13 (5794 states)</button>
+      <button class="preset-btn" onclick="loadPreset('map14')">&#128308; Map 14 (4722 states)</button>
+      <button class="preset-btn" onclick="loadPreset('map15')">&#128308; Map 15 (4407 states)</button>
+      <button class="preset-btn" onclick="loadPreset('map16')">&#128308; Map 16 (6422 states)</button>
+      <button class="preset-btn" onclick="loadPreset('map17')">&#128308; Map 17 (7649 states)</button>
+      <button class="preset-btn" onclick="loadPreset('map18')">&#128308; Map 18 (3543 states)</button>
+      <button class="preset-btn" onclick="loadPreset('map19')">&#128308; Map 19 (3913 states)</button>
+      <button class="preset-btn" onclick="loadPreset('map20')">&#128308; Map 20 (3660 states)</button>
+      <button class="preset-btn" onclick="loadPreset('map21')">&#128308; Map 21 (3612 states)</button>
+      <button class="preset-btn" onclick="loadPreset('map22')">&#128308; Map 22 (3571 states)</button>
+      <button class="preset-btn" onclick="loadPreset('map23')">&#128308; Map 23 (4405 states)</button>
+      <button class="preset-btn" onclick="loadPreset('map24')">&#128308; Map 24 (4179 states)</button>
+      <button class="preset-btn" onclick="loadPreset('map25')">&#128308; Map 25 (4147 states)</button>
+      <button class="preset-btn" onclick="loadPreset('map26')">&#128308; Map 26 (3902 states)</button>
       <div class="solver-result" id="solverResult">&#8212;</div>
       <div class="step-counter" id="stepCounter" style="display:none">Round <span id="stepCurr">0</span> / <span id="stepTotal">0</span></div>
       <button class="btn-solve" id="animBtn" onclick="toggleAnimate()" style="display:none">&#9654; Animate Solution</button>
@@ -407,7 +421,203 @@ var PRESETS={
     {type:'obstacle',dir:'v',col:4,row:1,size:2},
     {type:'obstacle',dir:'v',col:5,row:0,size:3}
   ],
-
+  map13: [
+    {type:'target',dir:'h',col:0,row:2,size:2},
+    {type:'obstacle',dir:'h',col:0,row:0,size:2},
+    {type:'obstacle',dir:'h',col:4,row:0,size:2},
+    {type:'obstacle',dir:'h',col:3,row:1,size:2},
+    {type:'obstacle',dir:'h',col:3,row:3,size:2},
+    {type:'obstacle',dir:'h',col:1,row:4,size:2},
+    {type:'obstacle',dir:'h',col:1,row:5,size:2},
+    {type:'obstacle',dir:'v',col:0,row:3,size:3},
+    {type:'obstacle',dir:'v',col:2,row:0,size:2},
+    {type:'obstacle',dir:'v',col:2,row:2,size:2},
+    {type:'obstacle',dir:'v',col:3,row:4,size:2},
+    {type:'obstacle',dir:'v',col:5,row:1,size:2},
+    {type:'obstacle',dir:'v',col:5,row:3,size:2}
+  ],
+  map14: [
+    {type:'target',dir:'h',col:1,row:2,size:2},
+    {type:'obstacle',dir:'h',col:0,row:0,size:2},
+    {type:'obstacle',dir:'h',col:3,row:0,size:2},
+    {type:'obstacle',dir:'h',col:1,row:3,size:3},
+    {type:'obstacle',dir:'h',col:4,row:4,size:2},
+    {type:'obstacle',dir:'h',col:0,row:5,size:2},
+    {type:'obstacle',dir:'v',col:0,row:1,size:3},
+    {type:'obstacle',dir:'v',col:2,row:0,size:2},
+    {type:'obstacle',dir:'v',col:3,row:4,size:2},
+    {type:'obstacle',dir:'v',col:4,row:1,size:3},
+    {type:'obstacle',dir:'v',col:5,row:1,size:3}
+  ],
+  map15: [
+    {type:'target',dir:'h',col:2,row:2,size:2},
+    {type:'obstacle',dir:'h',col:0,row:0,size:2},
+    {type:'obstacle',dir:'h',col:3,row:1,size:2},
+    {type:'obstacle',dir:'h',col:0,row:4,size:3},
+    {type:'obstacle',dir:'v',col:0,row:1,size:2},
+    {type:'obstacle',dir:'v',col:2,row:0,size:2},
+    {type:'obstacle',dir:'v',col:3,row:3,size:3},
+    {type:'obstacle',dir:'v',col:4,row:2,size:2},
+    {type:'obstacle',dir:'v',col:4,row:4,size:2},
+    {type:'obstacle',dir:'v',col:5,row:0,size:2},
+    {type:'obstacle',dir:'v',col:5,row:2,size:2}
+  ],
+  map16: [
+    {type:'target',dir:'h',col:0,row:2,size:2},
+    {type:'obstacle',dir:'h',col:1,row:0,size:2},
+    {type:'obstacle',dir:'h',col:1,row:1,size:2},
+    {type:'obstacle',dir:'h',col:3,row:3,size:2},
+    {type:'obstacle',dir:'h',col:1,row:5,size:2},
+    {type:'obstacle',dir:'h',col:4,row:5,size:2},
+    {type:'obstacle',dir:'v',col:0,row:0,size:2},
+    {type:'obstacle',dir:'v',col:2,row:2,size:3},
+    {type:'obstacle',dir:'v',col:3,row:0,size:3},
+    {type:'obstacle',dir:'v',col:5,row:0,size:2},
+    {type:'obstacle',dir:'v',col:5,row:2,size:2}
+  ],
+  map17: [
+    {type:'target',dir:'h',col:0,row:2,size:2},
+    {type:'obstacle',dir:'h',col:1,row:0,size:3},
+    {type:'obstacle',dir:'h',col:0,row:1,size:2},
+    {type:'obstacle',dir:'h',col:1,row:3,size:2},
+    {type:'obstacle',dir:'h',col:4,row:4,size:2},
+    {type:'obstacle',dir:'h',col:0,row:5,size:2},
+    {type:'obstacle',dir:'v',col:0,row:3,size:2},
+    {type:'obstacle',dir:'v',col:2,row:4,size:2},
+    {type:'obstacle',dir:'v',col:3,row:1,size:2},
+    {type:'obstacle',dir:'v',col:3,row:3,size:2},
+    {type:'obstacle',dir:'v',col:4,row:0,size:2},
+    {type:'obstacle',dir:'v',col:4,row:2,size:2}
+  ],
+  map18: [
+    {type:'target',dir:'h',col:0,row:2,size:2},
+    {type:'obstacle',dir:'h',col:1,row:0,size:3},
+    {type:'obstacle',dir:'h',col:1,row:3,size:2},
+    {type:'obstacle',dir:'h',col:4,row:4,size:2},
+    {type:'obstacle',dir:'h',col:0,row:5,size:2},
+    {type:'obstacle',dir:'h',col:2,row:5,size:3},
+    {type:'obstacle',dir:'v',col:0,row:0,size:2},
+    {type:'obstacle',dir:'v',col:2,row:1,size:2},
+    {type:'obstacle',dir:'v',col:3,row:1,size:2},
+    {type:'obstacle',dir:'v',col:3,row:3,size:2},
+    {type:'obstacle',dir:'v',col:4,row:1,size:2},
+    {type:'obstacle',dir:'v',col:5,row:0,size:2},
+    {type:'obstacle',dir:'v',col:5,row:2,size:2}
+  ],
+  map19: [
+    {type:'target',dir:'h',col:2,row:2,size:2},
+    {type:'obstacle',dir:'h',col:0,row:0,size:2},
+    {type:'obstacle',dir:'h',col:1,row:3,size:2},
+    {type:'obstacle',dir:'h',col:4,row:4,size:2},
+    {type:'obstacle',dir:'h',col:1,row:5,size:3},
+    {type:'obstacle',dir:'v',col:0,row:1,size:2},
+    {type:'obstacle',dir:'v',col:0,row:3,size:3},
+    {type:'obstacle',dir:'v',col:1,row:1,size:2},
+    {type:'obstacle',dir:'v',col:2,row:0,size:2},
+    {type:'obstacle',dir:'v',col:3,row:0,size:2},
+    {type:'obstacle',dir:'v',col:3,row:3,size:2},
+    {type:'obstacle',dir:'v',col:4,row:1,size:2},
+    {type:'obstacle',dir:'v',col:5,row:1,size:3}
+  ],
+  map20: [
+    {type:'target',dir:'h',col:0,row:2,size:2},
+    {type:'obstacle',dir:'h',col:3,row:0,size:3},
+    {type:'obstacle',dir:'h',col:0,row:3,size:3},
+    {type:'obstacle',dir:'h',col:4,row:4,size:2},
+    {type:'obstacle',dir:'h',col:0,row:5,size:2},
+    {type:'obstacle',dir:'v',col:0,row:0,size:2},
+    {type:'obstacle',dir:'v',col:2,row:4,size:2},
+    {type:'obstacle',dir:'v',col:3,row:1,size:2},
+    {type:'obstacle',dir:'v',col:3,row:3,size:2},
+    {type:'obstacle',dir:'v',col:5,row:1,size:3}
+  ],
+  map21: [
+    {type:'target',dir:'h',col:1,row:2,size:2},
+    {type:'obstacle',dir:'h',col:0,row:0,size:2},
+    {type:'obstacle',dir:'h',col:4,row:1,size:2},
+    {type:'obstacle',dir:'h',col:3,row:3,size:2},
+    {type:'obstacle',dir:'h',col:0,row:4,size:2},
+    {type:'obstacle',dir:'h',col:0,row:5,size:2},
+    {type:'obstacle',dir:'h',col:3,row:5,size:2},
+    {type:'obstacle',dir:'v',col:0,row:1,size:2},
+    {type:'obstacle',dir:'v',col:2,row:3,size:3},
+    {type:'obstacle',dir:'v',col:3,row:0,size:3},
+    {type:'obstacle',dir:'v',col:5,row:2,size:2},
+    {type:'obstacle',dir:'v',col:5,row:4,size:2}
+  ],
+  map22: [
+    {type:'target',dir:'h',col:0,row:2,size:2},
+    {type:'obstacle',dir:'h',col:4,row:0,size:2},
+    {type:'obstacle',dir:'h',col:4,row:1,size:2},
+    {type:'obstacle',dir:'h',col:0,row:3,size:2},
+    {type:'obstacle',dir:'h',col:1,row:4,size:3},
+    {type:'obstacle',dir:'h',col:1,row:5,size:3},
+    {type:'obstacle',dir:'v',col:0,row:4,size:2},
+    {type:'obstacle',dir:'v',col:2,row:1,size:2},
+    {type:'obstacle',dir:'v',col:3,row:0,size:2},
+    {type:'obstacle',dir:'v',col:3,row:2,size:2},
+    {type:'obstacle',dir:'v',col:4,row:2,size:2},
+    {type:'obstacle',dir:'v',col:4,row:4,size:2},
+    {type:'obstacle',dir:'v',col:5,row:2,size:3}
+  ],
+  map23: [
+    {type:'target',dir:'h',col:0,row:2,size:2},
+    {type:'obstacle',dir:'h',col:2,row:0,size:2},
+    {type:'obstacle',dir:'h',col:4,row:0,size:2},
+    {type:'obstacle',dir:'h',col:3,row:1,size:3},
+    {type:'obstacle',dir:'h',col:1,row:3,size:2},
+    {type:'obstacle',dir:'h',col:0,row:4,size:3},
+    {type:'obstacle',dir:'h',col:0,row:5,size:2},
+    {type:'obstacle',dir:'v',col:0,row:0,size:2},
+    {type:'obstacle',dir:'v',col:2,row:1,size:2},
+    {type:'obstacle',dir:'v',col:3,row:3,size:2},
+    {type:'obstacle',dir:'v',col:4,row:2,size:3},
+    {type:'obstacle',dir:'v',col:5,row:2,size:2},
+    {type:'obstacle',dir:'v',col:5,row:4,size:2}
+  ],
+  map24: [
+    {type:'target',dir:'h',col:0,row:2,size:2},
+    {type:'obstacle',dir:'h',col:1,row:0,size:2},
+    {type:'obstacle',dir:'h',col:3,row:0,size:3},
+    {type:'obstacle',dir:'h',col:0,row:1,size:3},
+    {type:'obstacle',dir:'h',col:1,row:3,size:2},
+    {type:'obstacle',dir:'h',col:3,row:4,size:2},
+    {type:'obstacle',dir:'h',col:0,row:5,size:2},
+    {type:'obstacle',dir:'v',col:0,row:3,size:2},
+    {type:'obstacle',dir:'v',col:2,row:4,size:2},
+    {type:'obstacle',dir:'v',col:3,row:1,size:3},
+    {type:'obstacle',dir:'v',col:4,row:1,size:3},
+    {type:'obstacle',dir:'v',col:5,row:1,size:2},
+    {type:'obstacle',dir:'v',col:5,row:3,size:2}
+  ],
+  map25: [
+    {type:'target',dir:'h',col:0,row:2,size:2},
+    {type:'obstacle',dir:'h',col:3,row:0,size:3},
+    {type:'obstacle',dir:'h',col:4,row:1,size:2},
+    {type:'obstacle',dir:'h',col:4,row:3,size:2},
+    {type:'obstacle',dir:'h',col:2,row:4,size:2},
+    {type:'obstacle',dir:'h',col:0,row:5,size:3},
+    {type:'obstacle',dir:'v',col:0,row:0,size:2},
+    {type:'obstacle',dir:'v',col:1,row:3,size:2},
+    {type:'obstacle',dir:'v',col:2,row:0,size:2},
+    {type:'obstacle',dir:'v',col:2,row:2,size:2},
+    {type:'obstacle',dir:'v',col:3,row:1,size:3},
+    {type:'obstacle',dir:'v',col:5,row:4,size:2}
+  ],
+  map26: [
+    {type:'target',dir:'h',col:0,row:2,size:2},
+    {type:'obstacle',dir:'h',col:2,row:0,size:2},
+    {type:'obstacle',dir:'h',col:1,row:1,size:3},
+    {type:'obstacle',dir:'h',col:0,row:3,size:2},
+    {type:'obstacle',dir:'h',col:4,row:4,size:2},
+    {type:'obstacle',dir:'v',col:0,row:0,size:2},
+    {type:'obstacle',dir:'v',col:2,row:2,size:2},
+    {type:'obstacle',dir:'v',col:3,row:2,size:2},
+    {type:'obstacle',dir:'v',col:3,row:4,size:2},
+    {type:'obstacle',dir:'v',col:4,row:0,size:2},
+    {type:'obstacle',dir:'v',col:4,row:2,size:2},
+    {type:'obstacle',dir:'v',col:5,row:0,size:3}
+  ],
 };
 
 function loadPreset(k){
