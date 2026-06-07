@@ -23,7 +23,7 @@ import {
 
 const COLS = 6, ROWS = 6, CELL = 78, GAP = 4;
 const VOTING_DURATION = 5;
-const MAX_ROUNDS_PER_LEVEL = 60;
+const MAX_ROUNDS_PER_LEVEL = 100;
 const NUM_LEVELS = 4;
 
 const NUM_PLAYERS = 1;
@@ -83,7 +83,7 @@ const LEVELS = [
   },
 ];
 
-const studyId = typeof GameName !== 'undefined' ? GameName : 'rushhour_sp';
+const studyId = typeof GameName !== 'undefined' ? GameName : 'rushhour_sp_100';
 const sessionConfig = {
   minPlayersNeeded:              1,
   maxPlayersNeeded:              1,
