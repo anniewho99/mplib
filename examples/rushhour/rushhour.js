@@ -29,7 +29,7 @@ const NUM_LEVELS = 4;
 // ?players=2 for two-player mode, default is 3
 const _pParam = new URLSearchParams(window.location.search).get('players');
 // const NUM_PLAYERS = (_pParam === '2') ? 2 : 3;
-const NUM_PLAYERS = 2;
+const NUM_PLAYERS = 3;
 
 
 const PHASE_LEASE_MS  = 6000;
@@ -87,7 +87,7 @@ const LEVELS = [
   },
 ];
 
-const studyId = typeof GameName !== 'undefined' ? GameName : 'rushhour_2p_100';
+const studyId = typeof GameName !== 'undefined' ? GameName : 'rushhour_3p_100';
 const sessionConfig = {
   minPlayersNeeded:              typeof MinPlayers !== 'undefined' ? MinPlayers : NUM_PLAYERS,
   maxPlayersNeeded:              typeof MaxPlayers !== 'undefined' ? MaxPlayers : NUM_PLAYERS,
