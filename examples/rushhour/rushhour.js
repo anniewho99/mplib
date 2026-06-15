@@ -26,10 +26,24 @@ const VOTING_DURATION = 5;
 const MAX_ROUNDS_PER_LEVEL = 100;
 const NUM_LEVELS = 4;
 
-// ?players=2 for two-player mode, default is 3
-const _pParam = new URLSearchParams(window.location.search).get('players');
-// const NUM_PLAYERS = (_pParam === '2') ? 2 : 3;
-const NUM_PLAYERS = 3;
+// ── AI configuration ──────────────────────────────────────────────────────────
+// Set AI_MODE to 'initiator', 'follower', or null (no AI, pure 3-human mode).
+// The AI is deployed from whichever browser holds the controller lease.
+// To run a pure 2-human-only session set AI_MODE = null AND NUM_PLAYERS = 2.
+// To run 1-human + 1-AI set AI_MODE to desired type AND NUM_PLAYERS = 1.
+const AI_MODE        = 'initiator'; // 'initiator' | 'follower' | null
+const AI_PLAYER_ID   = '_ai_player';
+const AI_PLAYER_NAME = 'Robot Player';
+const AI_COLOR       = 2;           // purple (index 2)
+// Timing offsets into the 5-second voting window
+const AI_INITIATOR_DELAY_MS = 500;
+const AI_FOLLOWER_DELAY_MS  = 4500;
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Number of *human* players needed to start a session.
+// With AI_MODE active this is 2 (AI is the 3rd slot, injected programmatically).
+// Set to 1 for 1-human + 1-AI mode, or 3 for pure human mode with AI_MODE=null.
+const NUM_PLAYERS = AI_MODE ? 2 : 3;
 
 
 const PHASE_LEASE_MS  = 6000;
@@ -87,7 +101,7 @@ const LEVELS = [
   },
 ];
 
-const studyId = typeof GameName !== 'undefined' ? GameName : 'rushhour_3p_100_2';
+const studyId = typeof GameName !== 'undefined' ? GameName : 'rushhour_3p_initiator';
 const sessionConfig = {
   minPlayersNeeded:              typeof MinPlayers !== 'undefined' ? MinPlayers : NUM_PLAYERS,
   maxPlayersNeeded:              typeof MaxPlayers !== 'undefined' ? MaxPlayers : NUM_PLAYERS,
@@ -120,6 +134,11 @@ let timerInterval = null;
 let _lastLevelState = null;
 let _lastLevelEndAt = null;
 
+// AI player state
+let aiVoteTimeoutId   = null;      // scheduled setTimeout for AI vote this round
+let _aiRegistered     = false;     // guard: only register once per session
+let _aiScheduledEvent = -1;        // which eventNumber the AI vote is already scheduled for
+
 // Moves are buffered here as Firebase fires one child at a time.
 // We apply them all at once when the phase switches to 'moving'.
 let _pendingMoves = {};      // bid → { dc, dr }
@@ -136,7 +155,7 @@ const instructionSteps = [
     demo: 'board-interactive',
   },
   {
-    text: `You'll be playing with two other real people.\n\nOne will appear as green 🟢, the other as purple 🟣. You will see their choices the second they click on any of the buttons — coordination is key!`,
+    text: `You'll be playing with one other real person and one robot player.\n\nThe human player will appear as green 🟢, the robot player as purple 🟣. You will see their choices the second they click on any of the buttons — coordination is key!`,
     demo: 'teammates',
   },
   {
@@ -144,7 +163,7 @@ const instructionSteps = [
     demo: 'multivote',
   },
   {
-    text: `That's it! You'll play 4 levels together. Your team need to finish a level within 60 rounds. \n\nYour player name is: ${playerName}\n\nPress Join Game when you're ready! Please do not refresh the page after joining the game.`,
+    text: `That's it! You'll play 4 levels together. Your team need to finish a level within 100 rounds. \n\nYour player name is: ${playerName}\n\nPress Join Game when you're ready! Please do not refresh the page after joining the game.`,
     showNameEntry: true,
   },
 ];
@@ -347,7 +366,7 @@ function renderDemoInstructions(stepIdx) {
     // Three player colors
     const wrap = document.createElement('div');
     wrap.style.cssText = 'display:flex;gap:12px;flex-wrap:wrap;';
-    [['#f4c400','You (yellow)'], ['#44cc44','Green player'], ['#9b59ff','Purple player']].forEach(function(pair) {
+    [['#f4c400','You (yellow)'], ['#44cc44','Green player'], ['#9b59ff','Robot player']].forEach(function(pair) {
       const item = document.createElement('div');
       item.style.cssText = 'display:flex;align-items:center;gap:10px;padding:12px 16px;background:#1a1a1a;border-radius:8px;border:1px solid #2a2a2a;';
       item.innerHTML = '<div style="width:22px;height:22px;border-radius:50%;background:' + pair[0] + ';box-shadow:0 0 8px ' + pair[0] + ';flex-shrink:0;"></div><div style="font-family:\'Space Mono\',monospace;font-size:12px;color:' + pair[0] + ';">' + pair[1] + '</div>';
@@ -564,6 +583,10 @@ function initGame() {
 
   startLeaseHeartbeat();
   seedLevelIfNeeded();
+
+  // Register AI as a visible player (controller writes on behalf of all)
+  // We register from every client but updateStateDirect is idempotent here.
+  if (AI_MODE) registerAIPlayer();
 }
 
 function assignColors() {
@@ -582,8 +605,8 @@ function renderPlayerPanel() {
   ['pb1','pb2','pb3'].forEach((id, i) => {
     document.getElementById(id).classList.toggle('active', i === myColor);
   });
-  // Hide P3 slot in 2-player mode
-  if (NUM_PLAYERS === 2) {
+  // Hide P3 slot only in pure 2-human mode (no AI)
+  if (NUM_PLAYERS === 2 && !AI_MODE) {
     const pb3 = document.getElementById('pb3');
     if (pb3) pb3.style.display = 'none';
   }
@@ -857,6 +880,8 @@ function renderPhase(p) {
   if (p.current === 'voting') {
     startLocalTimer(p.endTime);
     setButtonsEnabled(true);
+    // Controller schedules the AI vote for this round
+    if (AI_MODE && iAmController) scheduleAIVote(p.endTime);
   } else if (p.current === 'moving') {
     stopLocalTimer();
     setButtonsEnabled(false);
@@ -1163,6 +1188,247 @@ function clearVoteDisplay() {
 
 
 // ─────────────────────────────────────────
+//  BFS solver (used by AI player)
+// ─────────────────────────────────────────
+
+// Build a blockMeta lookup {id → {dir, size, type}} from a LEVELS entry.
+// This lets BFS run without needing DOM elements to exist yet.
+function buildBlockMeta(levelBlocks) {
+  const meta = {};
+  levelBlocks.forEach(b => { meta[b.id] = { dir: b.dir, size: b.size, type: b.type }; });
+  return meta;
+}
+
+// Get blockMeta for the current level from DOM (used during live play when DOM exists).
+function blockMetaFromDOM() {
+  const meta = {};
+  document.querySelectorAll('.rh-block').forEach(el => {
+    meta[el.dataset.bid] = { dir: el.dataset.dir, size: parseInt(el.dataset.size), type: el.dataset.type };
+  });
+  return meta;
+}
+
+// Encode the full board state as a compact string key for the BFS visited set.
+function encodeBoardState(positions) {
+  return Object.keys(positions).sort().map(id => {
+    const p = positions[id];
+    return `${id}:${p.col},${p.row}`;
+  }).join(';');
+}
+
+// Return all valid single-step moves for the given positions + blockMeta.
+// Each move is { blockId, dir, dc, dr, newPositions }.
+function getValidMoves(positions, meta) {
+  const moves = [];
+  for (const [bid, pos] of Object.entries(positions)) {
+    if (pos.col >= COLS) continue;
+    const { dir, size, type } = meta[bid] || {};
+    if (!dir) continue;
+
+    const candidates = dir === 'h'
+      ? [{ dc:  1, dr: 0, label: 'fwd'  },
+         { dc: -1, dr: 0, label: 'back' }]
+      : [{ dc: 0, dr:  1, label: 'fwd'  },
+         { dc: 0, dr: -1, label: 'back' }];
+
+    for (const { dc, dr, label } of candidates) {
+      const nc = pos.col + dc;
+      const nr = pos.row + dr;
+
+      if (dir === 'h') {
+        if (dc < 0 && nc < 0) continue;
+        if (dc > 0 && type !== 'target' && nc + size > COLS) continue;
+        if (dc > 0 && type === 'target' && nc > COLS) continue;
+      } else {
+        if (dr < 0 && nr < 0) continue;
+        if (dr > 0 && nr + size > ROWS) continue;
+      }
+
+      let blocked = false;
+      for (const [oid, opos] of Object.entries(positions)) {
+        if (oid === bid || opos.col >= COLS) continue;
+        const om = meta[oid];
+        if (!om) continue;
+        const os = om.size, od = om.dir;
+
+        if (dir === 'h') {
+          if (od === 'h') {
+            if (opos.row === pos.row) {
+              if (nc < opos.col + os && nc + size > opos.col) { blocked = true; break; }
+            }
+          } else {
+            if (pos.row >= opos.row && pos.row < opos.row + os) {
+              if (nc < opos.col + 1 && nc + size > opos.col) { blocked = true; break; }
+            }
+          }
+        } else {
+          if (od === 'v') {
+            if (opos.col === pos.col) {
+              if (nr < opos.row + os && nr + size > opos.row) { blocked = true; break; }
+            }
+          } else {
+            if (pos.col >= opos.col && pos.col < opos.col + os) {
+              if (nr < opos.row + 1 && nr + size > opos.row) { blocked = true; break; }
+            }
+          }
+        }
+      }
+      if (blocked) continue;
+
+      const newPositions = { ...positions, [bid]: { col: nc, row: nr } };
+      moves.push({ blockId: bid, dir: label, dc, dr, newPositions });
+    }
+  }
+  return moves;
+}
+
+// Compute BFS distance to solved state using provided meta (no DOM needed).
+function bfsDistance(positions, meta) {
+  const b0size = meta['b0']?.size ?? 2;
+  if ((positions['b0']?.col ?? 0) + b0size >= COLS) return 0;
+
+  const startKey = encodeBoardState(positions);
+  const visited  = new Set([startKey]);
+  const queue    = [{ positions, dist: 0 }];
+
+  while (queue.length > 0) {
+    const { positions: cur, dist } = queue.shift();
+    for (const move of getValidMoves(cur, meta)) {
+      const np  = move.newPositions;
+      const key = encodeBoardState(np);
+      if (visited.has(key)) continue;
+      visited.add(key);
+      if ((np['b0']?.col ?? 0) + b0size >= COLS) return dist + 1;
+      queue.push({ positions: np, dist: dist + 1 });
+    }
+  }
+  return Infinity;
+}
+
+// Return all single-step moves that strictly reduce BFS distance.
+function bfsImprovingMoves(positions, meta) {
+  const curDist = bfsDistance(positions, meta);
+  if (!isFinite(curDist)) return [];
+  return getValidMoves(positions, meta).filter(m => bfsDistance(m.newPositions, meta) < curDist);
+}
+
+// Pre-computed BFS-improving moves for each level's initial state.
+// Built at script load time (no DOM needed — uses LEVELS definitions directly).
+const LEVEL_INITIAL_GOOD_MOVES = LEVELS.map(level => {
+  const meta      = buildBlockMeta(level.blocks);
+  const positions = {};
+  level.blocks.forEach(b => { positions[b.id] = { col: b.col, row: b.row }; });
+  return bfsImprovingMoves(positions, meta);
+});
+console.log('[AI] precomputed initial good moves for all levels:', LEVEL_INITIAL_GOOD_MOVES.map(m => m.length));
+
+// ─────────────────────────────────────────
+//  AI player
+// ─────────────────────────────────────────
+
+// Register the AI as a visible player in Firebase (shows up in the panel).
+function registerAIPlayer() {
+  if (!AI_MODE || _aiRegistered) return;
+  _aiRegistered = true;
+  // arrivalColor 2 → purple slot
+  updateStateDirect(`players/${AI_PLAYER_ID}`,
+    { name: AI_PLAYER_NAME, arrivalColor: AI_COLOR, isAI: true },
+    'register AI player');
+  // Also put it in our local color map so the panel renders it immediately
+  playerColorMap[AI_PLAYER_ID] = { name: AI_PLAYER_NAME, color: AI_COLOR };
+  updatePlayerNameDisplay(AI_PLAYER_ID);
+}
+
+// Schedule the AI vote for this voting round. Called by the controller only.
+function scheduleAIVote(phaseEndTime) {
+  if (!AI_MODE) return;
+  // Use canIBeController (synchronous) rather than iAmController (set async after renewLease).
+  if (!canIBeController(currentPhaseSnap)) return;
+  // Guard: only schedule once per event number to avoid multiple timeouts
+  // from repeated renderPhase calls (Firebase fires once per field update).
+  const eventNum = currentLevelSnap?.eventNumber || 0;
+  if (_aiScheduledEvent === eventNum) return;
+  _aiScheduledEvent = eventNum;
+
+  clearTimeout(aiVoteTimeoutId);
+  const voteAt = AI_MODE === 'initiator' ? AI_INITIATOR_DELAY_MS : AI_FOLLOWER_DELAY_MS;
+  const phaseStartTime = phaseEndTime - VOTING_DURATION * 1000;
+  const delayMs = Math.max(0, phaseStartTime + voteAt - Date.now());
+
+  console.log(`[AI] scheduling ${AI_MODE} vote for event ${eventNum} in ${delayMs}ms`);
+  aiVoteTimeoutId = setTimeout(() => {
+    castAIVote();
+  }, delayMs);
+}
+
+function castAIVote() {
+  if (!AI_MODE) return;
+  if (!canIBeController(currentPhaseSnap)) return;
+
+  const eventNum  = currentLevelSnap?.eventNumber || 0;
+  const startAt   = currentLevelSnap?.startAt || 0;
+  const isFirstRound = (eventNum === startAt);
+
+  let goodMoves;
+  if (isFirstRound && LEVEL_INITIAL_GOOD_MOVES[currentLevel]) {
+    // Use precomputed result for the very first round of each level (no DOM wait needed)
+    goodMoves = LEVEL_INITIAL_GOOD_MOVES[currentLevel];
+  } else {
+    const meta = blockMetaFromDOM();
+    goodMoves  = bfsImprovingMoves({ ...blockPositions }, meta);
+  }
+  console.log(`[AI] casting ${AI_MODE} vote for event ${eventNum}, ${goodMoves.length} good moves available`);
+
+  let chosen = null;
+
+  if (AI_MODE === 'initiator') {
+    // Pick any BFS-improving move at random
+    if (goodMoves.length > 0) {
+      chosen = goodMoves[Math.floor(Math.random() * goodMoves.length)];
+    }
+  } else {
+    // Follower: pick a BFS-improving move not already voted by humans.
+    // If all good moves are covered, copy the most popular human vote.
+    const humanVotes = Object.entries(currentRawVoteCache)
+      .filter(([pid]) => pid !== AI_PLAYER_ID)
+      .map(([, v]) => v)
+      .filter(Boolean);
+
+    // Build set of (blockId, dir) already voted by humans
+    const humanVoteKeys = new Set(humanVotes.map(v => `${v.blockId}|${v.dir}`));
+
+    const uncoveredMoves = goodMoves.filter(
+      m => !humanVoteKeys.has(`${m.blockId}|${m.dir}`)
+    );
+
+    if (uncoveredMoves.length > 0) {
+      chosen = uncoveredMoves[Math.floor(Math.random() * uncoveredMoves.length)];
+    } else if (humanVotes.length > 0) {
+      // All good moves covered — copy most popular human vote
+      const tally = {};
+      humanVotes.forEach(v => {
+        const k = `${v.blockId}|${v.dir}`;
+        tally[k] = (tally[k] || { v, count: 0 });
+        tally[k].count++;
+      });
+      const best = Object.values(tally).sort((a, b) => b.count - a.count)[0];
+      chosen = best ? { blockId: best.v.blockId, dir: best.v.dir } : null;
+    }
+  }
+
+  if (!chosen) return; // no valid move (shouldn't happen normally)
+
+  const voteData = {
+    blockId:   chosen.blockId,
+    dir:       chosen.dir,
+    timestamp: Date.now(),
+    level:     currentLevel,
+    isAI:      true,
+  };
+  updateStateDirect(`votes/${eventNum}/${AI_PLAYER_ID}`, voteData, 'AI vote');
+}
+
+// ─────────────────────────────────────────
 //  Controller loop
 // ─────────────────────────────────────────
 function startLeaseHeartbeat() {
@@ -1253,16 +1519,19 @@ function receiveStateChange(pathNow, nodeName, newState, typeChange) {
       if (!playerColorMap[pid]) playerColorMap[pid] = {};
       playerColorMap[pid].name = data.name;
       if (typeof data.arrivalColor === 'number' && pid !== thisPlayerId) {
-        // Remap so color 0 is never used for others (0 = yellow = self)
-        // arrivalColor 0→1, 1→2, 2→1 or 2 depending on self
-        // Simple: use 1 + (data.arrivalColor % 2) to get 1 or 2, never 0
-        const myArrival = getCurrentPlayerArrivalIndex() - 1;
-        let c = data.arrivalColor;
-        if (c === myArrival) c = 0; // shouldn't happen but safety
-        // Map the two non-self arrivals to 1 and 2
-        const nonSelf = [0, 1, 2].filter(x => x !== myArrival);
-        const relIdx = nonSelf.indexOf(c);
-        playerColorMap[pid].color = relIdx === 0 ? 1 : 2;
+        if (pid === AI_PLAYER_ID) {
+          // AI always gets its fixed color slot — no remapping needed
+          playerColorMap[pid].color = AI_COLOR;
+        } else {
+          // Remap so color 0 is never used for others (0 = yellow = self)
+          const myArrival = getCurrentPlayerArrivalIndex() - 1;
+          let c = data.arrivalColor;
+          if (c === myArrival) c = 0; // shouldn't happen but safety
+          // Map the two non-self arrivals to 1 and 2
+          const nonSelf = [0, 1, 2].filter(x => x !== myArrival);
+          const relIdx = nonSelf.indexOf(c);
+          playerColorMap[pid].color = relIdx === 0 ? 1 : 2;
+        }
       }
       updatePlayerNameDisplay(pid);
     }
@@ -1361,9 +1630,12 @@ function renderLevelFromAuthority(L) {
     _pendingMoves = {};
     _pendingMovesEvent = -1;
     _movesApplied = false;
+    _aiScheduledEvent = -1; // allow AI to schedule fresh on next voting phase
   } else if (L.state === 'survey') {
+    clearTimeout(aiVoteTimeoutId); // cancel any pending AI vote
     showBetweenLevelSurvey(L.index);
   } else if (L.state === 'ended') {
+    clearTimeout(aiVoteTimeoutId);
     showFinalSurvey();
   } else if (L.state === 'redirecting') {
     redirectToProlific();
@@ -1474,11 +1746,12 @@ function evaluateUpdate(path, state, action, args) {
     }
 
     if (action === 'finalDone') {
-      // Track who has submitted the final survey; once all are done, flip to 'redirecting'
+      // Track who has submitted the final survey; once all *human* players are done, flip to 'redirecting'
       if (stateName === 'ended') {
         const finalDone = L.finalDone || {};
         const updated = { ...finalDone, [me]: true };
-        const ids = Object.keys(playerColorMap);
+        // Only count human players (exclude the AI player ID)
+        const ids = Object.keys(playerColorMap).filter(id => id !== AI_PLAYER_ID);
         const allDone = ids.length > 0 && ids.every(id => !!updated[id]);
         return {
           isAllowed: true,
@@ -1490,7 +1763,8 @@ function evaluateUpdate(path, state, action, args) {
 
     if (action === 'advance') {
       if (stateName === 'survey') {
-        const ids = Object.keys(playerColorMap);
+        // Only human players need to mark survey done before advancing
+        const ids = Object.keys(playerColorMap).filter(id => id !== AI_PLAYER_ID);
         const allDone = ids.length > 0 && ids.every(id => !!surveyDone[id]);
         if (!allDone) return { isAllowed: false, newState: null };
         const nextIndex = index + 1;
