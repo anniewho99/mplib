@@ -1337,7 +1337,7 @@ function scheduleAIVote() {
   clearTimeout(aiVoteTimeoutId);
   // Schedule from local arrival time — avoids server/client clock offset issues.
   // Initiator: 500ms into the window. Follower: 4500ms.
-  const delay = AI_MODE === 'initiator' ? 500 : 4500;
+  const delay = AI_MODE === 'initiator' ? 500 : 4100;
   console.log(`[AI] scheduling ${AI_MODE} vote in ${delay}ms`);
   aiVoteTimeoutId = setTimeout(castAIVote, delay);
 }
