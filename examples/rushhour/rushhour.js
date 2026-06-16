@@ -27,7 +27,7 @@ const MAX_ROUNDS_PER_LEVEL = 100;
 const NUM_LEVELS = 4;
 
 // ── AI configuration ──────────────────────────────────────────────────────────
-const AI_MODE        = 'initiator'; // 'initiator' | 'follower' | null
+const AI_MODE        = 'follower'; // 'initiator' | 'follower' | null
 const AI_PLAYER_ID   = '_ai_player';
 const AI_PLAYER_NAME = 'Robot Player';
 const AI_COLOR       = 2;           // purple (index 2)
@@ -91,7 +91,7 @@ const LEVELS = [
   },
 ];
 
-const studyId = typeof GameName !== 'undefined' ? GameName : 'rushhour_2_init';
+const studyId = typeof GameName !== 'undefined' ? GameName : 'rushhour_2_follow';
 const sessionConfig = {
   minPlayersNeeded:              typeof MinPlayers !== 'undefined' ? MinPlayers : NUM_PLAYERS,
   maxPlayersNeeded:              typeof MaxPlayers !== 'undefined' ? MaxPlayers : NUM_PLAYERS,
