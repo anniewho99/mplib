@@ -33,7 +33,7 @@ const AI_PLAYER_NAME = 'Robot Player';
 const AI_COLOR       = 2;           // purple (index 2)
 // ─────────────────────────────────────────────────────────────────────────────
 
-const NUM_PLAYERS = AI_MODE ? 2 : 3;
+const NUM_PLAYERS = AI_MODE ? 1 : 3;
 
 
 const PHASE_LEASE_MS  = 6000;
@@ -91,7 +91,7 @@ const LEVELS = [
   },
 ];
 
-const studyId = typeof GameName !== 'undefined' ? GameName : 'rushhour_3_init';
+const studyId = typeof GameName !== 'undefined' ? GameName : 'rushhour_2_init';
 const sessionConfig = {
   minPlayersNeeded:              typeof MinPlayers !== 'undefined' ? MinPlayers : NUM_PLAYERS,
   maxPlayersNeeded:              typeof MaxPlayers !== 'undefined' ? MaxPlayers : NUM_PLAYERS,
@@ -135,6 +135,29 @@ let _pendingMoves = {};      // bid → { dc, dr }
 let _pendingMovesEvent = -1; // which event these moves belong to
 let _movesApplied = false;   // guard: apply only once per event
 
+// const instructionSteps = [
+//   {
+//     text: `Welcome to multi-player Rush Hour!\n\nWork together to solve each level. The game is played on a 6×6 grid, just like the classic Rush Hour puzzle.\n\nThe goal is to move the red TARGET block to the EXIT on the right side of the board.\n\nBlocks can slide only in the direction they face: horizontally or vertically.\n\nTry to work together to solve the puzzle in as few moves as possible!`,
+//     demo: 'board',
+//   },
+//   {
+//     text: `You are the yellow player 🟡\n\nEach round you have 5 seconds to vote on which block to move and in which direction. There is a timer at the bottom now. Click any arrow on any block to cast your vote. You can change it anytime before the timer runs out. Your choice will be represented by a yellow dot on the block. \n\nTry it now — click any arrow!`,
+//     demo: 'board-interactive',
+//   },
+//   {
+//     text: `You'll be playing with one other real person and one robot player.\n\nThe human player will appear as green 🟢, the robot player as purple 🟣. You will see their choices the second they click on any of the buttons — coordination is key!`,
+//     demo: 'teammates',
+//   },
+//   {
+//     text: `Key mechanic: if multiple players vote for the same block in the same direction, it moves that many cells in one round.\n\nThe green player has already voted to move the red block right ➡. Click the same arrow to move it 2 cells at once!`,
+//     demo: 'multivote',
+//   },
+//   {
+//     text: `That's it! You'll play 4 levels together. Your team need to finish a level within 100 rounds. \n\nYour player name is: ${playerName}\n\nPress Join Game when you're ready! Please do not refresh the page after joining the game.`,
+//     showNameEntry: true,
+//   },
+// ];
+
 const instructionSteps = [
   {
     text: `Welcome to multi-player Rush Hour!\n\nWork together to solve each level. The game is played on a 6×6 grid, just like the classic Rush Hour puzzle.\n\nThe goal is to move the red TARGET block to the EXIT on the right side of the board.\n\nBlocks can slide only in the direction they face: horizontally or vertically.\n\nTry to work together to solve the puzzle in as few moves as possible!`,
@@ -145,7 +168,7 @@ const instructionSteps = [
     demo: 'board-interactive',
   },
   {
-    text: `You'll be playing with one other real person and one robot player.\n\nThe human player will appear as green 🟢, the robot player as purple 🟣. You will see their choices the second they click on any of the buttons — coordination is key!`,
+    text: `You'll be playing with one robot player.\n\nThe robot player will appear as purple 🟣. You will see their choices the second they click on any of the buttons — coordination is key!`,
     demo: 'teammates',
   },
   {
@@ -352,11 +375,24 @@ function renderDemoInstructions(stepIdx) {
     demoPracticeTimer = setInterval(tickDemo, 1000);
   }
 
+  // else if (stepIdx === 2) {
+  //   // Three player colors
+  //   const wrap = document.createElement('div');
+  //   wrap.style.cssText = 'display:flex;gap:12px;flex-wrap:wrap;';
+  //   [['#f4c400','You (yellow)'], ['#44cc44','Green player'], ['#9b59ff','Robot player']].forEach(function(pair) {
+  //     const item = document.createElement('div');
+  //     item.style.cssText = 'display:flex;align-items:center;gap:10px;padding:12px 16px;background:#1a1a1a;border-radius:8px;border:1px solid #2a2a2a;';
+  //     item.innerHTML = '<div style="width:22px;height:22px;border-radius:50%;background:' + pair[0] + ';box-shadow:0 0 8px ' + pair[0] + ';flex-shrink:0;"></div><div style="font-family:\'Space Mono\',monospace;font-size:12px;color:' + pair[0] + ';">' + pair[1] + '</div>';
+  //     wrap.appendChild(item);
+  //   });
+  //   demo.appendChild(wrap);
+  // }
+
   else if (stepIdx === 2) {
     // Three player colors
     const wrap = document.createElement('div');
     wrap.style.cssText = 'display:flex;gap:12px;flex-wrap:wrap;';
-    [['#f4c400','You (yellow)'], ['#44cc44','Green player'], ['#9b59ff','Robot player']].forEach(function(pair) {
+    [['#f4c400','You (yellow)'], ['#9b59ff','Robot player']].forEach(function(pair) {
       const item = document.createElement('div');
       item.style.cssText = 'display:flex;align-items:center;gap:10px;padding:12px 16px;background:#1a1a1a;border-radius:8px;border:1px solid #2a2a2a;';
       item.innerHTML = '<div style="width:22px;height:22px;border-radius:50%;background:' + pair[0] + ';box-shadow:0 0 8px ' + pair[0] + ';flex-shrink:0;"></div><div style="font-family:\'Space Mono\',monospace;font-size:12px;color:' + pair[0] + ';">' + pair[1] + '</div>';
@@ -592,10 +628,13 @@ function renderPlayerPanel() {
   ['pb1','pb2','pb3'].forEach((id, i) => {
     document.getElementById(id).classList.toggle('active', i === myColor);
   });
-  // Hide P3 slot only in pure 2-human mode (no AI)
-  if (NUM_PLAYERS === 2 && !AI_MODE) {
+  if (!AI_MODE && NUM_PLAYERS < 3) {
     const pb3 = document.getElementById('pb3');
     if (pb3) pb3.style.display = 'none';
+  }
+  if (AI_MODE && NUM_PLAYERS === 1) {
+    const pb2 = document.getElementById('pb2');
+    if (pb2) pb2.style.display = 'none';
   }
 }
 
