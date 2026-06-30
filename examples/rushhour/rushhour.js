@@ -33,7 +33,7 @@ const AI_PLAYER_NAME = 'Robot Player';
 const AI_COLOR       = 2;           // purple (index 2)
 // ─────────────────────────────────────────────────────────────────────────────
 
-const NUM_PLAYERS = AI_MODE ? 2 : 3;
+const NUM_PLAYERS = AI_MODE ? 1 : 3;
 
 
 const PHASE_LEASE_MS  = 6000;
@@ -91,7 +91,7 @@ const LEVELS = [
   },
 ];
 
-const studyId = typeof GameName !== 'undefined' ? GameName : 'rushhour_3_init';
+const studyId = typeof GameName !== 'undefined' ? GameName : 'rushhour_2_init';
 const sessionConfig = {
   minPlayersNeeded:              typeof MinPlayers !== 'undefined' ? MinPlayers : NUM_PLAYERS,
   maxPlayersNeeded:              typeof MaxPlayers !== 'undefined' ? MaxPlayers : NUM_PLAYERS,
@@ -168,7 +168,7 @@ const instructionSteps = [
     demo: 'board-interactive',
   },
   {
-    text: `You'll be playing with one other real person and one robot player.\n\nThe human player will appear as green 🟢, the robot player as purple 🟣. You will see their choices the second they click on any of the buttons — coordination is key!`,
+    text: `You'll be playing with one robot player.\n\nThe robot player as purple 🟣. You will see their choices the second they click on any of the buttons — coordination is key!`,
     demo: 'teammates',
   },
   {
@@ -375,24 +375,11 @@ function renderDemoInstructions(stepIdx) {
     demoPracticeTimer = setInterval(tickDemo, 1000);
   }
 
-  else if (stepIdx === 2) {
-    // Three player colors
-    const wrap = document.createElement('div');
-    wrap.style.cssText = 'display:flex;gap:12px;flex-wrap:wrap;';
-    [['#f4c400','You (yellow)'], ['#44cc44','Green player'], ['#9b59ff','Robot player']].forEach(function(pair) {
-      const item = document.createElement('div');
-      item.style.cssText = 'display:flex;align-items:center;gap:10px;padding:12px 16px;background:#1a1a1a;border-radius:8px;border:1px solid #2a2a2a;';
-      item.innerHTML = '<div style="width:22px;height:22px;border-radius:50%;background:' + pair[0] + ';box-shadow:0 0 8px ' + pair[0] + ';flex-shrink:0;"></div><div style="font-family:\'Space Mono\',monospace;font-size:12px;color:' + pair[0] + ';">' + pair[1] + '</div>';
-      wrap.appendChild(item);
-    });
-    demo.appendChild(wrap);
-  }
-
   // else if (stepIdx === 2) {
   //   // Three player colors
   //   const wrap = document.createElement('div');
   //   wrap.style.cssText = 'display:flex;gap:12px;flex-wrap:wrap;';
-  //   [['#f4c400','You (yellow)'], ['#9b59ff','Robot player']].forEach(function(pair) {
+  //   [['#f4c400','You (yellow)'], ['#44cc44','Green player'], ['#9b59ff','Robot player']].forEach(function(pair) {
   //     const item = document.createElement('div');
   //     item.style.cssText = 'display:flex;align-items:center;gap:10px;padding:12px 16px;background:#1a1a1a;border-radius:8px;border:1px solid #2a2a2a;';
   //     item.innerHTML = '<div style="width:22px;height:22px;border-radius:50%;background:' + pair[0] + ';box-shadow:0 0 8px ' + pair[0] + ';flex-shrink:0;"></div><div style="font-family:\'Space Mono\',monospace;font-size:12px;color:' + pair[0] + ';">' + pair[1] + '</div>';
@@ -400,6 +387,19 @@ function renderDemoInstructions(stepIdx) {
   //   });
   //   demo.appendChild(wrap);
   // }
+
+  else if (stepIdx === 2) {
+    // Three player colors
+    const wrap = document.createElement('div');
+    wrap.style.cssText = 'display:flex;gap:12px;flex-wrap:wrap;';
+    [['#f4c400','You (yellow)'], ['#9b59ff','Robot player']].forEach(function(pair) {
+      const item = document.createElement('div');
+      item.style.cssText = 'display:flex;align-items:center;gap:10px;padding:12px 16px;background:#1a1a1a;border-radius:8px;border:1px solid #2a2a2a;';
+      item.innerHTML = '<div style="width:22px;height:22px;border-radius:50%;background:' + pair[0] + ';box-shadow:0 0 8px ' + pair[0] + ';flex-shrink:0;"></div><div style="font-family:\'Space Mono\',monospace;font-size:12px;color:' + pair[0] + ';">' + pair[1] + '</div>';
+      wrap.appendChild(item);
+    });
+    demo.appendChild(wrap);
+  }
 
   else if (stepIdx === 3) {
     // Multi-vote demo
