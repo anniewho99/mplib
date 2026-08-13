@@ -15,7 +15,6 @@ import {
   getCurrentPlayerIds,
   getPlayerInfo,
   getNumberCurrentPlayers,
-  getCurrentPlayerArrivalIndex,
   getSessionId,
   getSessionError,
   getWaitRoomInfo
@@ -620,7 +619,7 @@ function assignColors() {
 }
 
 function writePlayerName() {
-  updateStateDirect(`players/${thisPlayerId}`, { name: playerName, arrivalColor: getCurrentPlayerArrivalIndex() - 1 }, 'register player');
+  updateStateDirect(`players/${thisPlayerId}`, { name: playerName }, 'register player');
 }
 
 function renderPlayerPanel() {
@@ -1326,7 +1325,7 @@ function registerAIPlayer() {
   if (!AI_MODE || _aiRegistered) return;
   _aiRegistered = true;
   updateStateDirect(`players/${AI_PLAYER_ID}`,
-    { name: AI_PLAYER_NAME, arrivalColor: AI_COLOR, isAI: true },
+    { name: AI_PLAYER_NAME, isAI: true },
     'register AI player');
   playerColorMap[AI_PLAYER_ID] = { name: AI_PLAYER_NAME, color: AI_COLOR };
   updatePlayerNameDisplay(AI_PLAYER_ID);
@@ -1469,17 +1468,13 @@ function receiveStateChange(pathNow, nodeName, newState, typeChange) {
     if (data && data.name) {
       if (!playerColorMap[pid]) playerColorMap[pid] = {};
       playerColorMap[pid].name = data.name;
-      if (typeof data.arrivalColor === 'number' && pid !== thisPlayerId) {
-        if (pid === AI_PLAYER_ID) {
-          playerColorMap[pid].color = AI_COLOR;
-        } else {
-          const myArrival = getCurrentPlayerArrivalIndex() - 1;
-          let c = data.arrivalColor;
-          if (c === myArrival) c = 0;
-          const nonSelf = [0, 1, 2].filter(x => x !== myArrival);
-          const relIdx = nonSelf.indexOf(c);
-          playerColorMap[pid].color = relIdx === 0 ? 1 : 2;
-        }
+      if (pid !== thisPlayerId) {
+        // This file only ever has "me" + at most one other human + the AI —
+        // never two other humans to distinguish between. So color assignment
+        // needs no arithmetic at all: self is always 0 (set in assignColors),
+        // the AI is always AI_COLOR, and the one other human (if present) is
+        // always color 1. No arrival-index math, no possibility of collision.
+        playerColorMap[pid].color = (pid === AI_PLAYER_ID) ? AI_COLOR : 1;
       }
       updatePlayerNameDisplay(pid);
     }
