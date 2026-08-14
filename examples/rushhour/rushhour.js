@@ -20,13 +20,15 @@ import {
   getWaitRoomInfo
 } from "/mplib/src/mplib.js";
 
+import { createStaticBayesianAgent } from "./ai_bayesian_static.js";
+
 const COLS = 6, ROWS = 6, CELL = 78, GAP = 4;
 const VOTING_DURATION = 5;
 const MAX_ROUNDS_PER_LEVEL = 100;
 const NUM_LEVELS = 4;
 
 // ── AI configuration ──────────────────────────────────────────────────────────
-const AI_MODE        = 'follower'; // 'initiator' | 'follower' | null
+const AI_MODE        = 'bayesian_static'; // 'initiator' | 'follower' | 'bayesian_static' | null
 const AI_PLAYER_ID   = '_ai_player';
 const AI_PLAYER_NAME = 'Robot Player';
 const AI_COLOR       = 2;           // purple (index 2)
@@ -34,6 +36,42 @@ const AI_COLOR       = 2;           // purple (index 2)
 
 const NUM_PLAYERS = AI_MODE ? 1 : 3;
 
+// ── Bayesian static agent state ─────────────────────────────────────────────
+// Kept entirely separate from the initiator/follower BFS-greedy AI below —
+// only used when AI_MODE === 'bayesian_static'.
+let bfsTable             = null;
+let staticPrior          = null;
+let bayesianAssetsReady  = null;   // Promise, resolves once both JSON files are loaded
+let bayesianAgent        = null;   // current per-level agent instance
+let bayesianAgentLevel   = -1;     // level the current agent instance was built for
+let _bayesianCastThisRound     = false;
+let _bayesianObservedThisRound = false;
+let bayesianEarlyTimeoutId = null; // ~500ms checkpoint: decide with zero human info
+let bayesianLateTimeoutId  = null; // ~4100ms safety-net checkpoint
+
+function loadBayesianAssets() {
+  if (bayesianAssetsReady) return bayesianAssetsReady;
+  bayesianAssetsReady = Promise.all([
+    fetch('./bfs_table.json').then(r => r.json()),
+    fetch('./empirical_prior_unnorm.json').then(r => r.json())
+  ]).then(([bfs, prior]) => {
+    bfsTable = bfs;
+    staticPrior = prior;
+    console.log('[bayesian] assets loaded');
+  }).catch(e => console.error('[bayesian] failed to load assets', e));
+  return bayesianAssetsReady;
+}
+
+if (AI_MODE === 'bayesian_static') {
+  // Kick off loading immediately so it's ready well before the first voting round.
+  loadBayesianAssets();
+}
+
+/** All human (non-AI) participant ids currently known to this client. */
+function getHumanPlayerIds() {
+  return Object.keys(playerColorMap).filter(pid => pid !== AI_PLAYER_ID);
+}
+// ─────────────────────────────────────────────────────────────────────────────
 
 const PHASE_LEASE_MS  = 6000;
 const PHASE_DRIFT_MS  = 1000;
@@ -90,7 +128,7 @@ const LEVELS = [
   },
 ];
 
-const studyId = typeof GameName !== 'undefined' ? GameName : 'rushhour_2_follow';
+const studyId = typeof GameName !== 'undefined' ? GameName : 'rushhour_static_test';
 const sessionConfig = {
   minPlayersNeeded:              typeof MinPlayers !== 'undefined' ? MinPlayers : NUM_PLAYERS,
   maxPlayersNeeded:              typeof MaxPlayers !== 'undefined' ? MaxPlayers : NUM_PLAYERS,
@@ -911,7 +949,11 @@ function renderPhase(p) {
       const key = `voting|${p.endTime}`;
       if (_lastAIScheduledKey !== key) {
         _lastAIScheduledKey = key;
-        scheduleAIVote();
+        if (AI_MODE === 'bayesian_static') {
+          scheduleBayesianVote();
+        } else {
+          scheduleAIVote();
+        }
       }
     }
   } else if (p.current === 'moving') {
@@ -1379,6 +1421,97 @@ function castAIVote() {
 }
 
 // ─────────────────────────────────────────
+//  Bayesian static agent
+// ─────────────────────────────────────────
+// Two-checkpoint design, mirroring the initiator (500ms) / follower (4100ms)
+// timing above, but adapted for the fact that a human can revise their vote
+// continuously within the 5s window (the agent's observeVote() expects ONE
+// discrete observation per player per round — calling it on every revision
+// would double-count evidence into the belief update). So:
+//   ~500ms  : decide() with zero human info — model can preempt on its own.
+//   on the human's FIRST vote this round, or ~4100ms as a safety net
+//             (whichever comes first): take exactly one snapshot of their
+//             vote, observeVote() once, then decide() with an empty
+//             remaining-players list — which per the agent's own contract
+//             forces a vote, so the AI never silently abstains.
+
+async function scheduleBayesianVote() {
+  if (!AI_MODE || !canIBeController(currentPhaseSnap)) return;
+  clearTimeout(bayesianEarlyTimeoutId);
+  clearTimeout(bayesianLateTimeoutId);
+  _bayesianCastThisRound     = false;
+  _bayesianObservedThisRound = false;
+
+  await loadBayesianAssets();
+  if (!bfsTable || !staticPrior) {
+    console.error('[bayesian] assets not available, skipping AI vote this round');
+    return;
+  }
+  // Re-check: the round may have already advanced while we were awaiting assets
+  // (only relevant on the very first round of a session).
+  if (!canIBeController(currentPhaseSnap)) return;
+
+  if (!bayesianAgent || bayesianAgentLevel !== currentLevel) {
+    bayesianAgent = createStaticBayesianAgent({ level: currentLevel, bfsTable, staticPrior });
+    bayesianAgentLevel = currentLevel;
+    console.log(`[bayesian] created new agent for level ${currentLevel}`);
+  }
+
+  const humanIds = getHumanPlayerIds();
+  const round = currentLevelSnap?.eventNumber || 0;
+  bayesianAgent.startRound({ ...blockPositions }, humanIds, round);
+
+  bayesianEarlyTimeoutId = setTimeout(() => {
+    if (_bayesianCastThisRound) return;
+    const { shouldVoteNow, vote } = bayesianAgent.decide([], humanIds);
+    console.log('[bayesian] early checkpoint', { shouldVoteNow, vote });
+    if (shouldVoteNow) castBayesianVote(vote);
+  }, 500);
+
+  bayesianLateTimeoutId = setTimeout(() => {
+    if (_bayesianCastThisRound) return;
+    console.log('[bayesian] late safety-net checkpoint firing');
+    finalizeBayesianVote(humanIds);
+  }, 4100);
+}
+
+/**
+ * Take one snapshot of the given human's current vote (or "no votes yet" if
+ * votedHuman is omitted), observe it exactly once, then force a decision.
+ * Called either by the late safety-net timeout, or the moment a human's
+ * first vote appears this round (see receiveStateChange's votes handler).
+ */
+function finalizeBayesianVote(humanIds, votedHuman) {
+  if (!bayesianAgent || _bayesianCastThisRound || _bayesianObservedThisRound) return;
+  _bayesianObservedThisRound = true;
+  clearTimeout(bayesianEarlyTimeoutId);
+  clearTimeout(bayesianLateTimeoutId);
+
+  let committed = [];
+  if (votedHuman) {
+    const v = currentRawVoteCache[votedHuman];
+    const voteObj = v ? { blockId: v.blockId, dir: v.dir } : null;
+    bayesianAgent.observeVote(votedHuman, voteObj, []);
+    if (voteObj) committed = [voteObj];
+  }
+  // remainingPlayerIds=[] forces the agent to return shouldVoteNow:true
+  const { shouldVoteNow, vote } = bayesianAgent.decide(committed, []);
+  console.log('[bayesian] finalize', { votedHuman, shouldVoteNow, vote });
+  if (shouldVoteNow) castBayesianVote(vote);
+}
+
+function castBayesianVote(vote) {
+  if (!vote || _bayesianCastThisRound) return;
+  _bayesianCastThisRound = true;
+  clearTimeout(bayesianEarlyTimeoutId);
+  clearTimeout(bayesianLateTimeoutId);
+  const eventNum = currentLevelSnap?.eventNumber || 0;
+  updateStateDirect(`votes/${eventNum}/${AI_PLAYER_ID}`,
+    { blockId: vote.blockId, dir: vote.dir, timestamp: Date.now(), level: currentLevel, isAI: true },
+    'AI vote (bayesian_static)');
+}
+
+// ─────────────────────────────────────────
 //  Controller loop
 // ─────────────────────────────────────────
 function startLeaseHeartbeat() {
@@ -1491,6 +1624,16 @@ function receiveStateChange(pathNow, nodeName, newState, typeChange) {
         if (v) currentRawVoteCache[pid] = v;
       });
       updateVoteDisplay(currentRawVoteCache);
+
+      // Bayesian static agent: trigger the observe+decide flow the moment a
+      // human's vote FIRST appears this round (see finalizeBayesianVote doc
+      // comment for why this fires once, not on every revision).
+      if (AI_MODE === 'bayesian_static' && bayesianAgent &&
+          !_bayesianCastThisRound && !_bayesianObservedThisRound) {
+        const humanIds = getHumanPlayerIds();
+        const votedHuman = humanIds.find(pid => currentRawVoteCache[pid]);
+        if (votedHuman) finalizeBayesianVote(humanIds, votedHuman);
+      }
     }
     return;
   }
