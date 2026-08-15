@@ -21,6 +21,7 @@ import {
 } from "/mplib/src/mplib.js";
 
 import { createStaticBayesianAgent } from "./ai_bayesian_static.js";
+import { createDynamicFZBayesianAgent } from "./ai_bayesian_dynamic_fz.js";
 
 const COLS = 6, ROWS = 6, CELL = 78, GAP = 4;
 const VOTING_DURATION = 5;
@@ -28,7 +29,7 @@ const MAX_ROUNDS_PER_LEVEL = 100;
 const NUM_LEVELS = 4;
 
 // ── AI configuration ──────────────────────────────────────────────────────────
-const AI_MODE        = 'bayesian_static'; // 'initiator' | 'follower' | 'bayesian_static' | null
+const AI_MODE        = 'bayesian_static'; // 'initiator' | 'follower' | 'bayesian_static' | 'bayesian_dynamic_fz' | null
 const AI_PLAYER_ID   = '_ai_player';
 const AI_PLAYER_NAME = 'Robot Player';
 const AI_COLOR       = 2;           // purple (index 2)
@@ -36,12 +37,18 @@ const AI_COLOR       = 2;           // purple (index 2)
 
 const NUM_PLAYERS = AI_MODE ? 1 : 3;
 
-// ── Bayesian static agent state ─────────────────────────────────────────────
+const IS_BAYESIAN_MODE = (AI_MODE === 'bayesian_static' || AI_MODE === 'bayesian_dynamic_fz');
+
+// ── Bayesian agent state (static or dynamic-FZ) ─────────────────────────────
 // Kept entirely separate from the initiator/follower BFS-greedy AI below —
-// only used when AI_MODE === 'bayesian_static'.
+// only used when AI_MODE is one of the two Bayesian modes. Both agents share
+// an identical method surface (startRound/observeVote/decide), so the same
+// scheduler functions below work unchanged for either — only asset loading
+// and which factory function gets called differ.
 let bfsTable             = null;
-let staticPrior          = null;
-let bayesianAssetsReady  = null;   // Promise, resolves once both JSON files are loaded
+let staticPrior          = null;   // used by 'bayesian_static'
+let dynamicPrior         = null;   // used by 'bayesian_dynamic_fz'
+let bayesianAssetsReady  = null;   // Promise, resolves once required JSON files are loaded
 let bayesianAgent        = null;   // current per-level agent instance
 let bayesianAgentLevel   = -1;     // level the current agent instance was built for
 let _bayesianCastThisRound     = false;
@@ -51,18 +58,28 @@ let bayesianLateTimeoutId  = null; // ~4100ms safety-net checkpoint
 
 function loadBayesianAssets() {
   if (bayesianAssetsReady) return bayesianAssetsReady;
+  const wantDynamic = (AI_MODE === 'bayesian_dynamic_fz');
+  const priorFile = wantDynamic ? './dynamic_prior.json' : './empirical_prior_unnorm.json';
   bayesianAssetsReady = Promise.all([
     fetch('./bfs_table.json').then(r => r.json()),
-    fetch('./empirical_prior_unnorm.json').then(r => r.json())
+    fetch(priorFile).then(r => r.json())
   ]).then(([bfs, prior]) => {
     bfsTable = bfs;
-    staticPrior = prior;
-    console.log('[bayesian] assets loaded');
+    if (wantDynamic) dynamicPrior = prior; else staticPrior = prior;
+    console.log('[bayesian] assets loaded', { mode: AI_MODE });
   }).catch(e => console.error('[bayesian] failed to load assets', e));
   return bayesianAssetsReady;
 }
 
-if (AI_MODE === 'bayesian_static') {
+/** Create the correct agent type for the current AI_MODE. Same call shape either way. */
+function createBayesianAgentForMode(level) {
+  if (AI_MODE === 'bayesian_dynamic_fz') {
+    return createDynamicFZBayesianAgent({ level, bfsTable, dynamicPrior });
+  }
+  return createStaticBayesianAgent({ level, bfsTable, staticPrior });
+}
+
+if (IS_BAYESIAN_MODE) {
   // Kick off loading immediately so it's ready well before the first voting round.
   loadBayesianAssets();
 }
@@ -128,7 +145,7 @@ const LEVELS = [
   },
 ];
 
-const studyId = typeof GameName !== 'undefined' ? GameName : 'rushhour_static_test';
+const studyId = typeof GameName !== 'undefined' ? GameName : 'rushhour_dyanmic_test_2';
 const sessionConfig = {
   minPlayersNeeded:              typeof MinPlayers !== 'undefined' ? MinPlayers : NUM_PLAYERS,
   maxPlayersNeeded:              typeof MaxPlayers !== 'undefined' ? MaxPlayers : NUM_PLAYERS,
@@ -949,7 +966,7 @@ function renderPhase(p) {
       const key = `voting|${p.endTime}`;
       if (_lastAIScheduledKey !== key) {
         _lastAIScheduledKey = key;
-        if (AI_MODE === 'bayesian_static') {
+        if (IS_BAYESIAN_MODE) {
           scheduleBayesianVote();
         } else {
           scheduleAIVote();
@@ -1443,7 +1460,8 @@ async function scheduleBayesianVote() {
   _bayesianObservedThisRound = false;
 
   await loadBayesianAssets();
-  if (!bfsTable || !staticPrior) {
+  const priorReady = (AI_MODE === 'bayesian_dynamic_fz') ? !!dynamicPrior : !!staticPrior;
+  if (!bfsTable || !priorReady) {
     console.error('[bayesian] assets not available, skipping AI vote this round');
     return;
   }
@@ -1452,9 +1470,9 @@ async function scheduleBayesianVote() {
   if (!canIBeController(currentPhaseSnap)) return;
 
   if (!bayesianAgent || bayesianAgentLevel !== currentLevel) {
-    bayesianAgent = createStaticBayesianAgent({ level: currentLevel, bfsTable, staticPrior });
+    bayesianAgent = createBayesianAgentForMode(currentLevel);
     bayesianAgentLevel = currentLevel;
-    console.log(`[bayesian] created new agent for level ${currentLevel}`);
+    console.log(`[bayesian] created new agent for level ${currentLevel}`, { mode: AI_MODE });
   }
 
   const humanIds = getHumanPlayerIds();
@@ -1508,7 +1526,7 @@ function castBayesianVote(vote) {
   const eventNum = currentLevelSnap?.eventNumber || 0;
   updateStateDirect(`votes/${eventNum}/${AI_PLAYER_ID}`,
     { blockId: vote.blockId, dir: vote.dir, timestamp: Date.now(), level: currentLevel, isAI: true },
-    'AI vote (bayesian_static)');
+    `AI vote (${AI_MODE})`);
 }
 
 // ─────────────────────────────────────────
@@ -1625,10 +1643,11 @@ function receiveStateChange(pathNow, nodeName, newState, typeChange) {
       });
       updateVoteDisplay(currentRawVoteCache);
 
-      // Bayesian static agent: trigger the observe+decide flow the moment a
-      // human's vote FIRST appears this round (see finalizeBayesianVote doc
-      // comment for why this fires once, not on every revision).
-      if (AI_MODE === 'bayesian_static' && bayesianAgent &&
+      // Bayesian agent (static or dynamic-FZ): trigger the observe+decide flow
+      // the moment a human's vote FIRST appears this round (see
+      // finalizeBayesianVote doc comment for why this fires once, not on
+      // every revision).
+      if (IS_BAYESIAN_MODE && bayesianAgent &&
           !_bayesianCastThisRound && !_bayesianObservedThisRound) {
         const humanIds = getHumanPlayerIds();
         const votedHuman = humanIds.find(pid => currentRawVoteCache[pid]);
