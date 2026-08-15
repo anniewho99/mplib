@@ -29,7 +29,7 @@ const MAX_ROUNDS_PER_LEVEL = 100;
 const NUM_LEVELS = 4;
 
 // ── AI configuration ──────────────────────────────────────────────────────────
-const AI_MODE        = 'bayesian_static'; // 'initiator' | 'follower' | 'bayesian_static' | 'bayesian_dynamic_fz' | null
+const AI_MODE        = 'bayesian_dynamic_fz'; // 'initiator' | 'follower' | 'bayesian_static' | 'bayesian_dynamic_fz' | null
 const AI_PLAYER_ID   = '_ai_player';
 const AI_PLAYER_NAME = 'Robot Player';
 const AI_COLOR       = 2;           // purple (index 2)
