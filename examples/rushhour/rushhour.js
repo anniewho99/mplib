@@ -35,7 +35,7 @@ const AI_PLAYER_NAME = 'Robot Player';
 const AI_COLOR       = 2;           // purple (index 2)
 // ─────────────────────────────────────────────────────────────────────────────
 
-const NUM_PLAYERS = AI_MODE ? 2 : 3;
+const NUM_PLAYERS = AI_MODE ? 1 : 3;
 
 const IS_BAYESIAN_MODE = (AI_MODE === 'bayesian_static' || AI_MODE === 'bayesian_dynamic_fz');
 
@@ -54,6 +54,7 @@ let bayesianAgentLevel   = -1;     // level the current agent instance was built
 let _bayesianCastThisRound     = false;
 let _bayesianObservedPids      = new Set();   // human ids already observed this round
 let _bayesianCommittedVotes    = [];          // vote objects observed so far this round
+let _bayesianDecideSeq         = 0;           // per-round counter for debug-log entries
 let bayesianEarlyTimeoutId = null; // ~500ms checkpoint: decide with zero human info
 let bayesianLateTimeoutId  = null; // ~4100ms safety-net checkpoint
 
@@ -146,7 +147,7 @@ const LEVELS = [
   },
 ];
 
-const studyId = typeof GameName !== 'undefined' ? GameName : 'rushhour_dyanmic_test_3';
+const studyId = typeof GameName !== 'undefined' ? GameName : 'rushhour_dyanmic_fullinfo_2';
 const sessionConfig = {
   minPlayersNeeded:              typeof MinPlayers !== 'undefined' ? MinPlayers : NUM_PLAYERS,
   maxPlayersNeeded:              typeof MaxPlayers !== 'undefined' ? MaxPlayers : NUM_PLAYERS,
@@ -1439,7 +1440,7 @@ function castAIVote() {
 }
 
 // ─────────────────────────────────────────
-//  Bayesian static agent
+//  Bayesian agent scheduler (shared: static + dynamic-FZ)
 // ─────────────────────────────────────────
 // Two-checkpoint design, mirroring the initiator (500ms) / follower (4100ms)
 // timing above, but adapted for the fact that (a) a human can revise their
@@ -1459,6 +1460,12 @@ function castAIVote() {
 //             above (shouldn't normally happen), then force a decision with
 //             an empty remaining-players list — which per the agent's own
 //             contract forces a vote, so the AI never silently abstains.
+//
+// Every decide() call that produces something new (early checkpoint, a
+// newly-observed human, or the safety net) gets logged to
+// aiDebug/{eventNum}/{seq} — belief state per human, per-candidate EVs, the
+// chosen vote's τ/σ, and the board state — for offline analysis without
+// needing to recompute any of it from raw vote/phase timestamps.
 
 async function scheduleBayesianVote() {
   if (!AI_MODE || !canIBeController(currentPhaseSnap)) return;
@@ -1467,6 +1474,7 @@ async function scheduleBayesianVote() {
   _bayesianCastThisRound   = false;
   _bayesianObservedPids    = new Set();
   _bayesianCommittedVotes  = [];
+  _bayesianDecideSeq       = 0;
 
   await loadBayesianAssets();
   const priorReady = (AI_MODE === 'bayesian_dynamic_fz') ? !!dynamicPrior : !!staticPrior;
@@ -1490,9 +1498,10 @@ async function scheduleBayesianVote() {
 
   bayesianEarlyTimeoutId = setTimeout(() => {
     if (_bayesianCastThisRound) return;
-    const { shouldVoteNow, vote } = bayesianAgent.decide([], humanIds);
-    console.log('[bayesian] early checkpoint', { shouldVoteNow, vote });
-    if (shouldVoteNow) castBayesianVote(vote);
+    const result = bayesianAgent.decide([], humanIds);
+    console.log('[bayesian] early checkpoint', result);
+    _logBayesianDecision('early', result, { remainingIds: humanIds, committedVotes: [] });
+    if (result.shouldVoteNow) castBayesianVote(result.vote);
   }, 500);
 
   bayesianLateTimeoutId = setTimeout(() => {
@@ -1500,6 +1509,47 @@ async function scheduleBayesianVote() {
     console.log('[bayesian] late safety-net checkpoint firing');
     finalizeBayesianRound({ force: true });
   }, 4100);
+}
+
+/** Snapshot every tracked human's belief state (λ/α distributions + current zone). */
+function _bayesianBeliefSnapshot() {
+  const snap = {};
+  if (bayesianAgent && bayesianAgent._beliefs) {
+    for (const [pid, belief] of bayesianAgent._beliefs.entries()) {
+      snap[pid] = {
+        lambdaBelief: [...belief._lambdaBelief],
+        alphaBelief:  [...belief._alphaBelief],
+        zone:         belief._currentZone,
+      };
+    }
+  }
+  return snap;
+}
+
+/** Write one decide()-call's full context to Firebase for offline analysis. */
+function _logBayesianDecision(trigger, result, extra) {
+  const eventNum = currentLevelSnap?.eventNumber || 0;
+  const seq = _bayesianDecideSeq++;
+  // Firebase throws on `undefined` values. ai_bayesian_static.js's decide()
+  // doesn't (yet) return vNow/vWait/candidateEVs/chosenFeatures the way the
+  // dynamic-fz agent's does, so default anything missing to null rather than
+  // letting a mode switch to 'bayesian_static' crash this logging call.
+  const payload = {
+    trigger,
+    t: Date.now(),
+    level: currentLevel,
+    shouldVoteNow: result.shouldVoteNow ?? null,
+    vote: result.vote ?? null,
+    vNow: result.vNow ?? null,
+    vWait: result.vWait ?? null,
+    choiceSetSize: result.choiceSetSize ?? null,
+    candidateEVs: result.candidateEVs ?? null,
+    chosenFeatures: result.chosenFeatures ?? null,
+    boardState: { ...blockPositions },
+    beliefs: _bayesianBeliefSnapshot(),
+    ...extra,
+  };
+  updateStateDirect(`aiDebug/${eventNum}/${seq}`, payload, `AI debug (${trigger})`);
 }
 
 /**
@@ -1526,6 +1576,7 @@ function finalizeBayesianRound({ force = false } = {}) {
   // Observe any human whose vote has appeared but hasn't been fed to the
   // belief model yet. A human who simply hasn't voted yet is left alone
   // here (not treated as a "no vote" observation) — same as before.
+  const newlyObserved = [];
   humanIds.forEach(pid => {
     if (_bayesianObservedPids.has(pid)) return;
     const v = currentRawVoteCache[pid];
@@ -1534,20 +1585,26 @@ function finalizeBayesianRound({ force = false } = {}) {
     const voteObj = { blockId: v.blockId, dir: v.dir };
     bayesianAgent.observeVote(pid, voteObj, []);
     _bayesianCommittedVotes.push(voteObj);
+    newlyObserved.push(pid);
   });
+
+  // Nothing new since the last call, and not forced — skip recomputing and
+  // logging an identical decision (e.g. a revision by an already-observed
+  // human, or a deselect leaving nobody new to observe).
+  if (!force && newlyObserved.length === 0) return;
 
   const remainingIds = force
     ? []
     : humanIds.filter(pid => !_bayesianObservedPids.has(pid));
 
-  const { shouldVoteNow, vote } = bayesianAgent.decide(_bayesianCommittedVotes, remainingIds);
-  console.log('[bayesian] finalize', {
-    observed: [..._bayesianObservedPids],
+  const result = bayesianAgent.decide(_bayesianCommittedVotes, remainingIds);
+  console.log('[bayesian] finalize', { newlyObserved, remainingIds, ...result });
+  _logBayesianDecision(force ? 'safetyNet' : 'voteObserved', result, {
+    newlyObserved,
     remainingIds,
-    shouldVoteNow,
-    vote,
+    committedVotes: [..._bayesianCommittedVotes],
   });
-  if (shouldVoteNow) castBayesianVote(vote);
+  if (result.shouldVoteNow) castBayesianVote(result.vote);
 }
 
 function castBayesianVote(vote) {
