@@ -52,7 +52,8 @@ let bayesianAssetsReady  = null;   // Promise, resolves once required JSON files
 let bayesianAgent        = null;   // current per-level agent instance
 let bayesianAgentLevel   = -1;     // level the current agent instance was built for
 let _bayesianCastThisRound     = false;
-let _bayesianObservedThisRound = false;
+let _bayesianObservedPids      = new Set();   // human ids already observed this round
+let _bayesianCommittedVotes    = [];          // vote objects observed so far this round
 let bayesianEarlyTimeoutId = null; // ~500ms checkpoint: decide with zero human info
 let bayesianLateTimeoutId  = null; // ~4100ms safety-net checkpoint
 
@@ -1441,23 +1442,31 @@ function castAIVote() {
 //  Bayesian static agent
 // ─────────────────────────────────────────
 // Two-checkpoint design, mirroring the initiator (500ms) / follower (4100ms)
-// timing above, but adapted for the fact that a human can revise their vote
-// continuously within the 5s window (the agent's observeVote() expects ONE
-// discrete observation per player per round — calling it on every revision
-// would double-count evidence into the belief update). So:
+// timing above, but adapted for the fact that (a) a human can revise their
+// vote continuously within the 5s window (the agent's observeVote() expects
+// ONE discrete observation per player per round — calling it on every
+// revision would double-count evidence into the belief update), and (b)
+// there can be more than one human, so "a vote appeared" isn't the same as
+// "nobody's left to wait for". So:
 //   ~500ms  : decide() with zero human info — model can preempt on its own.
-//   on the human's FIRST vote this round, or ~4100ms as a safety net
-//             (whichever comes first): take exactly one snapshot of their
-//             vote, observeVote() once, then decide() with an empty
-//             remaining-players list — which per the agent's own contract
-//             forces a vote, so the AI never silently abstains.
+//   on each human's FIRST vote this round (independently — a second human
+//             voting is observed too, not ignored just because someone else
+//             already went): take exactly one snapshot of their vote,
+//             observeVote() once, then decide() with whichever humans
+//             haven't voted yet as the remaining-players list — so the
+//             agent can genuinely choose to keep waiting on a second human.
+//   ~4100ms as a safety net: observe anyone who voted but wasn't caught
+//             above (shouldn't normally happen), then force a decision with
+//             an empty remaining-players list — which per the agent's own
+//             contract forces a vote, so the AI never silently abstains.
 
 async function scheduleBayesianVote() {
   if (!AI_MODE || !canIBeController(currentPhaseSnap)) return;
   clearTimeout(bayesianEarlyTimeoutId);
   clearTimeout(bayesianLateTimeoutId);
-  _bayesianCastThisRound     = false;
-  _bayesianObservedThisRound = false;
+  _bayesianCastThisRound   = false;
+  _bayesianObservedPids    = new Set();
+  _bayesianCommittedVotes  = [];
 
   await loadBayesianAssets();
   const priorReady = (AI_MODE === 'bayesian_dynamic_fz') ? !!dynamicPrior : !!staticPrior;
@@ -1489,32 +1498,55 @@ async function scheduleBayesianVote() {
   bayesianLateTimeoutId = setTimeout(() => {
     if (_bayesianCastThisRound) return;
     console.log('[bayesian] late safety-net checkpoint firing');
-    finalizeBayesianVote(humanIds);
+    finalizeBayesianRound({ force: true });
   }, 4100);
 }
 
 /**
- * Take one snapshot of the given human's current vote (or "no votes yet" if
- * votedHuman is omitted), observe it exactly once, then force a decision.
- * Called either by the late safety-net timeout, or the moment a human's
- * first vote appears this round (see receiveStateChange's votes handler).
+ * Observe any human vote(s) that have appeared since the last call and
+ * haven't yet been fed to the belief model — each human is observed exactly
+ * once per round, no matter how many times they revise — then decide
+ * whether the AI should vote now given whoever (if anyone) is still
+ * outstanding.
+ *
+ * Called either the moment any human's vote first appears this round (see
+ * receiveStateChange's votes handler — safe to call on every revision,
+ * since already-observed humans are skipped), or by the late safety-net
+ * timeout with force=true.
+ *
+ * force=true collapses remainingPlayerIds to [] regardless of who's still
+ * unobserved, so the agent is forced to commit — per its own contract, an
+ * empty remaining list always returns shouldVoteNow:true.
  */
-function finalizeBayesianVote(humanIds, votedHuman) {
-  if (!bayesianAgent || _bayesianCastThisRound || _bayesianObservedThisRound) return;
-  _bayesianObservedThisRound = true;
-  clearTimeout(bayesianEarlyTimeoutId);
-  clearTimeout(bayesianLateTimeoutId);
+function finalizeBayesianRound({ force = false } = {}) {
+  if (!bayesianAgent || _bayesianCastThisRound) return;
 
-  let committed = [];
-  if (votedHuman) {
-    const v = currentRawVoteCache[votedHuman];
-    const voteObj = v ? { blockId: v.blockId, dir: v.dir } : null;
-    bayesianAgent.observeVote(votedHuman, voteObj, []);
-    if (voteObj) committed = [voteObj];
-  }
-  // remainingPlayerIds=[] forces the agent to return shouldVoteNow:true
-  const { shouldVoteNow, vote } = bayesianAgent.decide(committed, []);
-  console.log('[bayesian] finalize', { votedHuman, shouldVoteNow, vote });
+  const humanIds = getHumanPlayerIds();
+
+  // Observe any human whose vote has appeared but hasn't been fed to the
+  // belief model yet. A human who simply hasn't voted yet is left alone
+  // here (not treated as a "no vote" observation) — same as before.
+  humanIds.forEach(pid => {
+    if (_bayesianObservedPids.has(pid)) return;
+    const v = currentRawVoteCache[pid];
+    if (!v) return;
+    _bayesianObservedPids.add(pid);
+    const voteObj = { blockId: v.blockId, dir: v.dir };
+    bayesianAgent.observeVote(pid, voteObj, []);
+    _bayesianCommittedVotes.push(voteObj);
+  });
+
+  const remainingIds = force
+    ? []
+    : humanIds.filter(pid => !_bayesianObservedPids.has(pid));
+
+  const { shouldVoteNow, vote } = bayesianAgent.decide(_bayesianCommittedVotes, remainingIds);
+  console.log('[bayesian] finalize', {
+    observed: [..._bayesianObservedPids],
+    remainingIds,
+    shouldVoteNow,
+    vote,
+  });
   if (shouldVoteNow) castBayesianVote(vote);
 }
 
@@ -1643,15 +1675,13 @@ function receiveStateChange(pathNow, nodeName, newState, typeChange) {
       });
       updateVoteDisplay(currentRawVoteCache);
 
-      // Bayesian agent (static or dynamic-FZ): trigger the observe+decide flow
-      // the moment a human's vote FIRST appears this round (see
-      // finalizeBayesianVote doc comment for why this fires once, not on
-      // every revision).
-      if (IS_BAYESIAN_MODE && bayesianAgent &&
-          !_bayesianCastThisRound && !_bayesianObservedThisRound) {
-        const humanIds = getHumanPlayerIds();
-        const votedHuman = humanIds.find(pid => currentRawVoteCache[pid]);
-        if (votedHuman) finalizeBayesianVote(humanIds, votedHuman);
+      // Bayesian agent (static or dynamic-FZ): re-run the observe+decide flow
+      // on every votes change. Safe to call unconditionally — each human is
+      // only ever observed once per round (see finalizeBayesianRound), so a
+      // revision by an already-observed human, or a deselect (no active
+      // vote in the cache), is a harmless no-op here.
+      if (IS_BAYESIAN_MODE && bayesianAgent && !_bayesianCastThisRound) {
+        finalizeBayesianRound();
       }
     }
     return;
