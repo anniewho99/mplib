@@ -796,7 +796,7 @@ class DynamicFZBayesianAgent {
     }
     vWait /= remainingIds.length;
 
-    const val = Math.min(vNow, vWait);
+    const val = (vNow <= vWait + EV_TIE_EPSILON) ? vNow : vWait;
     this._ebfsCache.set(key, val);
     return val;
   }
@@ -830,7 +830,7 @@ class DynamicFZBayesianAgent {
     }
     vWait /= remainingIds.length;
 
-    return vNow <= vWait;
+    return vNow <= vWait + EV_TIE_EPSILON;
   }
 
   _selectVote(candidates, remainingIds, committed) {
