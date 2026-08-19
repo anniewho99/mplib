@@ -35,7 +35,7 @@ const AI_PLAYER_NAME = 'Robot Player';
 const AI_COLOR       = 2;           // purple (index 2)
 // ─────────────────────────────────────────────────────────────────────────────
 
-const NUM_PLAYERS = AI_MODE ? 2 : 3;
+const NUM_PLAYERS = AI_MODE ? 1 : 3;
 
 const IS_BAYESIAN_MODE = (AI_MODE === 'bayesian_static' || AI_MODE === 'bayesian_dynamic_fz');
 
@@ -55,6 +55,8 @@ let _bayesianCastThisRound     = false;
 let _bayesianObservedPids      = new Set();   // human ids already observed this round
 let _bayesianCommittedVotes    = [];          // chronological: humans' votes AND the AI's own vote, in the order they actually happened this round
 let _bayesianDecideSeq         = 0;           // per-round counter for debug-log entries
+let _bayesianLastObservedVote  = new Map();   // pid -> last voteObj fed to observeVote/correctVote this round
+let _bayesianLastObservedPrior = new Map();   // pid -> _bayesianCommittedVotes snapshot at the time of that observe
 let bayesianEarlyTimeoutId = null; // ~500ms checkpoint: decide with zero human info
 let bayesianLateTimeoutId  = null; // ~4100ms safety-net checkpoint
 
@@ -147,7 +149,7 @@ const LEVELS = [
   },
 ];
 
-const studyId = typeof GameName !== 'undefined' ? GameName : 'rushhour_dyanmic_3_0817';
+const studyId = typeof GameName !== 'undefined' ? GameName : 'rushhour_dyanmic_2_0818';
 const sessionConfig = {
   minPlayersNeeded:              typeof MinPlayers !== 'undefined' ? MinPlayers : NUM_PLAYERS,
   maxPlayersNeeded:              typeof MaxPlayers !== 'undefined' ? MaxPlayers : NUM_PLAYERS,
@@ -1444,36 +1446,48 @@ function castAIVote() {
 // ─────────────────────────────────────────
 // Two-checkpoint design, mirroring the initiator (500ms) / follower (4100ms)
 // timing above, but adapted for the fact that (a) a human can revise their
-// vote continuously within the 5s window (the agent's observeVote() expects
-// ONE discrete observation per player per round — calling it on every
-// revision would double-count evidence into the belief update), (b) there
-// can be more than one human, so "a vote appeared" isn't the same as
-// "nobody's left to wait for", and (c) the AI's OWN vote is itself valid
-// prior context for judging a human who votes after it (social conformity
-// only means something if the human's vote is compared against whatever
-// was already on the table when they voted — including the AI's).
+// vote within the 5s window, and a revision is real evidence worth
+// incorporating — not double-counted as a second independent vote (that
+// would overweight anyone who changes their mind) and not silently ignored
+// either (that would throw away exactly the signal a revision carries) —
+// handled via correctVote(), which undoes the old observation's effect on
+// belief and applies the new one, (b) there can be more than one human, so
+// "a vote appeared" isn't the same as "nobody's left to wait for", and (c)
+// the AI's OWN vote is itself valid prior context for judging a human who
+// votes after it (social conformity only means something if the human's
+// vote is compared against whatever was already on the table when they
+// voted — including the AI's).
 //
 // _bayesianCommittedVotes tracks every vote (human or AI) in the actual
-// chronological order it happened this round, and is what gets passed as
-// prior_votes when observing whoever votes next — so:
+// chronological order it happened this round, each tagged with its pid so a
+// revision can find and update its own slot by identity — not by matching
+// blockId/dir content, which could target the wrong slot if two different
+// people (or the AI) happen to cast the same vote. Pid tags are stripped
+// (via _stripPid) before anything gets passed to the agent, whose API is
+// intentionally content-only. So:
 //   ~500ms  : decide() with zero human info — model can preempt on its own.
-//   on each human's FIRST vote this round (independently — a second human
-//             voting is observed too, and sees the first human's vote AND
-//             the AI's vote, if either already happened, as prior context):
-//             take exactly one snapshot of their vote, observeVote() once
-//             with the real prior-votes list, then decide() with whichever
-//             humans haven't voted yet as the remaining-players list.
+//             Re-reads the live player list first (Firebase's onChildAdded
+//             may not have fired for all humans yet when scheduleBayesianVote
+//             ran, so the humanIds captured then could be short a player);
+//             if still short, retries once 100ms later before deciding.
+//   on each human's FIRST vote this round: observeVote() once with the
+//             real prior-votes list, then decide() with whichever humans
+//             haven't voted yet as the remaining-players list. A SUBSEQUENT
+//             revision by that same human this round calls correctVote()
+//             instead, and updates their entry in _bayesianCommittedVotes
+//             in place.
 //   ~4100ms as a safety net: observe anyone who voted but wasn't caught
 //             above, then force a decision with an empty remaining-players
 //             list — which per the agent's own contract forces a vote.
 //
 // Once the AI casts, its own vote is pushed into _bayesianCommittedVotes so
 // any human who votes AFTER that point still gets observed WITH the AI's
-// vote as context — observation keeps running post-cast purely for belief
-// accuracy, even though that round's move is already locked in.
+// vote as context — observation (including revisions) keeps running
+// post-cast purely for belief accuracy, even though that round's move is
+// already locked in.
 //
 // Every decide() call that produces something new (early checkpoint, a
-// newly-observed human, or the safety net) gets logged to
+// newly-observed or revised human, or the safety net) gets logged to
 // aiDebug/{eventNum}/{seq} — belief state per human, per-candidate EVs, the
 // chosen vote's τ/σ, and the board state — for offline analysis without
 // needing to recompute any of it from raw vote/phase timestamps.
@@ -1482,10 +1496,12 @@ async function scheduleBayesianVote() {
   if (!AI_MODE || !canIBeController(currentPhaseSnap)) return;
   clearTimeout(bayesianEarlyTimeoutId);
   clearTimeout(bayesianLateTimeoutId);
-  _bayesianCastThisRound   = false;
-  _bayesianObservedPids    = new Set();
-  _bayesianCommittedVotes  = [];
-  _bayesianDecideSeq       = 0;
+  _bayesianCastThisRound     = false;
+  _bayesianObservedPids      = new Set();
+  _bayesianCommittedVotes    = [];
+  _bayesianDecideSeq         = 0;
+  _bayesianLastObservedVote  = new Map();
+  _bayesianLastObservedPrior = new Map();
 
   await loadBayesianAssets();
   const priorReady = (AI_MODE === 'bayesian_dynamic_fz') ? !!dynamicPrior : !!staticPrior;
@@ -1505,13 +1521,38 @@ async function scheduleBayesianVote() {
 
   const humanIds = getHumanPlayerIds();
   const round = currentLevelSnap?.eventNumber || 0;
+  // Best-effort immediate startRound() so the agent (_choiceSet, board state,
+  // zoned beliefs) is ready even if a human votes before the 500ms checkpoint
+  // below gets a chance to re-check for late-registering players. The
+  // checkpoint re-calls startRound with a corrected list if needed — that's
+  // a second, cheap call (re-zones existing beliefs, creates any new ones),
+  // not a problem to do twice.
   bayesianAgent.startRound({ ...blockPositions }, humanIds, round);
 
   bayesianEarlyTimeoutId = setTimeout(() => {
     if (_bayesianCastThisRound) return;
-    const result = bayesianAgent.decide([], humanIds);
+    // Re-read player list live — Firebase onChildAdded may not have fired
+    // for all humans yet when scheduleBayesianVote ran, so the humanIds
+    // captured at that point could be missing someone who's actually
+    // already in the session by the time this checkpoint fires.
+    const liveHumanIds = getHumanPlayerIds();
+    if (liveHumanIds.length < NUM_PLAYERS - 1) {
+      // Not all players registered yet; retry in 100ms.
+      bayesianEarlyTimeoutId = setTimeout(() => {
+        if (_bayesianCastThisRound) return;
+        const freshIds = getHumanPlayerIds();
+        bayesianAgent.startRound({ ...blockPositions }, freshIds, round);
+        const result = bayesianAgent.decide([], freshIds);
+        console.log('[bayesian] early checkpoint (retry)', result);
+        _logBayesianDecision('early', result, { remainingIds: freshIds, committedVotes: [] });
+        if (result.shouldVoteNow) castBayesianVote(result.vote);
+      }, 100);
+      return;
+    }
+    bayesianAgent.startRound({ ...blockPositions }, liveHumanIds, round);
+    const result = bayesianAgent.decide([], liveHumanIds);
     console.log('[bayesian] early checkpoint', result);
-    _logBayesianDecision('early', result, { remainingIds: humanIds, committedVotes: [] });
+    _logBayesianDecision('early', result, { remainingIds: liveHumanIds, committedVotes: [] });
     if (result.shouldVoteNow) castBayesianVote(result.vote);
   }, 500);
 
@@ -1564,17 +1605,19 @@ function _logBayesianDecision(trigger, result, extra) {
 }
 
 /**
- * Observe any human vote(s) that have appeared since the last call and
- * haven't yet been fed to the belief model — each human is observed exactly
- * once per round, no matter how many times they revise — using the REAL
- * chronological prior-votes context (anyone, human or AI, already committed
- * this round), then decide whether the AI should vote now given whoever (if
- * anyone) is still outstanding.
+ * Observe any human vote(s) that have appeared since the last call — first
+ * observation uses observeVote(), a later revision within the same round
+ * uses correctVote() to undo the old observation's effect on belief and
+ * apply the new one (rather than double-counting it as independent evidence
+ * or silently ignoring the change) — using the REAL chronological
+ * prior-votes context (anyone, human or AI, already committed this round),
+ * then decide whether the AI should vote now given whoever (if anyone) is
+ * still outstanding.
  *
- * Called either the moment any human's vote first appears this round (see
- * receiveStateChange's votes handler — safe to call on every revision,
- * since already-observed humans are skipped), or by the late safety-net
- * timeout with force=true.
+ * Called either the moment any human's vote first appears or changes this
+ * round (see receiveStateChange's votes handler — safe to call on every
+ * revision, since a revision that doesn't actually change blockId/dir is a
+ * no-op here), or by the late safety-net timeout with force=true.
  *
  * Keeps running (observation only) even after the AI has already cast this
  * round — a late-voting human's evidence still updates belief for future
@@ -1584,25 +1627,60 @@ function _logBayesianDecision(trigger, result, extra) {
  * unobserved, so the agent is forced to commit — per its own contract, an
  * empty remaining list always returns shouldVoteNow:true.
  */
+/** Strip internal pid tags before handing votes to the agent — its API is
+ * intentionally content-only (σ/conformity cares whether the same option
+ * was chosen, not who chose it), so it always expects plain {blockId,dir}. */
+function _stripPid(entries) {
+  return entries.map(({ blockId, dir }) => ({ blockId, dir }));
+}
+
 function finalizeBayesianRound({ force = false } = {}) {
   if (!bayesianAgent) return;
 
   const humanIds = getHumanPlayerIds();
 
   // Observe any human whose vote has appeared but hasn't been fed to the
-  // belief model yet. A human who simply hasn't voted yet is left alone
-  // here (not treated as a "no vote" observation). Prior-votes context is
-  // whatever's actually accumulated in _bayesianCommittedVotes so far this
-  // round — other humans' votes AND the AI's own vote, in real order.
+  // belief model yet, AND handle revisions from humans already observed
+  // this round (correctVote undoes the old observation's effect on belief
+  // and applies the new one, rather than either double-counting it as a
+  // second independent vote or silently ignoring the change). Prior-votes
+  // context is whatever's actually accumulated in _bayesianCommittedVotes
+  // so far this round — other humans' votes AND the AI's own vote, in real
+  // order. Each entry carries its own pid so a revision's in-place update
+  // finds the RIGHT slot by identity, not by matching blockId/dir content
+  // — two different people (or the AI) can legitimately cast the same
+  // vote, and content-matching would risk overwriting the wrong one's slot.
   const newlyObserved = [];
   humanIds.forEach(pid => {
-    if (_bayesianObservedPids.has(pid)) return;
     const v = currentRawVoteCache[pid];
     if (!v) return;
-    _bayesianObservedPids.add(pid);
     const voteObj = { blockId: v.blockId, dir: v.dir };
-    bayesianAgent.observeVote(pid, voteObj, [..._bayesianCommittedVotes]);
-    _bayesianCommittedVotes.push(voteObj);
+
+    if (_bayesianObservedPids.has(pid)) {
+      // Already observed this round — check if they changed their vote.
+      const lastVote = _bayesianLastObservedVote.get(pid);
+      if (lastVote && (lastVote.blockId !== voteObj.blockId || lastVote.dir !== voteObj.dir)) {
+        const originalPrior = _bayesianLastObservedPrior.get(pid);
+        bayesianAgent.correctVote(pid, lastVote, voteObj, originalPrior, _stripPid(_bayesianCommittedVotes));
+        // Update this pid's own slot in place, by identity, so future
+        // observers see the revised vote as prior context, not the old one.
+        const slotIdx = _bayesianCommittedVotes.findIndex(cv => cv.pid === pid);
+        if (slotIdx !== -1) {
+          _bayesianCommittedVotes[slotIdx] = { pid, blockId: voteObj.blockId, dir: voteObj.dir };
+        }
+        _bayesianLastObservedVote.set(pid, voteObj);
+        newlyObserved.push(pid);
+      }
+      return;
+    }
+
+    // First time seeing this player vote this round.
+    _bayesianObservedPids.add(pid);
+    const priorSnapshot = _stripPid(_bayesianCommittedVotes);
+    bayesianAgent.observeVote(pid, voteObj, priorSnapshot);
+    _bayesianCommittedVotes.push({ pid, blockId: voteObj.blockId, dir: voteObj.dir });
+    _bayesianLastObservedVote.set(pid, voteObj);
+    _bayesianLastObservedPrior.set(pid, priorSnapshot);
     newlyObserved.push(pid);
   });
 
@@ -1614,7 +1692,7 @@ function finalizeBayesianRound({ force = false } = {}) {
       _logBayesianDecision('lateObserve', { shouldVoteNow: null, vote: null }, {
         newlyObserved,
         remainingIds: humanIds.filter(pid => !_bayesianObservedPids.has(pid)),
-        committedVotes: [..._bayesianCommittedVotes],
+        committedVotes: [..._bayesianCommittedVotes], // pid-tagged, for debug readability
       });
     }
     return;
@@ -1629,12 +1707,12 @@ function finalizeBayesianRound({ force = false } = {}) {
     ? []
     : humanIds.filter(pid => !_bayesianObservedPids.has(pid));
 
-  const result = bayesianAgent.decide(_bayesianCommittedVotes, remainingIds);
+  const result = bayesianAgent.decide(_stripPid(_bayesianCommittedVotes), remainingIds);
   console.log('[bayesian] finalize', { newlyObserved, remainingIds, ...result });
   _logBayesianDecision(force ? 'safetyNet' : 'voteObserved', result, {
     newlyObserved,
     remainingIds,
-    committedVotes: [..._bayesianCommittedVotes],
+    committedVotes: [..._bayesianCommittedVotes], // pid-tagged, for debug readability
   });
   if (result.shouldVoteNow) castBayesianVote(result.vote);
 }
@@ -1646,7 +1724,7 @@ function castBayesianVote(vote) {
   clearTimeout(bayesianLateTimeoutId);
   // Push the AI's own vote into the chronological record so any human who
   // votes AFTER this point still gets it as prior context when observed.
-  _bayesianCommittedVotes.push(vote);
+  _bayesianCommittedVotes.push({ pid: AI_PLAYER_ID, blockId: vote.blockId, dir: vote.dir });
   const eventNum = currentLevelSnap?.eventNumber || 0;
   updateStateDirect(`votes/${eventNum}/${AI_PLAYER_ID}`,
     { blockId: vote.blockId, dir: vote.dir, timestamp: Date.now(), level: currentLevel, isAI: true },

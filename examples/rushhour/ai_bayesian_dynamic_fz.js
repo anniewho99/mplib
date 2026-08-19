@@ -77,6 +77,18 @@ const DYN_LAMBDA_GRID = [0.0, 0.3, 1.0, 3.0];   // N_DYN_LAM = 4
 /** α grid shared across all modes. */
 const ALPHA_GRID = [0.0, 1.0, 2.0, 3.0];          // N_ALP = 4
 
+/** Tolerance below which two EVs (or v_now vs v_wait) are treated as tied,
+ * rather than letting cross-platform floating-point noise arbitrarily
+ * decide which side wins a comparison that should be a genuine tie. */
+const EV_TIE_EPSILON = 1e-9;
+
+/** Deterministic tie-break ordering for votes with equal EV — lexicographic
+ * by blockId, then direction. */
+function _voteLess(a, b) {
+  if (a.blockId !== b.blockId) return a.blockId < b.blockId;
+  return a.dir < b.dir;
+}
+
 /** Utility penalty assigned to the no-vote option. */
 const NO_VOTE_PENALTY = 0.5;
 
@@ -85,8 +97,6 @@ const BOARD_SIZE = 6;
 
 /** Target block (red car) exits when its left edge reaches this column. */
 const TARGET_EXIT_COL = 5;
-
-const EV_TIE_EPSILON = 1e-9;
 
 /**
  * Fixed-zone BFS distance boundaries (ascending).
@@ -350,16 +360,6 @@ function _softmax(arr) {
 }
 
 /**
- * Deterministic ordering for breaking genuine EV ties in _selectVote:
- * lexicographic by blockId then direction. Matches ai_bayesian_static.js's
- * _voteLess and the Python reference model's tuple-comparison tie-break.
- */
-function _voteLess(a, b) {
-  if (a.blockId !== b.blockId) return a.blockId < b.blockId;
-  return a.dir < b.dir;
-}
-
-/**
  * Compute vote utilities for given λ and α.
  * u(vote) = -λ·τ + α·σ;  u(no-vote) = -NO_VOTE_PENALTY
  */
@@ -532,6 +532,67 @@ class DynamicFZPlayerBelief {
     this._normalizeAlpha();
   }
 
+// #######################################################################################################################################
+// #                                                                                                                                     #
+// #  These are added to handle vote corrections in the belief update mechanism                                                          #
+// #                                                                                                                                     #
+// #######################################################################################################################################
+
+  /**
+   * Correct belief when a player changes their vote from oldVote to newVote.
+   * Divides out the old likelihood and multiplies in the new one:
+   *   belief ∝ belief · L(newVote) / L(oldVote)
+   * This is exact — equivalent to replaying from the prior but much cheaper.
+   *
+   * @param {Array}  features    Same features used in the original observeVote call
+   * @param {number} oldVoteIdx  Index of the vote being retracted
+   * @param {number} newVoteIdx  Index of the replacement vote
+   */
+  correctVote(featuresOld, oldVoteIdx, featuresNew, newVoteIdx) {
+    const oldIdx = oldVoteIdx >= 0 ? oldVoteIdx : featuresOld.findIndex(f => f.isNoVote);
+    const newIdx = newVoteIdx >= 0 ? newVoteIdx : featuresNew.findIndex(f => f.isNoVote);
+    if (oldIdx < 0 || newIdx < 0) return;
+
+    const N_LAM = DYN_LAMBDA_GRID.length;
+    const N_ALP = ALPHA_GRID.length;
+
+    // Build ratio matrix: L(newVote | newPrior) / L(oldVote | oldPrior)
+    // Old likelihood uses the prior context at the time of the original vote.
+    // New likelihood uses the current prior context (which may include the AI's
+    // vote or other players' votes cast between the original vote and the change),
+    // since the human's revision is socially informed by what they saw in between.
+    const ratio = [];
+    for (let i = 0; i < N_LAM; i++) {
+      const row = [];
+      for (let j = 0; j < N_ALP; j++) {
+        const utilsOld = _utilities(featuresOld, DYN_LAMBDA_GRID[i], ALPHA_GRID[j]);
+        const utilsNew = _utilities(featuresNew, DYN_LAMBDA_GRID[i], ALPHA_GRID[j]);
+        const probsOld = _softmax(utilsOld);
+        const probsNew = _softmax(utilsNew);
+        row.push((probsNew[newIdx] || 1e-10) / (probsOld[oldIdx] || 1e-10));
+      }
+      ratio.push(row);
+    }
+
+    // Update λ (marginalise ratio over current α belief)
+    for (let i = 0; i < N_LAM; i++) {
+      let r = 0;
+      for (let j = 0; j < N_ALP; j++) r += this._alphaBelief[j] * ratio[i][j];
+      this._lambdaBelief[i] *= r;
+    }
+    this._normalizeLambda();
+
+    // Update α (marginalise ratio over updated λ belief)
+    for (let j = 0; j < N_ALP; j++) {
+      let r = 0;
+      for (let i = 0; i < N_LAM; i++) r += this._lambdaBelief[i] * ratio[i][j];
+      this._alphaBelief[j] *= r;
+    }
+    this._normalizeAlpha();
+  }
+// ###############################################################################################
+
+
   /**
    * Maximum-a-posteriori (λ, α) estimate (from marginals).
    * @returns {{lambda: number, alpha: number}}
@@ -668,6 +729,42 @@ class DynamicFZBayesianAgent {
     this._ebfsCache.clear();
   }
 
+// #######################################################################################################################################
+// #                                                                                                                                     #
+// #  These are added to handle vote corrections in the belief update mechanism                                                          #
+// #                                                                                                                                     #
+// #######################################################################################################################################  
+
+  /**
+   * Correct a player's belief when they change their vote.
+   * Must be called with the same priorVotes context used in the original
+   * observeVote() call (prior context doesn't change when a player revises).
+   *
+   * @param {string}      playerId
+   * @param {Object|null} oldVote        The vote being retracted
+   * @param {Object|null} newVote        The replacement vote
+   * @param {Array}       oldPriorVotes  Prior context used in the original observeVote call
+   * @param {Array}       newPriorVotes  Current committed votes context (may include AI vote
+   *                                     or other players' votes cast since the original vote)
+   */
+  correctVote(playerId, oldVote, newVote, oldPriorVotes, newPriorVotes) {
+    const belief = this._beliefs.get(playerId);
+    if (!belief) return;
+
+    const featuresOld = _computeFeatures(
+      this._choiceSet, oldPriorVotes, this._boardState, this._level, this._meta, this._bfsTable
+    );
+    const featuresNew = _computeFeatures(
+      this._choiceSet, newPriorVotes, this._boardState, this._level, this._meta, this._bfsTable
+    );
+    const toIdx = (vote, features) => vote === null
+      ? this._choiceSet.findIndex(v => v === null)
+      : this._choiceSet.findIndex(v => v && v.blockId === vote.blockId && v.dir === vote.dir);
+
+    belief.correctVote(featuresOld, toIdx(oldVote), featuresNew, toIdx(newVote));
+    this._ebfsCache.clear();
+  }
+// ##############################################################################################
   /**
    * Main decision function.
    * Call at round start and after each human vote.
@@ -678,18 +775,22 @@ class DynamicFZBayesianAgent {
    */
   decide(committedVotes, remainingPlayerIds) {
     const candidates = this._choiceSet.filter(v => v !== null);
-    if (candidates.length === 0) return { shouldVoteNow: false, vote: null };
-
-    if (remainingPlayerIds.length === 0) {
-      const [best] = this._selectVote(candidates, [], committedVotes);
-      return { shouldVoteNow: true, vote: best };
+    if (candidates.length === 0) {
+      return { shouldVoteNow: false, vote: null, vNow: null, vWait: null, choiceSetSize: 0, candidateEVs: [] };
     }
 
-    const shouldVote = this._shouldVoteNow(candidates, remainingPlayerIds, committedVotes);
-    if (!shouldVote) return { shouldVoteNow: false, vote: null };
+    if (remainingPlayerIds.length === 0) {
+      const [best, bestEV, evs] = this._selectVote(candidates, [], committedVotes);
+      return { shouldVoteNow: true, vote: best, vNow: bestEV, vWait: null, choiceSetSize: candidates.length, candidateEVs: evs };
+    }
 
-    const [best] = this._selectVote(candidates, remainingPlayerIds, committedVotes);
-    return { shouldVoteNow: true, vote: best };
+    const { shouldVote, vNow, vWait } = this._shouldVoteNowDetailed(candidates, remainingPlayerIds, committedVotes);
+    if (!shouldVote) {
+      return { shouldVoteNow: false, vote: null, vNow, vWait, choiceSetSize: candidates.length, candidateEVs: [] };
+    }
+
+    const [best, bestEV, evs] = this._selectVote(candidates, remainingPlayerIds, committedVotes);
+    return { shouldVoteNow: true, vote: best, vNow: bestEV, vWait, choiceSetSize: candidates.length, candidateEVs: evs };
   }
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -801,7 +902,7 @@ class DynamicFZBayesianAgent {
     return val;
   }
 
-  _shouldVoteNow(candidates, remainingIds, committed) {
+  _shouldVoteNowDetailed(candidates, remainingIds, committed) {
     let vNow = Infinity;
     for (const vote of candidates) {
       const ev = this._expectedBfsDelta(vote, remainingIds, committed);
@@ -830,13 +931,15 @@ class DynamicFZBayesianAgent {
     }
     vWait /= remainingIds.length;
 
-    return vNow <= vWait + EV_TIE_EPSILON;
+    return { shouldVote: vNow <= vWait + EV_TIE_EPSILON, vNow, vWait };
   }
 
   _selectVote(candidates, remainingIds, committed) {
     let bestVote = null, bestEV = Infinity;
+    const evs = [];
     for (const vote of candidates) {
       const ev = this._expectedBfsDelta(vote, remainingIds, committed);
+      evs.push({ blockId: vote.blockId, dir: vote.dir, ev });
       if (ev < bestEV - EV_TIE_EPSILON) {
         bestEV = ev;
         bestVote = vote;
@@ -844,7 +947,7 @@ class DynamicFZBayesianAgent {
         bestVote = vote;
       }
     }
-    return [bestVote, bestEV];
+    return [bestVote, bestEV, evs];
   }
 }
 
@@ -885,5 +988,3 @@ function createDynamicFZBayesianAgent(config) {
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = { createDynamicFZBayesianAgent, DynamicFZBayesianAgent };
 }
-
-export { createDynamicFZBayesianAgent, DynamicFZBayesianAgent };
