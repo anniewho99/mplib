@@ -193,29 +193,6 @@ let _pendingMoves = {};      // bid → { dc, dr }
 let _pendingMovesEvent = -1; // which event these moves belong to
 let _movesApplied = false;   // guard: apply only once per event
 
-// const instructionSteps = [
-//   {
-//     text: `Welcome to multi-player Rush Hour!\n\nWork together to solve each level. The game is played on a 6×6 grid, just like the classic Rush Hour puzzle.\n\nThe goal is to move the red TARGET block to the EXIT on the right side of the board.\n\nBlocks can slide only in the direction they face: horizontally or vertically.\n\nTry to work together to solve the puzzle in as few moves as possible!`,
-//     demo: 'board',
-//   },
-//   {
-//     text: `You are the yellow player 🟡\n\nEach round you have 5 seconds to vote on which block to move and in which direction. There is a timer at the bottom now. Click any arrow on any block to cast your vote. You can change it anytime before the timer runs out. Your choice will be represented by a yellow dot on the block. \n\nTry it now — click any arrow!`,
-//     demo: 'board-interactive',
-//   },
-//   {
-//     text: `You'll be playing with one other real person and one robot player.\n\nThe human player will appear as green 🟢, the robot player as purple 🟣. You will see their choices the second they click on any of the buttons — coordination is key!`,
-//     demo: 'teammates',
-//   },
-//   {
-//     text: `Key mechanic: if multiple players vote for the same block in the same direction, it moves that many cells in one round.\n\nThe green player has already voted to move the red block right ➡. Click the same arrow to move it 2 cells at once!`,
-//     demo: 'multivote',
-//   },
-//   {
-//     text: `That's it! You'll play 4 levels together. Your team need to finish a level within 100 rounds. \n\nYour player name is: ${playerName}\n\nPress Join Game when you're ready! Please do not refresh the page after joining the game.`,
-//     showNameEntry: true,
-//   },
-// ];
-
 const instructionSteps = [
   {
     text: `Welcome to multi-player Rush Hour!\n\nWork together to solve each level. The game is played on a 6×6 grid, just like the classic Rush Hour puzzle.\n\nThe goal is to move the red TARGET block to the EXIT on the right side of the board.\n\nBlocks can slide only in the direction they face: horizontally or vertically.\n\nTry to work together to solve the puzzle in as few moves as possible!`,
@@ -226,7 +203,7 @@ const instructionSteps = [
     demo: 'board-interactive',
   },
   {
-    text: `You'll be playing with one robot player.\n\nThe robot player as purple 🟣. You will see their choices the second they click on any of the buttons — coordination is key!`,
+    text: `You'll be playing with one other real person and one robot player.\n\nThe human player will appear as green 🟢, the robot player as purple 🟣. You will see their choices the second they click on any of the buttons — coordination is key!`,
     demo: 'teammates',
   },
   {
@@ -238,6 +215,29 @@ const instructionSteps = [
     showNameEntry: true,
   },
 ];
+
+// const instructionSteps = [
+//   {
+//     text: `Welcome to multi-player Rush Hour!\n\nWork together to solve each level. The game is played on a 6×6 grid, just like the classic Rush Hour puzzle.\n\nThe goal is to move the red TARGET block to the EXIT on the right side of the board.\n\nBlocks can slide only in the direction they face: horizontally or vertically.\n\nTry to work together to solve the puzzle in as few moves as possible!`,
+//     demo: 'board',
+//   },
+//   {
+//     text: `You are the yellow player 🟡\n\nEach round you have 5 seconds to vote on which block to move and in which direction. There is a timer at the bottom now. Click any arrow on any block to cast your vote. You can change it anytime before the timer runs out. Your choice will be represented by a yellow dot on the block. \n\nTry it now — click any arrow!`,
+//     demo: 'board-interactive',
+//   },
+//   {
+//     text: `You'll be playing with one robot player.\n\nThe robot player as purple 🟣. You will see their choices the second they click on any of the buttons — coordination is key!`,
+//     demo: 'teammates',
+//   },
+//   {
+//     text: `Key mechanic: if multiple players vote for the same block in the same direction, it moves that many cells in one round.\n\nThe green player has already voted to move the red block right ➡. Click the same arrow to move it 2 cells at once!`,
+//     demo: 'multivote',
+//   },
+//   {
+//     text: `That's it! You'll play 4 levels together. Your team need to finish a level within 100 rounds. \n\nYour player name is: ${playerName}\n\nPress Join Game when you're ready! Please do not refresh the page after joining the game.`,
+//     showNameEntry: true,
+//   },
+// ];
 
 // ── Mini practice board ──
 const DEMO_CELL = 68, DEMO_GAP = 4, DEMO_COLS = 6, DEMO_ROWS = 6;
