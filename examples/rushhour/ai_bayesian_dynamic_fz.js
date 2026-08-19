@@ -985,6 +985,14 @@ function createDynamicFZBayesianAgent(config) {
 }
 
 // ─── Module export ──────────────────────────────────────────────────────────
+// ES export: required for rushhour.js's `import { createDynamicFZBayesianAgent }
+// from "./ai_bayesian_dynamic_fz.js"` to resolve at all in the browser --
+// browsers running this as a <script type="module"> have no CommonJS support,
+// so `module` is simply undefined there and the block below is silently inert.
+export { createDynamicFZBayesianAgent, DynamicFZBayesianAgent };
+
+// CommonJS export: kept for Node-based tooling (verification harnesses run
+// via `require()`), not used by the browser at all.
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = { createDynamicFZBayesianAgent, DynamicFZBayesianAgent };
 }
