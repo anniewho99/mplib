@@ -60,6 +60,8 @@ let _bayesianLastObservedPrior = new Map();   // pid -> _bayesianCommittedVotes 
 let bayesianEarlyTimeoutId = null; // ~500ms checkpoint: decide with zero human info
 let bayesianLateTimeoutId  = null; // ~4100ms safety-net checkpoint
 
+let _levelRenderDebounceId = null;
+
 function loadBayesianAssets() {
   if (bayesianAssetsReady) return bayesianAssetsReady;
   const wantDynamic = (AI_MODE === 'bayesian_dynamic_fz');
@@ -1905,13 +1907,16 @@ function receiveStateChange(pathNow, nodeName, newState, typeChange) {
       updateRoundCounter(newState);
     }
 
-    const stateChanged = currentLevelSnap.state !== _lastLevelState;
-    const endAtChanged = currentLevelSnap.endAt !== _lastLevelEndAt;
-    if (stateChanged || (currentLevelSnap.state === 'play' && endAtChanged)) {
-      _lastLevelState = currentLevelSnap.state;
-      _lastLevelEndAt = currentLevelSnap.endAt;
-      renderLevelFromAuthority(currentLevelSnap);
-    }
+    clearTimeout(_levelRenderDebounceId);
+    _levelRenderDebounceId = setTimeout(() => {
+      const stateChanged = currentLevelSnap.state !== _lastLevelState;
+      const endAtChanged = currentLevelSnap.endAt !== _lastLevelEndAt;
+      if (stateChanged || (currentLevelSnap.state === 'play' && endAtChanged)) {
+        _lastLevelState = currentLevelSnap.state;
+        _lastLevelEndAt = currentLevelSnap.endAt;
+        renderLevelFromAuthority(currentLevelSnap);
+      }
+    }, 50);
     return;
   }
 }
