@@ -715,8 +715,19 @@ class DynamicFZBayesianAgent {
    * @param {Array}       priorVotes  Votes committed before this player
    */
   observeVote(playerId, vote, priorVotes) {
-    const belief = this._beliefs.get(playerId);
-    if (!belief) return;
+    let belief = this._beliefs.get(playerId);
+    if (!belief) {
+      // Defensive fallback: this player cast a real vote but this agent
+      // never tracked them (e.g. their registration hadn't propagated to
+      // this client when startRound() last ran). Silently dropping their
+      // vote, as this used to do, is worse than creating a belief for them
+      // now, on the fly, seeded from the fresh prior -- late, but not lost.
+      belief = DynamicFZPlayerBelief.fromData(this._dynamicPrior);
+      const d = _bfsLookup(this._boardState, this._level, this._bfsTable);
+      belief.setZoneFromDistance(d);
+      this._beliefs.set(playerId, belief);
+      console.warn(`[bayesian] observeVote: no belief existed yet for ${playerId} -- created one from the fresh prior instead of dropping their vote`);
+    }
 
     const features = _computeFeatures(
       this._choiceSet, priorVotes, this._boardState, this._level, this._meta, this._bfsTable
@@ -749,7 +760,15 @@ class DynamicFZBayesianAgent {
    */
   correctVote(playerId, oldVote, newVote, oldPriorVotes, newPriorVotes) {
     const belief = this._beliefs.get(playerId);
-    if (!belief) return;
+    if (!belief) {
+      // Defensive fallback, same rationale as observeVote() above: there's
+      // no valid "old" observation to divide out here (we never tracked
+      // one), so treat the new vote as this player's first observation
+      // instead of silently dropping it.
+      console.warn(`[bayesian] correctVote: no belief existed yet for ${playerId} -- treating the new vote as a first observation instead of dropping it`);
+      this.observeVote(playerId, newVote, newPriorVotes);
+      return;
+    }
 
     const featuresOld = _computeFeatures(
       this._choiceSet, oldPriorVotes, this._boardState, this._level, this._meta, this._bfsTable
@@ -765,6 +784,57 @@ class DynamicFZBayesianAgent {
     this._ebfsCache.clear();
   }
 // ##############################################################################################
+
+// #######################################################################################################################################
+// #                                                                                                                                     #
+// #  Added for controller-handoff belief persistence: a new controlling client's agent starts   #
+// #  with NO memory of what a previous controller had already learned. snapshotBeliefs() /       #
+// #  restoreBeliefs() let rushhour.js persist belief to Firebase after every update and restore   #
+// #  it when a fresh agent is created, so a handoff doesn't silently reset every player's belief. #
+// #                                                                                                                                     #
+// #######################################################################################################################################
+
+  /**
+   * Snapshot every tracked player's belief state, in a plain-object form
+   * safe to write directly to Firebase.
+   * @returns {Object}  { [playerId]: { lambdaBelief: number[], alphaBelief: number[], zone: number|null } }
+   */
+  snapshotBeliefs() {
+    const snap = {};
+    for (const [pid, belief] of this._beliefs.entries()) {
+      snap[pid] = {
+        lambdaBelief: Array.from(belief._lambdaBelief),
+        alphaBelief:  Array.from(belief._alphaBelief),
+        zone:         belief._currentZone,
+      };
+    }
+    return snap;
+  }
+
+  /**
+   * Restore belief state for one or more players from a snapshot (as
+   * produced by snapshotBeliefs() and persisted by rushhour.js). Used when
+   * this agent was just created because THIS client took over as
+   * controller mid-level -- without this, every player would start over
+   * from the fresh prior, discarding everything the previous controller
+   * had already learned about them.
+   *
+   * @param {Object} snapshot  { [playerId]: { lambdaBelief, alphaBelief, zone } }
+   */
+  restoreBeliefs(snapshot) {
+    if (!snapshot) return;
+    const zonePriors     = this._dynamicPrior.fixed_zones.zone_lambda_priors;
+    const transitionMats = this._dynamicPrior.fixed_zones.transition_matrices;
+    for (const [pid, s] of Object.entries(snapshot)) {
+      if (!s || !Array.isArray(s.lambdaBelief) || !Array.isArray(s.alphaBelief)) continue;
+      this._beliefs.set(pid, new DynamicFZPlayerBelief(
+        s.alphaBelief, s.lambdaBelief, zonePriors, transitionMats,
+        (s.zone === undefined ? null : s.zone)
+      ));
+    }
+  }
+// ##############################################################################################
+
   /**
    * Main decision function.
    * Call at round start and after each human vote.

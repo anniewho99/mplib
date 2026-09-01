@@ -17,7 +17,8 @@ import {
   getNumberCurrentPlayers,
   getSessionId,
   getSessionError,
-  getWaitRoomInfo
+  getWaitRoomInfo,
+  readState
 } from "/mplib/src/mplib.js";
 
 import { createStaticBayesianAgent } from "./ai_bayesian_static.js";
@@ -61,6 +62,11 @@ let bayesianEarlyTimeoutId = null; // ~500ms checkpoint: decide with zero human 
 let bayesianLateTimeoutId  = null; // ~4100ms safety-net checkpoint
 
 let _levelRenderDebounceId = null;
+
+// ── Belief persistence / controller-handoff continuity ─────────────────────
+let _wasController         = false; // this client's controller status as of the last heartbeat tick
+let _localBeliefUpdatedAt  = 0;     // Date.now() of the freshest belief update THIS client's agent has (local update or restore)
+let _beliefRestorePromise  = null;  // in-flight restore attempt, if any -- callers that touch belief await this first
 
 function loadBayesianAssets() {
   if (bayesianAssetsReady) return bayesianAssetsReady;
@@ -151,7 +157,7 @@ const LEVELS = [
   },
 ];
 
-const studyId = typeof GameName !== 'undefined' ? GameName : 'rushhour_dyanmic_3_0830';
+const studyId = typeof GameName !== 'undefined' ? GameName : 'rushhour_dyanmic_3_0831';
 const sessionConfig = {
   minPlayersNeeded:              typeof MinPlayers !== 'undefined' ? MinPlayers : NUM_PLAYERS,
   maxPlayersNeeded:              typeof MaxPlayers !== 'undefined' ? MaxPlayers : NUM_PLAYERS,
@@ -217,29 +223,6 @@ const instructionSteps = [
     showNameEntry: true,
   },
 ];
-
-// const instructionSteps = [
-//   {
-//     text: `Welcome to multi-player Rush Hour!\n\nWork together to solve each level. The game is played on a 6×6 grid, just like the classic Rush Hour puzzle.\n\nThe goal is to move the red TARGET block to the EXIT on the right side of the board.\n\nBlocks can slide only in the direction they face: horizontally or vertically.\n\nTry to work together to solve the puzzle in as few moves as possible!`,
-//     demo: 'board',
-//   },
-//   {
-//     text: `You are the yellow player 🟡\n\nEach round you have 5 seconds to vote on which block to move and in which direction. There is a timer at the bottom now. Click any arrow on any block to cast your vote. You can change it anytime before the timer runs out. Your choice will be represented by a yellow dot on the block. \n\nTry it now — click any arrow!`,
-//     demo: 'board-interactive',
-//   },
-//   {
-//     text: `You'll be playing with one robot player.\n\nThe robot player as purple 🟣. You will see their choices the second they click on any of the buttons — coordination is key!`,
-//     demo: 'teammates',
-//   },
-//   {
-//     text: `Key mechanic: if multiple players vote for the same block in the same direction, it moves that many cells in one round.\n\nThe green player has already voted to move the red block right ➡. Click the same arrow to move it 2 cells at once!`,
-//     demo: 'multivote',
-//   },
-//   {
-//     text: `That's it! You'll play 4 levels together. Your team need to finish a level within 100 rounds. \n\nYour player name is: ${playerName}\n\nPress Join Game when you're ready! Please do not refresh the page after joining the game.`,
-//     showNameEntry: true,
-//   },
-// ];
 
 // ── Mini practice board ──
 const DEMO_CELL = 68, DEMO_GAP = 4, DEMO_COLS = 6, DEMO_ROWS = 6;
@@ -447,19 +430,6 @@ function renderDemoInstructions(stepIdx) {
     });
     demo.appendChild(wrap);
   }
-
-  // else if (stepIdx === 2) {
-  //   // Two player colors
-  //   const wrap = document.createElement('div');
-  //   wrap.style.cssText = 'display:flex;gap:12px;flex-wrap:wrap;';
-  //   [['#f4c400','You (yellow)'], ['#9b59ff','Robot player']].forEach(function(pair) {
-  //     const item = document.createElement('div');
-  //     item.style.cssText = 'display:flex;align-items:center;gap:10px;padding:12px 16px;background:#1a1a1a;border-radius:8px;border:1px solid #2a2a2a;';
-  //     item.innerHTML = '<div style="width:22px;height:22px;border-radius:50%;background:' + pair[0] + ';box-shadow:0 0 8px ' + pair[0] + ';flex-shrink:0;"></div><div style="font-family:\'Space Mono\',monospace;font-size:12px;color:' + pair[0] + ';">' + pair[1] + '</div>';
-  //     wrap.appendChild(item);
-  //   });
-  //   demo.appendChild(wrap);
-  // }
 
   else if (stepIdx === 3) {
     // Multi-vote demo
@@ -1492,7 +1462,12 @@ function castAIVote() {
 // newly-observed or revised human, or the safety net) gets logged to
 // aiDebug/{eventNum}/{seq} — belief state per human, per-candidate EVs, the
 // chosen vote's τ/σ, and the board state — for offline analysis without
-// needing to recompute any of it from raw vote/phase timestamps.
+// needing to recompute any of it from raw vote/phase timestamps. The SAME
+// belief snapshot is also written to aiBeliefState/{level} (see
+// _persistBeliefState) — a separate, READ-scoped path, not the write-only
+// debug log — so that if controller ever hands off to a different client
+// mid-level, the new controller can restore where the previous one left
+// off instead of starting every player's belief over from the fresh prior.
 
 async function scheduleBayesianVote() {
   if (!AI_MODE || !canIBeController(currentPhaseSnap)) return;
@@ -1521,6 +1496,17 @@ async function scheduleBayesianVote() {
     console.log(`[bayesian] created new agent for level ${currentLevel}`, { mode: AI_MODE });
   }
 
+  // Always check for a newer persisted snapshot before this agent does
+  // anything, not just right after creating a fresh one -- a client can
+  // also REGAIN controller status with an existing-but-stale agent (e.g.
+  // controller went A -> B -> A: A's own agent object never went away
+  // while B was in charge, so it would never hit the "just created"
+  // branch above, but B may have learned real things A doesn't know
+  // about). _scheduleRestoreCheck is a no-op if the persisted state isn't
+  // actually newer than what's already in memory (see its timestamp
+  // gate), so this is safe to call unconditionally here.
+  await _scheduleRestoreCheck(bayesianAgentLevel);
+
   const humanIds = getHumanPlayerIds();
   const round = currentLevelSnap?.eventNumber || 0;
   // Best-effort immediate startRound() so the agent (_choiceSet, board state,
@@ -1531,17 +1517,36 @@ async function scheduleBayesianVote() {
   // not a problem to do twice.
   bayesianAgent.startRound({ ...blockPositions }, humanIds, round);
 
-  bayesianEarlyTimeoutId = setTimeout(() => {
+  bayesianEarlyTimeoutId = setTimeout(async () => {
     if (_bayesianCastThisRound) return;
+    // A heartbeat-triggered restore (controller regained mid-round) can
+    // start independently of the await above -- wait for it before this
+    // checkpoint touches belief.
+    if (_beliefRestorePromise) await _beliefRestorePromise;
     // Re-read player list live — Firebase onChildAdded may not have fired
     // for all humans yet when scheduleBayesianVote ran, so the humanIds
     // captured at that point could be missing someone who's actually
     // already in the session by the time this checkpoint fires.
     const liveHumanIds = getHumanPlayerIds();
-    if (liveHumanIds.length < NUM_PLAYERS - 1) {
+    // getHumanPlayerIds() already includes THIS client's own pid (set
+    // locally/instantly by assignColors(), no network round-trip needed),
+    // so the correct completeness check is against the FULL expected
+    // count (NUM_PLAYERS), not NUM_PLAYERS - 1. The old "- 1" threshold
+    // meant a controller could already satisfy the check by seeing only
+    // itself, before any other human's registration had even arrived --
+    // proceeding with an incomplete roster and never re-checking again
+    // this round, silently missing that player's belief tracking entirely
+    // (confirmed live: a human who registered a beat late still cast a
+    // real vote that round, and it was never observed at all).
+    if (liveHumanIds.length < NUM_PLAYERS) {
       // Not all players registered yet; retry in 100ms.
-      bayesianEarlyTimeoutId = setTimeout(() => {
+      bayesianEarlyTimeoutId = setTimeout(async () => {
         if (_bayesianCastThisRound) return;
+        // A heartbeat-triggered restore (controller regained mid-round) can
+        // start independently of scheduleBayesianVote's own await above --
+        // wait for it before touching belief, same reasoning as
+        // finalizeBayesianRound.
+        if (_beliefRestorePromise) await _beliefRestorePromise;
         const freshIds = getHumanPlayerIds();
         bayesianAgent.startRound({ ...blockPositions }, freshIds, round);
         const result = bayesianAgent.decide([], freshIds);
@@ -1580,10 +1585,71 @@ function _bayesianBeliefSnapshot() {
   return snap;
 }
 
+/**
+ * Persist the current belief snapshot to a path a NEW (or returning)
+ * controller can read back (aiDebug is write-only/append-style and not
+ * meant to be read by the live client itself). Called every time belief
+ * changes, alongside the debug log, so a mid-level controller handoff has
+ * the freshest possible state to restore from.
+ *
+ * Tagged with the same timestamp used locally in _localBeliefUpdatedAt, so
+ * a restorer (this client later, or a different one) can tell whether this
+ * snapshot is actually newer than whatever it already has in memory,
+ * rather than blindly overwriting possibly-fresher local state.
+ */
+function _persistBeliefState(snap) {
+  const updatedAt = Date.now();
+  _localBeliefUpdatedAt = updatedAt;
+  updateStateDirect(`aiBeliefState/${currentLevel}`, { beliefs: snap, updatedAt }, 'persist AI belief state');
+}
+
+/**
+ * Check Firebase for a persisted belief snapshot for `level` and restore it
+ * into the current agent ONLY if it's actually newer than what this
+ * client's agent already has (_localBeliefUpdatedAt) -- otherwise this
+ * would risk overwriting fresher local state with stale data, e.g. if this
+ * client itself wrote the most recent snapshot.
+ *
+ * Safe to call unconditionally and often: on a genuinely fresh level (or
+ * once already up to date) this simply finds nothing newer and no-ops.
+ */
+async function _maybeRestoreBelief(level) {
+  if (!bayesianAgent || typeof bayesianAgent.restoreBeliefs !== 'function') return;
+  try {
+    const persisted = await readState(`aiBeliefState/${level}`);
+    if (persisted && typeof persisted.updatedAt === 'number' && persisted.updatedAt > _localBeliefUpdatedAt) {
+      bayesianAgent.restoreBeliefs(persisted.beliefs);
+      _localBeliefUpdatedAt = persisted.updatedAt;
+      console.log(`[bayesian] restored belief state for level ${level} (persisted was newer than local)`, persisted);
+    }
+  } catch (e) {
+    // No persisted state yet, or a transient read error -- normal on a
+    // genuinely fresh level; proceed with whatever's already in memory.
+  }
+}
+
+/**
+ * Wraps _maybeRestoreBelief in a tracked promise so any caller about to
+ * touch belief (observeVote/correctVote/decide, via finalizeBayesianRound
+ * or the early-checkpoint timeouts) can await _beliefRestorePromise first.
+ * This closes the race where a vote could otherwise be processed against
+ * fresh-prior belief WHILE a restore is in flight, only to have that
+ * restore silently overwrite the belief moments later and discard the
+ * vote's effect. With this, restoration always completes before any vote
+ * gets processed against the agent it targets.
+ */
+function _scheduleRestoreCheck(level) {
+  _beliefRestorePromise = _maybeRestoreBelief(level).finally(() => {
+    _beliefRestorePromise = null;
+  });
+  return _beliefRestorePromise;
+}
+
 /** Write one decide()-call's full context to Firebase for offline analysis. */
 function _logBayesianDecision(trigger, result, extra) {
   const eventNum = currentLevelSnap?.eventNumber || 0;
   const seq = _bayesianDecideSeq++;
+  const snap = _bayesianBeliefSnapshot();
   // Firebase throws on `undefined` values. ai_bayesian_static.js's decide()
   // doesn't (yet) return vNow/vWait/candidateEVs/chosenFeatures the way the
   // dynamic-fz agent's does, so default anything missing to null rather than
@@ -1600,10 +1666,11 @@ function _logBayesianDecision(trigger, result, extra) {
     candidateEVs: result.candidateEVs ?? null,
     chosenFeatures: result.chosenFeatures ?? null,
     boardState: { ...blockPositions },
-    beliefs: _bayesianBeliefSnapshot(),
+    beliefs: snap,
     ...extra,
   };
   updateStateDirect(`aiDebug/${eventNum}/${seq}`, payload, `AI debug (${trigger})`);
+  _persistBeliefState(snap);
 }
 
 /**
@@ -1636,8 +1703,16 @@ function _stripPid(entries) {
   return entries.map(({ blockId, dir }) => ({ blockId, dir }));
 }
 
-function finalizeBayesianRound({ force = false } = {}) {
+async function finalizeBayesianRound({ force = false } = {}) {
   if (!bayesianAgent) return;
+
+  // If a restore is in flight (this agent was just created, or this client
+  // just regained controller status), wait for it before touching belief.
+  // Without this, a vote arriving in that window would get processed
+  // against fresh-prior belief via observeVote()'s own defensive fallback,
+  // only for the restore to silently overwrite that belief moments later
+  // and discard the vote's effect entirely.
+  if (_beliefRestorePromise) await _beliefRestorePromise;
 
   const humanIds = getHumanPlayerIds();
 
@@ -1739,7 +1814,23 @@ function castBayesianVote(vote) {
 function startLeaseHeartbeat() {
   if (leaseHeartbeatId) return;
   leaseHeartbeatId = setInterval(() => {
-    if (canIBeController(currentPhaseSnap)) {
+    const amControllerNow = canIBeController(currentPhaseSnap);
+
+    // Detect (re)gaining controller status. scheduleBayesianVote()'s own
+    // restore check only runs when it happens to fire (a new voting round
+    // starting) and only really matters for a freshly-created agent -- it
+    // doesn't cover a client that already has an agent object (from
+    // earlier in this same level) regaining control after losing it to a
+    // different client for a while. That agent's in-memory belief would
+    // otherwise sit stale and never get rechecked. Catching the transition
+    // here, independent of whether a voting round happens to be starting,
+    // closes that gap.
+    if (amControllerNow && !_wasController && IS_BAYESIAN_MODE && bayesianAgent) {
+      _scheduleRestoreCheck(bayesianAgentLevel);
+    }
+    _wasController = amControllerNow;
+
+    if (amControllerNow) {
       renewLease();
       maybeAdvancePhase();
     } else {
