@@ -157,7 +157,7 @@ const LEVELS = [
   },
 ];
 
-const studyId = typeof GameName !== 'undefined' ? GameName : 'rushhour_dyanmic_3_0831';
+const studyId = typeof GameName !== 'undefined' ? GameName : 'rushhour_dyanmic_3_0901';
 const sessionConfig = {
   minPlayersNeeded:              typeof MinPlayers !== 'undefined' ? MinPlayers : NUM_PLAYERS,
   maxPlayersNeeded:              typeof MaxPlayers !== 'undefined' ? MaxPlayers : NUM_PLAYERS,
@@ -1366,8 +1366,11 @@ function registerAIPlayer() {
   updatePlayerNameDisplay(AI_PLAYER_ID);
 }
 
-function scheduleAIVote() {
-  if (!AI_MODE || !canIBeController(currentPhaseSnap)) return;
+async function scheduleAIVote() {
+  if (!AI_MODE) return;
+  // Fresh atomic confirmation, not a check against a possibly-stale local
+  // snapshot -- see the comment above attemptLeaseRenewal() for why.
+  if (!(await attemptLeaseRenewal())) return;
   clearTimeout(aiVoteTimeoutId);
   // Schedule from local arrival time — avoids server/client clock offset issues.
   // Initiator: 500ms into the window. Follower: 4500ms.
@@ -1376,8 +1379,11 @@ function scheduleAIVote() {
   aiVoteTimeoutId = setTimeout(castAIVote, delay);
 }
 
-function castAIVote() {
-  if (!AI_MODE || !canIBeController(currentPhaseSnap)) return;
+async function castAIVote() {
+  if (!AI_MODE) return;
+  // Re-confirm at cast time too -- scheduleAIVote's confirmation was up to
+  // 4100ms ago; control could have legitimately changed hands since then.
+  if (!(await attemptLeaseRenewal())) return;
   const eventNum = currentLevelSnap?.eventNumber || 0;
   const startAt  = currentLevelSnap?.startAt || 0;
 
@@ -1470,7 +1476,14 @@ function castAIVote() {
 // off instead of starting every player's belief over from the fresh prior.
 
 async function scheduleBayesianVote() {
-  if (!AI_MODE || !canIBeController(currentPhaseSnap)) return;
+  if (!AI_MODE) return;
+  // Fresh atomic confirmation, not a check against a possibly-stale local
+  // snapshot -- see the comment above attemptLeaseRenewal() for why. This
+  // is the fix for the confirmed dual-controller race: without it, two
+  // clients whose local currentPhaseSnap hadn't yet caught up with each
+  // other could both believe they were controller and both run everything
+  // below independently.
+  if (!(await attemptLeaseRenewal())) return;
   clearTimeout(bayesianEarlyTimeoutId);
   clearTimeout(bayesianLateTimeoutId);
   _bayesianCastThisRound     = false;
@@ -1486,9 +1499,11 @@ async function scheduleBayesianVote() {
     console.error('[bayesian] assets not available, skipping AI vote this round');
     return;
   }
-  // Re-check: the round may have already advanced while we were awaiting assets
-  // (only relevant on the very first round of a session).
-  if (!canIBeController(currentPhaseSnap)) return;
+  // Re-confirm, freshly, not from the earlier attempt's now-stale result --
+  // real time (an asset fetch) has passed since then, and control could
+  // genuinely have changed hands in the meantime (only relevant on the very
+  // first round of a session, when assets aren't preloaded yet).
+  if (!(await attemptLeaseRenewal())) return;
 
   if (!bayesianAgent || bayesianAgentLevel !== currentLevel) {
     bayesianAgent = createBayesianAgentForMode(currentLevel);
@@ -1811,49 +1826,73 @@ function castBayesianVote(vote) {
 // ─────────────────────────────────────────
 //  Controller loop
 // ─────────────────────────────────────────
+// canIBeController() (removed) used to gate scheduleAIVote/scheduleBayesianVote
+// on a check against currentPhaseSnap -- this client's own LOCAL, CACHED copy
+// of the phase state. That cache can be stale: right after a different client
+// wins controllerId, this client's own currentPhaseSnap may not have caught
+// up yet (Firebase propagation isn't instant), so BOTH clients' pre-checks
+// could return true at once, and BOTH would proceed to run scheduleBayesianVote
+// independently -- two live belief-tracking processes racing on the same
+// Firebase paths (confirmed directly in real session data: two full,
+// interleaved sequences of early/safetyNet/lateObserve aiDebug entries for
+// the same round, from two different clients).
+//
+// attemptLeaseRenewal() replaces that pattern: every caller always ATTEMPTS
+// the real atomic 'phase'/'lease' transaction, and only proceeds if THAT
+// SPECIFIC ATTEMPT actually won. Firebase transactions are atomic against
+// the same path, and evaluateUpdate's 'lease' rule already only allows the
+// current holder (controller === me) or a renewal after the lease has
+// expired to succeed -- so when two clients call this in the same narrow
+// window, only one can actually come back true. There's no more cached
+// snapshot to be stale about, because nothing is decided before asking
+// Firebase directly.
+//
+// This also fixes a second bug in what used to be renewLease(): a FAILED
+// transaction (someone else holds the lease) returns false from
+// updateStateTransaction, it does not throw -- so the old try/catch, which
+// only ever reset iAmController on a thrown error, was setting
+// iAmController = true unconditionally whenever the call didn't literally
+// error, regardless of whether this client's attempt actually won.
+async function attemptLeaseRenewal() {
+  try {
+    const currentEvent = currentLevelSnap?.eventNumber || 0;
+    const won = await updateStateTransaction('phase', 'lease', { currentEvent });
+    iAmController = !!won;
+    if (iAmController) txBackoffMs = 0;
+    return iAmController;
+  } catch (e) {
+    iAmController = false;
+    txBackoffMs = Math.min((txBackoffMs || 500) * 2, 8000);
+    return false;
+  }
+}
+
 function startLeaseHeartbeat() {
   if (leaseHeartbeatId) return;
-  leaseHeartbeatId = setInterval(() => {
-    const amControllerNow = canIBeController(currentPhaseSnap);
+  leaseHeartbeatId = setInterval(async () => {
+    const wasController = iAmController;
+    const nowController = await attemptLeaseRenewal();
 
-    // Detect (re)gaining controller status. scheduleBayesianVote()'s own
-    // restore check only runs when it happens to fire (a new voting round
-    // starting) and only really matters for a freshly-created agent -- it
-    // doesn't cover a client that already has an agent object (from
+    // Detect (re)gaining controller status -- iAmController's own
+    // before/after comparison here IS the authoritative signal now (it's
+    // only ever set from an actual transaction result), so a separate
+    // _wasController tracker is no longer needed. scheduleBayesianVote()'s
+    // own restore check only runs when it happens to fire (a new voting
+    // round starting) and only really matters for a freshly-created agent
+    // -- it doesn't cover a client that already has an agent object (from
     // earlier in this same level) regaining control after losing it to a
     // different client for a while. That agent's in-memory belief would
     // otherwise sit stale and never get rechecked. Catching the transition
     // here, independent of whether a voting round happens to be starting,
     // closes that gap.
-    if (amControllerNow && !_wasController && IS_BAYESIAN_MODE && bayesianAgent) {
+    if (nowController && !wasController && IS_BAYESIAN_MODE && bayesianAgent) {
       _scheduleRestoreCheck(bayesianAgentLevel);
     }
-    _wasController = amControllerNow;
 
-    if (amControllerNow) {
-      renewLease();
+    if (nowController) {
       maybeAdvancePhase();
-    } else {
-      iAmController = false;
     }
   }, PHASE_TICK_MS);
-}
-
-function canIBeController(p) {
-  const now = Date.now();
-  return !p || !p.leaseUntil || now > (p.leaseUntil - PHASE_DRIFT_MS) || p.controllerId === thisPlayerId;
-}
-
-async function renewLease() {
-  try {
-    const currentEvent = currentLevelSnap?.eventNumber || 0;
-    await updateStateTransaction('phase', 'lease', { currentEvent });
-    iAmController = true;
-    txBackoffMs = 0;
-  } catch (e) {
-    iAmController = false;
-    txBackoffMs = Math.min((txBackoffMs || 500) * 2, 8000);
-  }
 }
 
 async function maybeAdvancePhase() {
