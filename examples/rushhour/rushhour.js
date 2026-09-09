@@ -30,13 +30,13 @@ const MAX_ROUNDS_PER_LEVEL = 100;
 const NUM_LEVELS = 4;
 
 // ── AI configuration ──────────────────────────────────────────────────────────
-const AI_MODE        = 'bayesian_dynamic_fz'; // 'initiator' | 'follower' | 'bayesian_static' | 'bayesian_dynamic_fz' | null
+const AI_MODE        = 'initiator'; // 'initiator' | 'follower' | 'bayesian_static' | 'bayesian_dynamic_fz' | null
 const AI_PLAYER_ID   = '_ai_player';
 const AI_PLAYER_NAME = 'Robot Player';
 const AI_COLOR       = 2;           // purple (index 2)
 // ─────────────────────────────────────────────────────────────────────────────
 
-const NUM_PLAYERS = AI_MODE ? 2 : 3;
+const NUM_PLAYERS = AI_MODE ? 1 : 3;
 
 const IS_BAYESIAN_MODE = (AI_MODE === 'bayesian_static' || AI_MODE === 'bayesian_dynamic_fz');
 
@@ -157,7 +157,7 @@ const LEVELS = [
   },
 ];
 
-const studyId = typeof GameName !== 'undefined' ? GameName : 'rushhour_dyanmic_3_0901';
+const studyId = typeof GameName !== 'undefined' ? GameName : 'init0909';
 const sessionConfig = {
   minPlayersNeeded:              typeof MinPlayers !== 'undefined' ? MinPlayers : NUM_PLAYERS,
   maxPlayersNeeded:              typeof MaxPlayers !== 'undefined' ? MaxPlayers : NUM_PLAYERS,
