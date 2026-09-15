@@ -36,7 +36,7 @@ const AI_PLAYER_NAME = 'Robot Player';
 const AI_COLOR       = 2;           // purple (index 2)
 // ─────────────────────────────────────────────────────────────────────────────
 
-const NUM_PLAYERS = AI_MODE ? 1 : 3;
+const NUM_PLAYERS = AI_MODE ? 2 : 3;
 
 const IS_BAYESIAN_MODE = (AI_MODE === 'bayesian_static' || AI_MODE === 'bayesian_dynamic_fz');
 
@@ -157,7 +157,7 @@ const LEVELS = [
   },
 ];
 
-const studyId = typeof GameName !== 'undefined' ? GameName : 'follow0912';
+const studyId = typeof GameName !== 'undefined' ? GameName : 'init_30915';
 const sessionConfig = {
   minPlayersNeeded:              typeof MinPlayers !== 'undefined' ? MinPlayers : NUM_PLAYERS,
   maxPlayersNeeded:              typeof MaxPlayers !== 'undefined' ? MaxPlayers : NUM_PLAYERS,
